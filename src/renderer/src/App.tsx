@@ -11,6 +11,9 @@ import { AdminLoginOverlay } from './components/AdminLoginOverlay'
 import { CommandPalette } from './components/CommandPalette'
 import { LockOverlay } from './components/LockOverlay'
 import { ProfileSidebar } from './components/ProfileSidebar'
+import DashboardRail from './components/dashboard/DashboardRail'
+import DashboardView from './components/dashboard/DashboardView'
+import { useDashboardStore } from './hooks/useDashboard'
 import { SettingsPanel } from './components/SettingsPanel'
 import { SidebarPanelIcon } from './components/SidebarPanelIcon'
 import { SlackViewport } from './components/SlackViewport'
@@ -288,6 +291,7 @@ function App(): React.JSX.Element {
       : localAuthPhase
 
   const browserAuthBusy = authPhase === 'google' || authPhase === 'slack'
+  const dashboardOpen = useDashboardStore((s) => s.dashboardOpen)
   const splitOn =
     settings.splitViewEnabled && Boolean(splitSecondary) && !browserAuthBusy && !locked
   // Keep embed mounted for WhatsApp QR even while status is signing-in / not yet linked.
@@ -297,6 +301,7 @@ function App(): React.JSX.Element {
     adminAuthenticated &&
     activeProfile &&
     activeAppId &&
+    !dashboardOpen &&
     !browserAuthBusy &&
     !locked &&
     !settingsOpen &&
@@ -693,6 +698,7 @@ function App(): React.JSX.Element {
           }}
         >
           <div className="sidebar-rail-expanded" aria-hidden={settings.sidebarCollapsed}>
+            <DashboardRail />
             <ProfileSidebar
               profiles={profiles}
               activeProfileId={activeProfileId}
@@ -801,7 +807,9 @@ function App(): React.JSX.Element {
             </div>
           ) : null}
 
-          {showEmbed ? (
+          {dashboardOpen ? (
+            <DashboardView />
+          ) : showEmbed ? (
             <div className={`main-embed${splitOn ? ' is-split' : ''}`}>
               <SlackViewport hasActiveProfile={true} onBoundsChange={handleBoundsChange} />
               {splitOn ? (
@@ -812,7 +820,7 @@ function App(): React.JSX.Element {
             </div>
           ) : null}
 
-          {!browserAuthBusy && !showEmbed && !locked ? (
+          {!browserAuthBusy && !showEmbed && !dashboardOpen && !locked ? (
             <div className="empty-main">
               <img className="empty-main-icon" src={appIcon} alt="" aria-hidden />
               <h1>{emptyCopy.title}</h1>

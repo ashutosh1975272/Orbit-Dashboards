@@ -1,4 +1,15 @@
 import type {
+  DashboardManualToken,
+  DashboardSnapshot,
+  DashboardSyncProgressPayload,
+  DashboardViewSetPayload,
+  ManualTokenPayload,
+  ProjectDeletePayload,
+  ProjectUpsertPayload,
+  SyncNowPayload,
+  ValidateTokenResultPayload
+} from './dashboard-contract'
+import type {
   ActivateAppPayload,
   ActivateProfilePayload,
   AppId,
@@ -78,7 +89,17 @@ export const IpcChannels = {
 
   SlackWorkspacesForProfile: 'slack:workspaces-for-profile',
   SlackChannelsForWorkspace: 'slack:channels-for-workspace',
-  SlackHistoryForChannel: 'slack:history-for-channel'
+  SlackHistoryForChannel: 'slack:history-for-channel',
+
+  DashboardGetSnapshot: 'dashboard:get-snapshot',
+  DashboardViewSet: 'dashboard:view-set',
+  DashboardUpsertProject: 'dashboard:upsert-project',
+  DashboardDeleteProject: 'dashboard:delete-project',
+  DashboardSyncNow: 'dashboard:sync-now',
+  DashboardAddManualToken: 'dashboard:add-manual-token',
+  DashboardValidateManualToken: 'dashboard:validate-manual-token',
+  DashboardSnapshotChanged: 'dashboard:snapshot-changed',
+  DashboardSyncProgress: 'dashboard:sync-progress'
 } as const
 
 export type IpcChannel = (typeof IpcChannels)[keyof typeof IpcChannels]
@@ -212,6 +233,17 @@ export interface IpcApi {
       limit?: number
     ) => Promise<SlackMessageSummary[]>
   }
+  dashboard: {
+    getSnapshot: () => Promise<DashboardSnapshot>
+    upsertProject: (payload: ProjectUpsertPayload) => Promise<DashboardSnapshot>
+    deleteProject: (payload: ProjectDeletePayload) => Promise<DashboardSnapshot>
+    syncNow: (payload?: SyncNowPayload) => Promise<void>
+    addManualToken: (payload: ManualTokenPayload) => Promise<DashboardSnapshot>
+    validateManualToken: (payload: ManualTokenPayload) => Promise<ValidateTokenResultPayload>
+    setView: (payload: DashboardViewSetPayload) => Promise<void>
+    onSnapshotChanged: (callback: (snapshot: DashboardSnapshot) => void) => () => void
+    onSyncProgress: (callback: (payload: DashboardSyncProgressPayload) => void) => () => void
+  }
 }
 
 export type {
@@ -221,18 +253,27 @@ export type {
   ChannelHistoryPayload,
   CreateProfileInput,
   CurrentWorkspaceInfo,
+  DashboardManualToken,
+  DashboardSnapshot,
+  DashboardSyncProgressPayload,
+  DashboardViewSetPayload,
+  ManualTokenPayload,
   OpenWorkspacePayload,
   PinFromAvailablePayload,
   Profile,
   ProfileIdPayload,
   ProfileSessionStatusPayload,
+  ProjectDeletePayload,
+  ProjectUpsertPayload,
   SlackChannelSummary,
   SlackMessageSummary,
   SlackWorkspaceLink,
   StartAppLoginPayload,
   StartGoogleAuthPayload,
+  SyncNowPayload,
   SyncWorkspacesPayload,
   UnpinWorkspacePayload,
+  ValidateTokenResultPayload,
   ViewportBounds,
   WorkspacePayload,
   WorkspaceThemePayload

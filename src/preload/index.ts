@@ -12,6 +12,7 @@ import type {
   ViewportBounds,
   WorkspaceThemePayload
 } from '../shared/types'
+import type { DashboardSnapshot, DashboardSyncProgressPayload } from '../shared/dashboard-contract'
 
 const api: IpcApi = {
   profiles: {
@@ -150,6 +151,30 @@ const api: IpcApi = {
         channelId,
         limit
       })
+  },
+  dashboard: {
+    getSnapshot: () => ipcRenderer.invoke(IpcChannels.DashboardGetSnapshot),
+    upsertProject: (payload) => ipcRenderer.invoke(IpcChannels.DashboardUpsertProject, payload),
+    deleteProject: (payload) => ipcRenderer.invoke(IpcChannels.DashboardDeleteProject, payload),
+    syncNow: (payload) => ipcRenderer.invoke(IpcChannels.DashboardSyncNow, payload),
+    addManualToken: (payload) => ipcRenderer.invoke(IpcChannels.DashboardAddManualToken, payload),
+    validateManualToken: (payload) =>
+      ipcRenderer.invoke(IpcChannels.DashboardAddManualToken, payload),
+    setView: (payload) => ipcRenderer.invoke(IpcChannels.DashboardViewSet, payload),
+    onSnapshotChanged: (callback: (snapshot: DashboardSnapshot) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, snapshot: DashboardSnapshot): void =>
+        callback(snapshot)
+      ipcRenderer.on(IpcChannels.DashboardSnapshotChanged, listener)
+      return () => ipcRenderer.removeListener(IpcChannels.DashboardSnapshotChanged, listener)
+    },
+    onSyncProgress: (callback: (payload: DashboardSyncProgressPayload) => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        payload: DashboardSyncProgressPayload
+      ): void => callback(payload)
+      ipcRenderer.on(IpcChannels.DashboardSyncProgress, listener)
+      return () => ipcRenderer.removeListener(IpcChannels.DashboardSyncProgress, listener)
+    }
   }
 }
 

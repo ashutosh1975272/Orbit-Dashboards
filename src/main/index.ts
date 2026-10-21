@@ -13,6 +13,11 @@ import { registerAppIpc } from './ipc/app.ipc'
 import { registerOauthIpc } from './ipc/oauth.ipc'
 import { registerProfileIpc } from './ipc/profiles.ipc'
 import { registerSlackDataIpc } from './ipc/slack-data.ipc'
+import { registerDashboardIpc } from './ipc/dashboard.ipc'
+import { DashboardDeltaStore } from './dashboard/delta-store'
+import { MonitorStore } from './dashboard/monitor-store'
+import { DashboardSyncEngine } from './dashboard/sync-engine'
+import { DashboardScheduler } from './dashboard/scheduler'
 import { loadAppEnv } from './load-app-env'
 import { log } from './logging'
 import { getChromeStayEmbed, getPendingChromeBrowserAuth } from './profiles/chrome-browser-auth'
@@ -182,7 +187,7 @@ if (!gotSingleInstanceLock) {
     }
   }
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     electronApp.setAppUserModelId(APP_BUNDLE_ID)
 
     app.userAgentFallback = CHROME_USER_AGENT
@@ -205,6 +210,25 @@ if (!gotSingleInstanceLock) {
     const profileStore = new ProfileStore({ filePath: defaultProfileStorePath(userData) })
     const tokenStore = new TokenStore({ filePath: defaultTokenStorePath(userData) })
     const settingsStore = new AppSettingsStore(defaultAppSettingsPath(userData))
+
+    // dashboard feature (ADR-0007) — isolated module, no behavior changes above
+    const dashboardRoot = join(userData, 'dashboard')
+    const dashboardMonitorStore = new MonitorStore({
+      rootDir: dashboardRoot,
+      encryptionAvailable: (await import('electron')).safeStorage.isEncryptionAvailable()
+    })
+    const dashboardDeltaStore = new DashboardDeltaStore({ rootDir: dashboardRoot })
+    const dashboardEngine = new DashboardSyncEngine({
+      monitorStore: dashboardMonitorStore,
+      deltaStore: dashboardDeltaStore,
+      oauthTokenProvider: { tryGet: (profileId, teamId) => tokenStore.tryGet(profileId, teamId) },
+      manualTokenProvider: {
+        getManualToken: (key: string) => dashboardMonitorStore.getManualToken(key)
+      }
+    })
+    const dashboardScheduler = new DashboardScheduler(dashboardEngine, () =>
+      dashboardMonitorStore.syncIntervalSeconds()
+    )
 
     const adminAuth = new AdminAuthController({
       sessionPath: defaultAdminSessionPath(userData)
@@ -241,6 +265,13 @@ if (!gotSingleInstanceLock) {
       getOauthConfig
     })
     registerSlackDataIpc({ tokenStore })
+    registerDashboardIpc({
+      monitorStore: dashboardMonitorStore,
+      engine: dashboardEngine,
+      scheduler: dashboardScheduler,
+      getMainWindow: () => mainWindow
+    })
+    dashboardScheduler.start()
     registerAppIpc({
       settingsStore,
       lock,

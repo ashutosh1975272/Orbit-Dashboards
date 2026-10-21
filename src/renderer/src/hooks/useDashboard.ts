@@ -1,0 +1,102 @@
+import { create } from 'zustand'
+import type {
+  DashboardManualToken,
+  DashboardProject,
+  DashboardSnapshot,
+  DashboardSyncProgressPayload
+} from '../../../shared/dashboard-contract'
+
+interface DashboardState {
+  /** whether the dashboard page (instead of the native embed) is open */
+  dashboardOpen: boolean
+  dashboardAppId: 'slack' | null
+  snapshot: DashboardSnapshot | null
+  loading: boolean
+  syncingProjectIds: string[]
+  progress: DashboardSyncProgressPayload | null
+  error: string | null
+
+  openDashboard: (appId?: 'slack') => void
+  closeDashboard: () => void
+
+  loadSnapshot: () => Promise<void>
+  upsertProject: (
+    project:
+      | Omit<DashboardProject, 'id' | 'createdAt'>
+      | (Omit<DashboardProject, 'createdAt'> & { id: string })
+  ) => Promise<void>
+  deleteProject: (projectId: string) => Promise<void>
+  syncNow: (projectId?: string) => Promise<void>
+  addManualToken: (key: string, token: string) => Promise<{ valid: boolean; error?: string }>
+  applySnapshot: (snapshot: DashboardSnapshot) => void
+  applyProgress: (payload: DashboardSyncProgressPayload) => void
+}
+
+export const useDashboardStore = create<DashboardState>((set, get) => ({
+  dashboardOpen: false,
+  dashboardAppId: null,
+  snapshot: null,
+  loading: false,
+  syncingProjectIds: [],
+  progress: null,
+  error: null,
+
+  openDashboard: (appId = 'slack') => set({ dashboardOpen: true, dashboardAppId: appId }),
+  closeDashboard: () => set({ dashboardOpen: false }),
+
+  loadSnapshot: async () => {
+    set({ loading: true, error: null })
+    try {
+      const snapshot = await window.api.dashboard.getSnapshot()
+      set({ snapshot, loading: false })
+    } catch (err) {
+      set({
+        error: err instanceof Error ? err.message : 'failed to load dashboard',
+        loading: false
+      })
+    }
+  },
+
+  upsertProject: async (project) => {
+    const snapshot = await window.api.dashboard.upsertProject({ project })
+    set({ snapshot })
+  },
+
+  deleteProject: async (projectId) => {
+    const snapshot = await window.api.dashboard.deleteProject({ projectId })
+    set({ snapshot })
+  },
+
+  syncNow: async (projectId) => {
+    set({ error: null })
+    try {
+      await window.api.dashboard.syncNow({ projectId })
+      const snapshot = await window.api.dashboard.getSnapshot()
+      set({ snapshot })
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : 'sync failed' })
+    }
+  },
+
+  addManualToken: async (key, token) => {
+    const result = await window.api.dashboard.validateManualToken({ key, token })
+    if (result.valid) {
+      get().loadSnapshot()
+    }
+    return { valid: result.valid, error: result.error }
+  },
+
+  applySnapshot: (snapshot) => set({ snapshot, loading: false }),
+
+  applyProgress: (payload) =>
+    set((state) => ({
+      progress: payload,
+      syncingProjectIds: payload.syncing
+        ? Array.from(
+            new Set([...state.syncingProjectIds, ...(payload.projectId ? [payload.projectId] : [])])
+          )
+        : state.syncingProjectIds.filter((id) => !payload.projectIds.includes(id))
+    }))
+}))
+
+export type { DashboardManualToken }
