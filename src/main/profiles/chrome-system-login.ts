@@ -38,11 +38,20 @@ export interface ChromeSystemLoginOptions {
 
 export type ChromeSystemLoginResult = 'signed-in' | 'cancelled' | 'failed'
 
-const CHROME_CANDIDATES = [
-  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-  '/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary',
-  '/Applications/Chromium.app/Contents/MacOS/Chromium'
-]
+const CHROME_CANDIDATES = process.env.CHROME_EXECUTABLE_CANDIDATES
+  ? process.env.CHROME_EXECUTABLE_CANDIDATES.split(':')
+  : [
+      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+      '/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary',
+      '/Applications/Chromium.app/Contents/MacOS/Chromium',
+      '/usr/bin/google-chrome-stable',
+      '/usr/bin/google-chrome',
+      '/opt/google/chrome/google-chrome',
+      '/usr/bin/chromium',
+      '/usr/bin/chromium-browser',
+      '/usr/bin/brave-browser',
+      '/snap/bin/chromium'
+    ]
 
 export function resolveChromeExecutable(): string | null {
   for (const candidate of CHROME_CANDIDATES) {
