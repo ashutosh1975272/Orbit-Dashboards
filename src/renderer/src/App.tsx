@@ -11,8 +11,8 @@ import { AdminLoginOverlay } from './components/AdminLoginOverlay'
 import { CommandPalette } from './components/CommandPalette'
 import { LockOverlay } from './components/LockOverlay'
 import { ProfileSidebar } from './components/ProfileSidebar'
-import DashboardRail from './components/dashboard/DashboardRail'
 import DashboardView from './components/dashboard/DashboardView'
+import DashboardRail from './components/dashboard/DashboardRail'
 import { useDashboardStore } from './hooks/useDashboard'
 import { SettingsPanel } from './components/SettingsPanel'
 import { SidebarPanelIcon } from './components/SidebarPanelIcon'
@@ -698,8 +698,8 @@ function App(): React.JSX.Element {
           }}
         >
           <div className="sidebar-rail-expanded" aria-hidden={settings.sidebarCollapsed}>
-            <DashboardRail />
             <ProfileSidebar
+              dashboardSlot={<DashboardRail />}
               profiles={profiles}
               activeProfileId={activeProfileId}
               activeAppId={activeAppId}

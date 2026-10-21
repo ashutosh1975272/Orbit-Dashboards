@@ -154,6 +154,7 @@ const api: IpcApi = {
   },
   dashboard: {
     getSnapshot: () => ipcRenderer.invoke(IpcChannels.DashboardGetSnapshot),
+    listChannels: (payload) => ipcRenderer.invoke(IpcChannels.DashboardListChannels, payload),
     upsertProject: (payload) => ipcRenderer.invoke(IpcChannels.DashboardUpsertProject, payload),
     deleteProject: (payload) => ipcRenderer.invoke(IpcChannels.DashboardDeleteProject, payload),
     syncNow: (payload) => ipcRenderer.invoke(IpcChannels.DashboardSyncNow, payload),

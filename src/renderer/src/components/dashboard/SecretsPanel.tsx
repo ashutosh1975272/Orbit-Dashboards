@@ -33,33 +33,44 @@ export default function SecretsPanel({ onClose }: SecretsPanelProps): React.Reac
 
   const usedKeys = useMemo(() => snapshot?.manualTokens.map((t) => t.key) ?? [], [snapshot])
 
-  // only manual-token workspaces can back a manual project; pick first channel-set source
+  // resolve channels from the chosen token source (OAuth workspace or manual vault key)
   useEffect(() => {
     void (async () => {
       setLoadingChannels(true)
       try {
-        // We list channels for the manual workspace via OAuth workspaces list too
-        const profiles = await window.api.profiles.list()
-        const first = profiles[0]
-        if (!first) return
-        const discordants = await window.api.slack.listWorkspaces(first.id)
-        setChannelSource({ profileId: first.id, teamId: discordants[0]?.teamId ?? '' })
+        if (selectedTokenKey) {
+          setChannels(
+            await window.api.dashboard
+              .listChannels({
+                tokenSource: 'manual',
+                manualTokenKey: selectedTokenKey
+              })
+              .then((found: Array<{ id: string; name: string }>) =>
+                found.map((c) => ({ id: c.id, name: c.name }))
+              )
+          )
+          setChannelSource({ profileId: `manual:${selectedTokenKey}`, teamId: 'manual' })
+        } else {
+          const profiles = await window.api.profiles.list()
+          const first = profiles[0]
+          if (!first) return
+          const workspaces = await window.api.slack.listWorkspaces(first.id)
+          const teamId = workspaces[0]?.teamId ?? ''
+          setChannelSource({ profileId: first.id, teamId })
+          if (teamId) {
+            const found = await window.api.dashboard.listChannels({
+              tokenSource: 'oauth',
+              profileId: first.id,
+              teamId
+            })
+            setChannels(found.map((c) => ({ id: c.id, name: c.name })))
+          }
+        }
       } finally {
         setLoadingChannels(false)
       }
     })()
-  }, [])
-
-  useEffect(() => {
-    void (async () => {
-      if (!channelSource || !channelSource.teamId) return
-      const found = await window.api.slack.listChannels(
-        channelSource.profileId,
-        channelSource.teamId
-      )
-      setChannels(found.map((c) => ({ id: c.id, name: c.name })))
-    })()
-  }, [channelSource])
+  }, [selectedTokenKey])
 
   const saveToken = async (): Promise<void> => {
     if (!tokenKey.trim() || !tokenValue.trim()) return
@@ -172,7 +183,13 @@ export default function SecretsPanel({ onClose }: SecretsPanelProps): React.Reac
           <p className="settings-hint">
             Token source — Workspace has been OAuth-connected already, or use a manual vault key
           </p>
-          <select value={selectedTokenKey} onChange={(e) => setSelectedTokenKey(e.target.value)}>
+          <select
+            value={selectedTokenKey}
+            onChange={(e) => {
+              setSelectedTokenKey(e.target.value)
+              setSelectedChannels([])
+            }}
+          >
             <option value="">OAuth (the workspace connected in the app)</option>
             {snapshot?.manualTokens.map((t) => (
               <option key={t.key} value={t.key}>

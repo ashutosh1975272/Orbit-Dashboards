@@ -46,6 +46,8 @@ interface ProfileSidebarProps {
   onPinFromAvailable: (profileId: string, appId: AppId, teamId: string) => void
   onUnpin: (profileId: string, appId: AppId, teamId: string) => void
   onDismissError: () => void
+  /** Optional slot rendered after the Recents strip (dashboard entry point). */
+  dashboardSlot?: React.ReactNode
 }
 
 function isBusy(status: AppSessionStatus): boolean {
@@ -281,7 +283,8 @@ export const ProfileSidebar = memo(function ProfileSidebar({
   onOpenWorkspace,
   onPinFromAvailable,
   onUnpin,
-  onDismissError
+  onDismissError,
+  dashboardSlot
 }: ProfileSidebarProps): React.JSX.Element {
   const [profileExpanded, setProfileExpanded] = useState<Record<string, boolean>>({})
   const [appExpanded, setAppExpanded] = useState<Record<string, boolean>>({})
@@ -396,6 +399,8 @@ export const ProfileSidebar = memo(function ProfileSidebar({
           </ul>
         </div>
       ) : null}
+
+      {dashboardSlot}
 
       <label className="field-label" htmlFor="google-email">
         Google email

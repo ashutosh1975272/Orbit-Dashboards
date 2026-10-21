@@ -13,6 +13,8 @@ import type { DashboardSyncEngine } from '../dashboard/sync-engine'
 import type { DashboardScheduler } from '../dashboard/scheduler'
 import type { MonitorStore } from '../dashboard/monitor-store'
 import { SlackPoller } from '../dashboard/slack-poller'
+import { listChannels } from '../slack/slack-api-client'
+import type { SlackChannelSummary } from '../../shared/types'
 import { handleInvoke } from './handle'
 
 export interface DashboardIpcDeps {
@@ -20,6 +22,7 @@ export interface DashboardIpcDeps {
   engine: DashboardSyncEngine
   scheduler: DashboardScheduler
   getMainWindow: () => BrowserWindow | null
+  oauthTokenProvider: { tryGet(profileId: string, teamId: string): Promise<string | null> }
 }
 
 export interface DashboardIpcRegistration {
@@ -58,6 +61,27 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
   }
 
   handleInvoke(IpcChannels.DashboardGetSnapshot, async () => publicSnapshot())
+
+  handleInvoke(
+    IpcChannels.DashboardListChannels,
+    async (payload: {
+      tokenSource: 'oauth' | 'manual'
+      profileId?: string
+      teamId?: string
+      manualTokenKey?: string
+    }): Promise<SlackChannelSummary[]> => {
+      let token: string | null = null
+      if (payload.tokenSource === 'manual') {
+        token = payload.manualTokenKey
+          ? await deps.monitorStore.getManualToken(payload.manualTokenKey)
+          : null
+      } else if (payload.profileId && payload.teamId) {
+        token = await deps.oauthTokenProvider.tryGet(payload.profileId, payload.teamId)
+      }
+      if (!token) return []
+      return listChannels(token)
+    }
+  )
 
   handleInvoke(
     IpcChannels.DashboardViewSet,

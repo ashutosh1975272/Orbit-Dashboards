@@ -1,43 +1,56 @@
-import type React from 'react'
 import { useState } from 'react'
 import { useDashboardStore } from '../../hooks/useDashboard'
 
 /**
- * Sidebar "Dashboard" top button → dropdown app menu → Slack dashboard page.
- * Rendered as an additive block at the top of the sidebar.
+ * Native sidebar row rendered after the Recents strip (via dashboardSlot).
+ * One simple "Dashboard" row; clicking it expands an inline "Slack" item
+ * (same pattern as the profile app sections — no absolute positioning,
+ * so it can never be clipped by the rail's overflow rules).
  */
-export default function DashboardRail(): React.ReactElement {
+export default function DashboardRail(): React.JSX.Element {
   const openDashboard = useDashboardStore((s) => s.openDashboard)
   const dashboardOpen = useDashboardStore((s) => s.dashboardOpen)
-  const loading = useDashboardStore((s) => s.loading)
-  const [menuOpen, setMenuOpen] = useState(false)
+  const [expanded, setExpanded] = useState(false)
 
   return (
-    <div className="dash-rail" data-testid="dashboard-rail">
+    <div className="dash-entry" data-testid="dashboard-rail">
       <button
         type="button"
-        className={`dash-toggle${dashboardOpen ? ' active' : ''}`}
-        disabled={loading}
-        onClick={() => setMenuOpen((v) => !v)}
+        className={`recent-item dash-entry-row${dashboardOpen ? ' is-active' : ''}`}
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
         data-testid="dashboard-toggle"
         title="Dashboard"
       >
-        <span className="dash-toggle-glyph">▦</span> Dashboard
+        <span className="recent-app-chip dash-entry-glyph" aria-hidden>
+          ▦
+        </span>
+        <span className="ws-copy">
+          <span className="ws-title">Dashboard</span>
+        </span>
+        <span className={`dash-entry-chevron${expanded ? ' open' : ''}`} aria-hidden>
+          ▸
+        </span>
       </button>
 
-      {menuOpen ? (
-        <div className="dash-apps" role="menu" aria-label="Dashboard apps">
+      {expanded ? (
+        <div className="dash-entry-apps" role="menu" aria-label="Dashboard apps">
           <button
             type="button"
             role="menuitem"
+            className={`recent-item dash-entry-app${dashboardOpen ? ' is-active' : ''}`}
             onClick={() => {
-              openDashboard?.('slack')
-              setMenuOpen(false)
+              openDashboard('slack')
+              setExpanded(false)
             }}
             data-testid="dashboard-app-slack"
-            data-app-active={dashboardOpen}
           >
-            <span className="dash-app-glyph">#</span> Slack
+            <span className="recent-app-chip dash-entry-glyph" aria-hidden>
+              #
+            </span>
+            <span className="ws-copy">
+              <span className="ws-title">Slack</span>
+            </span>
           </button>
         </div>
       ) : null}

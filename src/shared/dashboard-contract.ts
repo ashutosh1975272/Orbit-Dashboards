@@ -95,6 +95,13 @@ export type DashboardSyncProgressPayload = {
   message?: string
 }
 
+export interface DashboardListChannelsPayload {
+  tokenSource: 'oauth' | 'manual'
+  profileId?: string
+  teamId?: string
+  manualTokenKey?: string
+}
+
 export interface SyncNowPayload {
   projectId?: string
 }

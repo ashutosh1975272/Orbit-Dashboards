@@ -269,7 +269,8 @@ if (!gotSingleInstanceLock) {
       monitorStore: dashboardMonitorStore,
       engine: dashboardEngine,
       scheduler: dashboardScheduler,
-      getMainWindow: () => mainWindow
+      getMainWindow: () => mainWindow,
+      oauthTokenProvider: { tryGet: (profileId, teamId) => tokenStore.tryGet(profileId, teamId) }
     })
     dashboardScheduler.start()
     registerAppIpc({
