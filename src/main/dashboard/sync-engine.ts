@@ -279,7 +279,9 @@ export class DashboardSyncEngine {
     for (const project of target) {
       const cached = this.lastResults.get(project.id)
       if (cached) {
-        out.push(cached)
+        // the cached snapshot may predate the latest insight (the enrich
+        // step runs after the cache is written) — always refresh it
+        out.push(await this.attachLastInsight(project, cached))
         continue
       }
       const perChannel = await this.storedDeltas(project)

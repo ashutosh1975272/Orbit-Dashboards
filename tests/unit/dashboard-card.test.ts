@@ -469,3 +469,80 @@ describe('cold start — the AI insight is shown without a sync', () => {
     }
   })
 })
+
+describe('cached snapshot also carries the latest insight', () => {
+  it('refreshes the insight on a cached snapshot', async () => {
+    const { mkdtemp: mk, rm: rmDir } = await import('node:fs/promises')
+    const { tmpdir: tmp } = await import('node:os')
+    const { join: joinPath } = await import('node:path')
+    const { MonitorStore: MS } = await import('../../src/main/dashboard/monitor-store')
+    const { DashboardDeltaStore: DS } = await import('../../src/main/dashboard/delta-store')
+    const { DashboardSyncEngine: SE } = await import('../../src/main/dashboard/sync-engine')
+    const dir = await mk(joinPath(tmp(), 'dash-cached-'))
+    try {
+      const monitorStore = new MS({ rootDir: dir, encryptionAvailable: false })
+      const deltaStore = new DS({ rootDir: dir })
+      await monitorStore.upsertProject({
+        project: {
+          id: 'p1',
+          name: 'Acme',
+          clientName: 'Acme',
+          profileId: 'manual:K1',
+          teamId: 'T1',
+          teamName: 'Workspace A',
+          appId: 'slack',
+          tokenSource: 'manual',
+          manualTokenKey: 'K1',
+          monitors: [{ channelId: 'C1', channelName: 'general' }]
+        }
+      })
+      const insight = {
+        status: 'at-risk' as const,
+        statusReason: 'r',
+        statusChange: '',
+        mood: 'neutral' as const,
+        moodReason: '',
+        moodQuote: '',
+        progress: 55,
+        progressEvidence: '',
+        situationLine: 'slipping',
+        recentLine: 'slipping',
+        highlights: [],
+        blockers: [],
+        nextStep: '',
+        dates: {},
+        clientAsk: {
+          needsReply: false,
+          urgency: 'normal' as const,
+          lastClientMessage: null,
+          openQuestions: []
+        },
+        commitments: [],
+        decisions: [],
+        risks: [],
+        keywords: []
+      }
+      const engine = new SE({
+        monitorStore,
+        deltaStore,
+        oauthTokenProvider: { tryGet: async () => null },
+        insightReader: {
+          getLastInsight: async () => insight,
+          getLastEntry: async () => ({
+            atIso: new Date().toISOString(),
+            newMessageCount: 1,
+            insight,
+            source: 'ai' as const
+          })
+        }
+      })
+      // first call fills the cache, second call must still carry the insight
+      const [first] = await engine.buildSnapshot()
+      expect(first.insight?.status).toBe('at-risk')
+      const [second] = await engine.buildSnapshot()
+      expect(second.insight?.status).toBe('at-risk')
+    } finally {
+      await rmDir(dir, { recursive: true, force: true }).catch(() => {})
+    }
+  })
+})

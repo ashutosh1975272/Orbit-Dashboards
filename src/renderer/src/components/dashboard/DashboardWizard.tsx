@@ -477,6 +477,11 @@ export default function DashboardWizard(): React.ReactElement {
                 ? 'Loading channels via token…'
                 : `${channels.length} readable with ${savedKey} — tick what this card watches.`}
             </p>
+            {result?.teamName ? (
+              <p className="settings-hint">
+                Workspace: <b>{result.teamName}</b> — one card watches exactly one workspace.
+              </p>
+            ) : null}
             {channelError ? (
               <>
                 <p className="wizard-error">{channelError}</p>
@@ -533,6 +538,12 @@ export default function DashboardWizard(): React.ReactElement {
           <div className="wizard-body">
             <h3>Confirm card</h3>
             <p className="wizard-sub">Names are pre-filled from the workspace — edit freely.</p>
+            {result?.teamName ? (
+              <p className="settings-hint">
+                Workspace: <b>{result.teamName}</b> (<code>{result.teamId}</code>) — this card will
+                only ever read this workspace.
+              </p>
+            ) : null}
             <label className="settings-row">
               <p className="settings-hint">Project (card title)</p>
               <input value={projectName} onChange={(e) => setProjectName(e.target.value)} />
