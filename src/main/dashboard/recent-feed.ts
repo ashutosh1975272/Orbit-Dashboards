@@ -130,7 +130,8 @@ export async function buildRecentFeed(deps: RecentFeedDeps): Promise<RecentActiv
         stale: hoursSince >= 48
       }),
       oneLine: text,
-      delta: insight?.statusChange || undefined
+      delta: insight?.statusChange || undefined,
+      hoursSinceLastMessage: hoursSince
     })
   }
 

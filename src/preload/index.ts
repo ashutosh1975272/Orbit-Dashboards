@@ -16,7 +16,9 @@ import type {
   DashboardSnapshot,
   DashboardSyncProgressPayload,
   InsightHistoryEntryContract,
-  RecentActivity
+  RecentActivity,
+  ProjectSidebarState,
+  SidebarState
 } from '../shared/dashboard-contract'
 
 const api: IpcApi = {
@@ -187,7 +189,13 @@ const api: IpcApi = {
       ): void => callback(payload)
       ipcRenderer.on(IpcChannels.DashboardSyncProgress, listener)
       return () => ipcRenderer.removeListener(IpcChannels.DashboardSyncProgress, listener)
-    }
+    },
+    getSidebarState: (projectId: string) =>
+      ipcRenderer.invoke(IpcChannels.DashboardSidebarGet, { projectId }) as Promise<ProjectSidebarState>,
+    setSidebarState: (projectId: string, state: ProjectSidebarState) =>
+      ipcRenderer.invoke(IpcChannels.DashboardSidebarSet, { projectId, state }),
+    updateSidebarState: (projectId: string, sidebar: 'left' | 'right', patch: Partial<SidebarState>) =>
+      ipcRenderer.invoke(IpcChannels.DashboardSidebarUpdate, { projectId, sidebar, patch }) as Promise<SidebarState>
   }
 }
 

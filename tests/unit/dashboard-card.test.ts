@@ -372,7 +372,13 @@ describe('card view-model (three zones)', () => {
         commitments: [],
         decisions: [],
         risks: ['scope creep'],
-        keywords: ['mockups']
+        keywords: ['mockups'],
+        requirements: [],
+        scope: { in: [], out: [] },
+        deliverables: [],
+        files: [],
+        people: [],
+        milestones: []
       },
       insightSource: 'ai',
       insightUpdatedAt: new Date().toISOString()
@@ -442,7 +448,13 @@ describe('cold start — the AI insight is shown without a sync', () => {
         commitments: [],
         decisions: [],
         risks: [],
-        keywords: []
+        keywords: [],
+        requirements: [],
+        scope: { in: [], out: [] },
+        deliverables: [],
+        files: [],
+        people: [],
+        milestones: []
       }
       const engine = new SE({
         monitorStore,
@@ -520,7 +532,13 @@ describe('cached snapshot also carries the latest insight', () => {
         commitments: [],
         decisions: [],
         risks: [],
-        keywords: []
+        keywords: [],
+        requirements: [],
+        scope: { in: [], out: [] },
+        deliverables: [],
+        files: [],
+        people: [],
+        milestones: []
       }
       const engine = new SE({
         monitorStore,

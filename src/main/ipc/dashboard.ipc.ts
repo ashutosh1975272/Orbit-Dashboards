@@ -8,7 +8,9 @@ import type {
   ProjectDeletePayload,
   ProjectUpsertPayload,
   RecentActivity,
-  ValidateTokenResultPayload
+  ValidateTokenResultPayload,
+  ProjectSidebarState,
+  SidebarState
 } from '../../shared/dashboard-contract'
 import type { DashboardSyncEngine } from '../dashboard/sync-engine'
 import type { DashboardScheduler } from '../dashboard/scheduler'
@@ -18,6 +20,7 @@ import { listChannels } from '../slack/slack-api-client'
 import type { SlackChannelSummary } from '../../shared/types'
 import { handleInvoke } from './handle'
 import type { HistoryStore } from '../dashboard/history-store'
+import type { DashboardSidebarStateStore } from '../dashboard/sidebar-state'
 
 export interface DashboardIpcDeps {
   monitorStore: MonitorStore
@@ -31,6 +34,8 @@ export interface DashboardIpcDeps {
   buildRecent?: () => Promise<RecentActivity[]>
   /** v2.3 — the top digest across workspaces */
   getDigest?: () => Promise<DashboardSnapshot['digest']>
+  /** v2.4 — sidebar state per project */
+  sidebarStateStore?: DashboardSidebarStateStore
 }
 
 export interface DashboardIpcRegistration {
@@ -197,6 +202,32 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
   }
 
   const unsubscribeProgress = deps.engine.addProgressListener(onProgress)
+
+  // v2.4 — Sidebar state per project
+  if (deps.sidebarStateStore) {
+    handleInvoke(
+      IpcChannels.DashboardSidebarGet,
+      async (payload: { projectId: string }) => deps.sidebarStateStore!.get(payload.projectId)
+    )
+
+    handleInvoke(
+      IpcChannels.DashboardSidebarSet,
+      async (payload: { projectId: string; state: ProjectSidebarState }) => {
+        await deps.sidebarStateStore!.set(payload.projectId, payload.state)
+      }
+    )
+
+    handleInvoke(
+      IpcChannels.DashboardSidebarUpdate,
+      async (payload: { projectId: string; sidebar: 'left' | 'right'; patch: Partial<SidebarState> }) => {
+        if (payload.sidebar === 'left') {
+          return deps.sidebarStateStore!.updateLeft(payload.projectId, payload.patch)
+        } else {
+          return deps.sidebarStateStore!.updateRight(payload.projectId, payload.patch)
+        }
+      }
+    )
+  }
 
   return {
     dispose: (): void => {

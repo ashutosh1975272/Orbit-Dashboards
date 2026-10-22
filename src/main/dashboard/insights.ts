@@ -1,4 +1,4 @@
-/** ProjectInsight prompt + schema (v2.2). Rolling merge: previous insight +
+/** ProjectInsight prompt + schema (v2.4). Rolling merge: previous insight +
  * ONLY the NEW messages → merged insight. Nothing is fabricated; quotes come
  * from chat only. If the model omits a field, the previous value carries over.
  *
@@ -11,8 +11,13 @@ import type {
   InsightBlocker,
   InsightCommitment,
   InsightDecision,
+  InsightDeliverable,
+  InsightFile,
   InsightHighlight,
   InsightMood,
+  InsightMilestone,
+  InsightPerson,
+  InsightRequirement,
   InsightStatus,
   InsightUrgency,
   ProjectInsight
@@ -23,8 +28,13 @@ export type {
   InsightBlocker,
   InsightCommitment,
   InsightDecision,
+  InsightDeliverable,
+  InsightFile,
   InsightHighlight,
   InsightMood,
+  InsightMilestone,
+  InsightPerson,
+  InsightRequirement,
   InsightStatus,
   InsightUrgency,
   ProjectInsight
@@ -72,7 +82,14 @@ export const BASE_INSIGHT: ProjectInsight = {
   commitments: [],
   decisions: [],
   risks: [],
-  keywords: []
+  keywords: [],
+
+  requirements: [],
+  scope: { in: [], out: [] },
+  deliverables: [],
+  files: [],
+  people: [],
+  milestones: []
 }
 
 const SYSTEM_PROMPT = [
@@ -89,6 +106,9 @@ const SYSTEM_PROMPT = [
   '2. Never invent. Every claim must be traceable to a message. Quotes must be copied verbatim (max 160 chars) with who said it and when.',
   '3. If a field has no evidence, keep the previous value, or use "", [] or null as specified. Never guess dates, percentages, names or quotes.',
   '4. Reply in the language used in the messages.',
+  '5. REQUIREMENTS: only things the client explicitly asked for. If a requirement came from a PDF/DOCX attachment, include sourceFile. Never invent requirements.',
+  '6. FILES: only files actually shared in the messages (attachments, links). Include name, type (pdf/docx/link/image/other), who shared, when.',
+  '7. PEOPLE: only people mentioned in messages. side = "client" if they are the client side, "us" if they are the freelancer/team.',
   '',
   'FIELDS (exact JSON keys, no extras)',
   '{',
@@ -115,7 +135,14 @@ const SYSTEM_PROMPT = [
   '  "commitments": [ {"who": "<name>", "what": "<=12 words>", "dueIso": "<timestamp>"} ],',
   '  "decisions": [ {"what": "<=12 words>", "who": "<name>", "whenIso": "<timestamp>"} ],',
   '  "risks": ["<short risk>"],',
-  '  "keywords": ["<=6 short tags"]',
+  '  "keywords": ["<=6 short tags"],',
+  '',
+  '  "requirements": [ {"text": "<=20 words>", "sourceFile": "<filename or null>", "who": "<name>", "whenIso": "<timestamp>"} ],',
+  '  "scope": { "in": ["<item>"], "out": ["<item>"] },',
+  '  "deliverables": [ {"name": "<=12 words>", "status": "done" | "in-progress" | "pending" | "not-started"} ],',
+  '  "files": [ {"name": "<filename>", "type": "pdf" | "docx" | "link" | "image" | "other", "who": "<name>", "whenIso": "<timestamp>", "url": "<url or null>"} ],',
+  '  "people": [ {"name": "<name>", "role": "<role or null>", "side": "client" | "us"} ],',
+  '  "milestones": [ {"label": "<=12 words>", "dateIso": "yyyy-mm-dd", "done": true | false} ]',
   '}',
   '',
   'DECISION RULES',
@@ -127,6 +154,12 @@ const SYSTEM_PROMPT = [
   '- dates: only dates explicitly written in the chat. Convert "Nov 10" to the current year. If a date is only implied, leave it out.',
   '- recentLine: describe only what changed in the NEW messages — the newest meaningful event (a question, a decision, a delivery, a blocker). Ignore greetings, reactions and system notices.',
   '- statusChange: fill it only when the status actually changed compared to PREVIOUS INSIGHT, as "old → new".',
+  '- requirements: NEVER invent. Only include if explicitly stated by the client in chat or in an attached file. If from file, set sourceFile.',
+  '- scope: only in/out items explicitly discussed. Leave arrays empty if not stated.',
+  '- deliverables: only items explicitly named as deliverables. Status from chat evidence or "pending".',
+  '- files: only files actually attached or linked in messages. Type from extension/URL.',
+  '- people: only people who appear in messages. side = "client" if they are not the token owner.',
+  '- milestones: only dates explicitly mentioned as milestones/deadlines. done=true only if chat says completed.',
   '',
   'OUTPUT',
   'Reply with ONLY the JSON object. No markdown, no explanation, no code fences.'
@@ -256,6 +289,106 @@ function parseDecisions(v: unknown): InsightDecision[] | undefined {
   return out.length ? out.slice(0, 3) : undefined
 }
 
+function parseRequirements(v: unknown): InsightRequirement[] | undefined {
+  if (!Array.isArray(v)) return undefined
+  const out: InsightRequirement[] = []
+  for (const item of v) {
+    if (!item || typeof item !== 'object') continue
+    const text = asString((item as Record<string, unknown>).text)
+    if (!text) continue
+    out.push({
+      text,
+      sourceFile: asString((item as Record<string, unknown>).sourceFile),
+      who: asString((item as Record<string, unknown>).who),
+      whenIso: asString((item as Record<string, unknown>).whenIso)
+    })
+  }
+  return out.length ? out.slice(0, 10) : undefined
+}
+
+function parseScope(v: unknown): { in: string[]; out: string[] } | undefined {
+  if (!v || typeof v !== 'object') return undefined
+  const obj = v as Record<string, unknown>
+  const inArr = asStringArray(obj['in'], 10)
+  const outArr = asStringArray(obj['out'], 10)
+  if (!inArr && !outArr) return undefined
+  return { in: inArr ?? [], out: outArr ?? [] }
+}
+
+function parseDeliverables(v: unknown): InsightDeliverable[] | undefined {
+  if (!Array.isArray(v)) return undefined
+  const out: InsightDeliverable[] = []
+  for (const item of v) {
+    if (!item || typeof item !== 'object') continue
+    const name = asString((item as Record<string, unknown>).name)
+    if (!name) continue
+    const status = asString((item as Record<string, unknown>).status) as
+      | 'done' | 'in-progress' | 'pending' | 'not-started' | undefined
+    out.push({
+      name,
+      status: status && ['done', 'in-progress', 'pending', 'not-started'].includes(status)
+        ? status
+        : 'pending'
+    })
+  }
+  return out.length ? out.slice(0, 10) : undefined
+}
+
+function parseFiles(v: unknown): InsightFile[] | undefined {
+  if (!Array.isArray(v)) return undefined
+  const out: InsightFile[] = []
+  for (const item of v) {
+    if (!item || typeof item !== 'object') continue
+    const name = asString((item as Record<string, unknown>).name)
+    if (!name) continue
+    const type = asString((item as Record<string, unknown>).type) as
+      | 'pdf' | 'docx' | 'link' | 'image' | 'other' | undefined
+    out.push({
+      name,
+      type: type && ['pdf', 'docx', 'link', 'image', 'other'].includes(type) ? type : 'other',
+      who: asString((item as Record<string, unknown>).who),
+      whenIso: asString((item as Record<string, unknown>).whenIso),
+      url: asString((item as Record<string, unknown>).url)
+    })
+  }
+  return out.length ? out.slice(0, 20) : undefined
+}
+
+function parsePeople(v: unknown): InsightPerson[] | undefined {
+  if (!Array.isArray(v)) return undefined
+  const out: InsightPerson[] = []
+  for (const item of v) {
+    if (!item || typeof item !== 'object') continue
+    const name = asString((item as Record<string, unknown>).name)
+    if (!name) continue
+    const side = asString((item as Record<string, unknown>).side) as 'client' | 'us' | undefined
+    out.push({
+      name,
+      role: asString((item as Record<string, unknown>).role),
+      side: side && ['client', 'us'].includes(side) ? side : 'client'
+    })
+  }
+  return out.length ? out.slice(0, 20) : undefined
+}
+
+function parseMilestones(v: unknown): InsightMilestone[] | undefined {
+  if (!Array.isArray(v)) return undefined
+  const out: InsightMilestone[] = []
+  for (const item of v) {
+    if (!item || typeof item !== 'object') continue
+    const label = asString((item as Record<string, unknown>).label)
+    if (!label) continue
+    const dateIso = asString((item as Record<string, unknown>).dateIso)
+    const done = (item as Record<string, unknown>).done === true
+    out.push({
+      label,
+      dateIso: dateIso ?? new Date().toISOString().slice(0, 10),
+      done
+    })
+  }
+  return out.length ? out.slice(0, 10) : undefined
+}
+
 /**
  * Merge parsed LLM JSON over the previous insight; unknown fields carry over.
  * `quotes` (the message texts we supplied) are used to drop quotes that the
@@ -279,7 +412,13 @@ export function mergeInsight(
         commitments: [...previous.commitments],
         decisions: [...previous.decisions],
         risks: [...previous.risks],
-        keywords: [...previous.keywords]
+        keywords: [...previous.keywords],
+        requirements: [...previous.requirements],
+        scope: { in: [...previous.scope.in], out: [...previous.scope.out] },
+        deliverables: [...previous.deliverables],
+        files: [...previous.files],
+        people: [...previous.people],
+        milestones: [...previous.milestones]
       }
     : {
         ...BASE_INSIGHT,
@@ -357,6 +496,13 @@ export function mergeInsight(
     commitments: parseCommitments(parsed.commitments) ?? base.commitments,
     decisions: parseDecisions(parsed.decisions) ?? base.decisions,
     risks: asStringArray(parsed.risks, 3) ?? base.risks,
-    keywords: asStringArray(parsed.keywords, 6) ?? base.keywords
+    keywords: asStringArray(parsed.keywords, 6) ?? base.keywords,
+
+    requirements: parseRequirements(parsed.requirements) ?? base.requirements,
+    scope: parseScope(parsed.scope) ?? base.scope,
+    deliverables: parseDeliverables(parsed.deliverables) ?? base.deliverables,
+    files: parseFiles(parsed.files) ?? base.files,
+    people: parsePeople(parsed.people) ?? base.people,
+    milestones: parseMilestones(parsed.milestones) ?? base.milestones
   }
 }

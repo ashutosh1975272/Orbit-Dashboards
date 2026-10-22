@@ -135,6 +135,8 @@ export interface RecentActivity {
   oneLine: string
   /** "old → new" when the status changed */
   delta?: string
+  /** hours since last message (for inactive filter) */
+  hoursSinceLastMessage: number
 }
 
 export type DashboardSyncProgressPayload = {
@@ -264,6 +266,84 @@ export interface ProjectInsight {
   decisions: InsightDecision[]
   risks: string[]
   keywords: string[]
+
+  /* ===== v2.4 — Project Guide & Attention sidebar fields ===== */
+  /** Client requirements explicitly stated (source: PDF/DOCX/chat) */
+  requirements: InsightRequirement[]
+  /** Scope: in-scope and out-of-scope items */
+  scope: { in: string[]; out: string[] }
+  /** Deliverables with status */
+  deliverables: InsightDeliverable[]
+  /** Files shared in the workspace */
+  files: InsightFile[]
+  /** People involved */
+  people: InsightPerson[]
+  /** Milestones with dates and completion */
+  milestones: InsightMilestone[]
+}
+
+export interface InsightRequirement {
+  text: string
+  /** Source file name if from attachment (PDF/DOCX) */
+  sourceFile?: string
+  /** Who said it */
+  who?: string
+  /** When (ISO timestamp) */
+  whenIso?: string
+}
+
+export interface InsightDeliverable {
+  name: string
+  /** 'done' | 'in-progress' | 'pending' | 'not-started' */
+  status: 'done' | 'in-progress' | 'pending' | 'not-started'
+}
+
+export interface InsightFile {
+  name: string
+  /** 'pdf' | 'docx' | 'link' | 'image' | 'other' */
+  type: 'pdf' | 'docx' | 'link' | 'image' | 'other'
+  who?: string
+  whenIso?: string
+  url?: string
+}
+
+export interface InsightPerson {
+  name: string
+  role?: string
+  /** 'client' | 'us' */
+  side: 'client' | 'us'
+}
+
+export interface InsightMilestone {
+  label: string
+  dateIso: string
+  done: boolean
+}
+
+export interface SidebarState {
+  collapsed: boolean
+  width: number
+  openSection: number | null
+}
+
+export interface ProjectSidebarState {
+  left: SidebarState
+  right: SidebarState
+}
+
+export interface DashboardSidebarGetPayload {
+  projectId: string
+}
+
+export interface DashboardSidebarSetPayload {
+  projectId: string
+  state: ProjectSidebarState
+}
+
+export interface DashboardSidebarUpdatePayload {
+  projectId: string
+  sidebar: 'left' | 'right'
+  patch: Partial<SidebarState>
 }
 
 export interface InsightHistoryEntryContract {
@@ -278,4 +358,7 @@ export interface InsightHistoryEntryContract {
   model?: string
   /** Status before this refresh — lets the timeline show "at-risk → on-track". */
   previousStatus?: InsightStatus
+
+  /* v2.4 — sidebar state snapshot at this insight */
+  sidebarState?: { left: SidebarState; right: SidebarState }
 }

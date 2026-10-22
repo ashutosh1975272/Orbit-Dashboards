@@ -10,6 +10,8 @@ import type {
   ProjectDeletePayload,
   ProjectUpsertPayload,
   RecentActivity,
+  SidebarState,
+  ProjectSidebarState,
   SyncNowPayload,
   ValidateTokenResultPayload
 } from './dashboard-contract'
@@ -107,7 +109,11 @@ export const IpcChannels = {
   DashboardAddManualToken: 'dashboard:add-manual-token',
   DashboardValidateManualToken: 'dashboard:validate-manual-token',
   DashboardSnapshotChanged: 'dashboard:snapshot-changed',
-  DashboardSyncProgress: 'dashboard:sync-progress'
+  DashboardSyncProgress: 'dashboard:sync-progress',
+
+  DashboardSidebarGet: 'dashboard:sidebar-get',
+  DashboardSidebarSet: 'dashboard:sidebar-set',
+  DashboardSidebarUpdate: 'dashboard:sidebar-update'
 } as const
 
 export type IpcChannel = (typeof IpcChannels)[keyof typeof IpcChannels]
@@ -255,6 +261,9 @@ export interface IpcApi {
     setView: (payload: DashboardViewSetPayload) => Promise<void>
     onSnapshotChanged: (callback: (snapshot: DashboardSnapshot) => void) => () => void
     onSyncProgress: (callback: (payload: DashboardSyncProgressPayload) => void) => () => void
+    getSidebarState: (projectId: string) => Promise<ProjectSidebarState>
+    setSidebarState: (projectId: string, state: ProjectSidebarState) => Promise<void>
+    updateSidebarState: (projectId: string, sidebar: 'left' | 'right', patch: Partial<SidebarState>) => Promise<SidebarState>
   }
 }
 

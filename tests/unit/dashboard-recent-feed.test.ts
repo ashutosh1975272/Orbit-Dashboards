@@ -61,6 +61,12 @@ function insight(overrides: Partial<ProjectInsight> = {}): ProjectInsight {
     decisions: [],
     risks: [],
     keywords: [],
+    requirements: [],
+    scope: { in: [], out: [] },
+    deliverables: [],
+    files: [],
+    people: [],
+    milestones: [],
     ...overrides
   }
 }

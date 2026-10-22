@@ -19,6 +19,7 @@ import { DashboardDeltaStore } from './dashboard/delta-store'
 import { MonitorStore } from './dashboard/monitor-store'
 import { DashboardInsightSyncEngine } from './dashboard/sync-engine'
 import { DashboardScheduler } from './dashboard/scheduler'
+import { DashboardSidebarStateStore } from './dashboard/sidebar-state'
 import { migrateWorkspaceCards } from './dashboard/workspace-migration'
 import { buildRecentFeed } from './dashboard/recent-feed'
 import { DashboardDigestStore, refreshDigest } from './dashboard/digest'
@@ -249,6 +250,7 @@ if (!gotSingleInstanceLock) {
         })
       : null
     const dashboardHistoryStore = new HistoryStore({ rootDir: dashboardRoot })
+    const sidebarStateStore = new DashboardSidebarStateStore(userData)
     // The engine always exists: with a key it enriches with NVIDIA NIM,
     // without one it still keeps every card meaningful via local heuristics.
     const insightEngine = new InsightEngine({
@@ -398,7 +400,8 @@ if (!gotSingleInstanceLock) {
       oauthTokenProvider: { tryGet: (profileId, teamId) => tokenStore.tryGet(profileId, teamId) },
       historyStore: dashboardHistoryStore,
       buildRecent,
-      getDigest
+      getDigest,
+      sidebarStateStore
     })
     void runWorkspaceMigration()
     dashboardScheduler.start()

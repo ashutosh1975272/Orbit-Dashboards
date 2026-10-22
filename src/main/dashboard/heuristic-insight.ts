@@ -1,5 +1,5 @@
 /**
- * v2.2 heuristic insight — the fallback that keeps the dashboard useful when
+ * v2.4 heuristic insight — the fallback that keeps the dashboard useful when
  * NVIDIA NIM is unavailable (no key, API error, timeout) or when the model
  * reply cannot be parsed. It reuses the local heuristics (mood, pace,
  * completion, distilled summary) so the card never goes blank because of AI.
@@ -57,6 +57,14 @@ export function buildHeuristicInsight(snapshot: DashboardProjectSnapshot): Proje
     commitments: [],
     decisions: [],
     risks: [],
-    keywords: []
+    keywords: [],
+
+    // v2.4 fields — heuristic fallback leaves them empty
+    requirements: [],
+    scope: { in: [], out: [] },
+    deliverables: [],
+    files: [],
+    people: [],
+    milestones: []
   }
 }
