@@ -292,6 +292,7 @@ function App(): React.JSX.Element {
 
   const browserAuthBusy = authPhase === 'google' || authPhase === 'slack'
   const dashboardOpen = useDashboardStore((s) => s.dashboardOpen)
+  const wizardOpen = useDashboardStore((s) => s.wizardOpenFor) != null
   const splitOn =
     settings.splitViewEnabled && Boolean(splitSecondary) && !browserAuthBusy && !locked
   // Keep embed mounted for WhatsApp QR even while status is signing-in / not yet linked.
@@ -302,6 +303,7 @@ function App(): React.JSX.Element {
     activeProfile &&
     activeAppId &&
     !dashboardOpen &&
+    !wizardOpen &&
     !browserAuthBusy &&
     !locked &&
     !settingsOpen &&
@@ -671,18 +673,6 @@ function App(): React.JSX.Element {
 
   return (
     <div className={`app-shell${settings.sidebarCollapsed ? ' is-sidebar-collapsed' : ''}`}>
-      <header className="app-topbar">
-        <button
-          type="button"
-          className="btn ghost icon-btn app-settings-btn"
-          onClick={() => setSettingsOpen(true)}
-          title="Settings (⌘,)"
-          aria-label="Settings"
-        >
-          ⚙
-        </button>
-      </header>
-
       <div className="app-body">
         <div
           className={`sidebar-rail${settings.sidebarCollapsed ? ' is-collapsed' : ''}`}
@@ -818,6 +808,18 @@ function App(): React.JSX.Element {
                 </div>
               ) : null}
             </div>
+          ) : null}
+
+          {!browserAuthBusy && !locked && !showEmbed && !dashboardOpen && !wizardOpen ? (
+            <button
+              type="button"
+              className="settings-float-btn"
+              onClick={() => setSettingsOpen(true)}
+              title="Settings (⌘,)"
+              aria-label="Settings"
+            >
+              ⚙
+            </button>
           ) : null}
 
           {!browserAuthBusy && !showEmbed && !dashboardOpen && !locked ? (

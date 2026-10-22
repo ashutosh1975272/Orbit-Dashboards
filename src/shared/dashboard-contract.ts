@@ -28,6 +28,8 @@ export interface DashboardProject {
   tokenSource: DashboardTokenSource
   /** Used when tokenSource = manual (vault key, not raw token). */
   manualTokenKey?: string
+  /** Workspace display name (v2.2) — stamped at create, drives card header. */
+  teamName?: string
   monitors: DashboardMonitor[]
   /** User-set dates (ISO yyyy-mm-dd) — win over extractedDates. */
   startDate?: string
@@ -41,6 +43,8 @@ export interface DashboardChannelDelta {
   channelId: string
   channelName: string
   messageCount: number
+  /** New messages added by the latest sync (tiny +N chip on the card). */
+  newMessageCount?: number
   /** ISO of newest stored message. */
   latestMessageAt: string
   /** Slack ts cursor of newest stored message. */
@@ -66,6 +70,13 @@ export interface DashboardProjectSnapshot {
   /** ISO of the last successful sync covering this project. */
   lastUpdatedAt: string | null
   syncState: DashboardSyncState
+  /** v2.2 NVIDIA NIM rolling insight (undefined/null = not generated yet). */
+  insight?: ProjectInsight | null
+  insightUpdatedAt?: string | null
+  insightModel?: string | null
+  /** 'ai' = NVIDIA NIM, 'heuristic' = local fallback. */
+  insightSource?: 'ai' | 'heuristic' | null
+  newSinceLastInsight?: number
 }
 
 export interface DashboardManualToken {
@@ -130,4 +141,46 @@ export interface DashboardViewSetPayload {
 export interface ValidateTokenResultPayload extends DashboardManualToken {
   valid: boolean
   error?: string
+  /** Slack user (display login) from auth.test — used to prefill client name. */
+  userName?: string
+}
+
+/** Public app identity so the wizard can render the exact manifest JSON for the user. */
+export interface DashboardAppClientConfig {
+  clientId: string
+  redirectUri: string
+}
+
+/* ===== v2.2 — NVIDIA NIM insight engine ===== */
+export type InsightStatus = 'on-track' | 'at-risk' | 'blocked' | 'waiting-on-client'
+export type InsightMood = 'good' | 'neutral' | 'tense'
+
+export interface InsightClientMessage {
+  who: string
+  whenIso: string
+  quote: string
+}
+
+export interface ProjectInsight {
+  status: InsightStatus
+  mood: InsightMood
+  /** 0-100 */
+  progress: number
+  progressEvidence: string
+  situationLine: string
+  highlights: string[]
+  blockers: string[]
+  nextStep: string
+  dates: { startDate?: string; endDate?: string }
+  clientAsk: { needsReply: boolean; lastClientMessage: InsightClientMessage | null }
+}
+
+export interface InsightHistoryEntryContract {
+  atIso: string
+  newMessageCount: number
+  insight: ProjectInsight
+  /** Slack ts cursor position this insight covered (delta tracking). */
+  cursorAtSummarize?: string
+  /** 'ai' = NVIDIA NIM, 'heuristic' = local fallback (no key / API failure). */
+  source?: 'ai' | 'heuristic'
 }

@@ -12,7 +12,11 @@ import type {
   ViewportBounds,
   WorkspaceThemePayload
 } from '../shared/types'
-import type { DashboardSnapshot, DashboardSyncProgressPayload } from '../shared/dashboard-contract'
+import type {
+  DashboardSnapshot,
+  DashboardSyncProgressPayload,
+  InsightHistoryEntryContract
+} from '../shared/dashboard-contract'
 
 const api: IpcApi = {
   profiles: {
@@ -154,6 +158,11 @@ const api: IpcApi = {
   },
   dashboard: {
     getSnapshot: () => ipcRenderer.invoke(IpcChannels.DashboardGetSnapshot),
+    getAppConfig: () => ipcRenderer.invoke(IpcChannels.DashboardGetAppConfig),
+    getHistory: (payload: { projectId: string }) =>
+      ipcRenderer.invoke(IpcChannels.DashboardGetHistory, payload) as Promise<
+        InsightHistoryEntryContract[]
+      >,
     listChannels: (payload) => ipcRenderer.invoke(IpcChannels.DashboardListChannels, payload),
     upsertProject: (payload) => ipcRenderer.invoke(IpcChannels.DashboardUpsertProject, payload),
     deleteProject: (payload) => ipcRenderer.invoke(IpcChannels.DashboardDeleteProject, payload),

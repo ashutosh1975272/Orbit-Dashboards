@@ -16,6 +16,7 @@ import { SlackPoller } from '../dashboard/slack-poller'
 import { listChannels } from '../slack/slack-api-client'
 import type { SlackChannelSummary } from '../../shared/types'
 import { handleInvoke } from './handle'
+import type { HistoryStore } from '../dashboard/history-store'
 
 export interface DashboardIpcDeps {
   monitorStore: MonitorStore
@@ -23,6 +24,8 @@ export interface DashboardIpcDeps {
   scheduler: DashboardScheduler
   getMainWindow: () => BrowserWindow | null
   oauthTokenProvider: { tryGet(profileId: string, teamId: string): Promise<string | null> }
+  /** v2.2 — insight history (optional, additive) */
+  historyStore?: HistoryStore
 }
 
 export interface DashboardIpcRegistration {
@@ -114,18 +117,45 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
     }
   )
 
+  handleInvoke(IpcChannels.DashboardGetAppConfig, async () => ({
+    clientId: process.env.SLACK_CLIENT_ID ?? '',
+    redirectUri: process.env.SLACK_REDIRECT_URI ?? ''
+  }))
+
+  handleInvoke(
+    IpcChannels.DashboardGetHistory,
+    async (payload: { projectId: string }) =>
+      (await deps.historyStore?.read(payload.projectId)) ?? []
+  )
+
   handleInvoke(IpcChannels.DashboardAddManualToken, async (payload: ManualTokenPayload) => {
     const poller = new SlackPoller()
     let validated = false
     let valid = false
     let error: string | undefined
     let vaultTeamName: string | undefined
+    let vaultTeamId: string | undefined
+    let vaultUserName: string | undefined
+    let vaultScopes: string[] | undefined
     try {
       const check = await poller.authTest(payload.token)
-      valid = check.valid
       validated = true
-      await deps.monitorStore.saveManualToken(payload.key, payload.token)
-      if (check.teamName) vaultTeamName = check.teamName
+      if (!check.valid) {
+        error = check.error ?? 'Slack rejected this token'
+      } else {
+        const meta =
+          check.teamId && check.teamName
+            ? { teamId: check.teamId, teamName: check.teamName, userName: check.userName }
+            : undefined
+        const stored = await deps.monitorStore.saveManualToken(payload.key, payload.token, meta)
+        if (!stored.plaintext)
+          console.info(`[dashboard] manual token ${payload.key} stored encrypted in vault`)
+        valid = true
+        if (check.teamName) vaultTeamName = check.teamName
+        if (check.teamId) vaultTeamId = check.teamId
+        if (check.userName) vaultUserName = check.userName
+        if (check.scopes) vaultScopes = check.scopes
+      }
     } catch (err) {
       error = err instanceof Error ? err.message : 'token validation failed'
     }
@@ -134,8 +164,10 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
       validated,
       valid,
       error,
-      teamId: undefined,
-      teamName: vaultTeamName
+      teamId: vaultTeamId,
+      teamName: vaultTeamName,
+      userName: vaultUserName,
+      scopes: vaultScopes
     }
     await broadcastSnapshot()
     return vault

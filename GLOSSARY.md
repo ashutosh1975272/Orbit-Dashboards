@@ -16,3 +16,6 @@
 | **Extracted Dates** | Start/deadline dates found by date-pattern heuristics in messages. Manual project dates (if set) win over extracted. |
 | **Secrets Panel** | Bottom-of-sidebar settings surface for adding manual tokens and creating/editing Projects (pick workspace + Watched Channels). |
 | **Dashboard Mode** | Renderer view state where the embedded Slack view is hidden and the card list is shown. |
+| **Wizard** | The 3-step add flow (Step1 Connect workspace, Step2 Choose channels, Step3 Confirm card). |
+| **Wizard Edit Mode** | The wizard reopening prefilled for an existing project. |
+| **Baseline Sync** | First sync after a token is added: pulls the most recent 200 messages per channel as initial history. |

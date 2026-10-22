@@ -16,10 +16,16 @@ import { registerSlackDataIpc } from './ipc/slack-data.ipc'
 import { registerDashboardIpc } from './ipc/dashboard.ipc'
 import { DashboardDeltaStore } from './dashboard/delta-store'
 import { MonitorStore } from './dashboard/monitor-store'
-import { DashboardSyncEngine } from './dashboard/sync-engine'
+import { DashboardInsightSyncEngine } from './dashboard/sync-engine'
 import { DashboardScheduler } from './dashboard/scheduler'
+import { migrateWorkspaceCards } from './dashboard/workspace-migration'
+import { HistoryStore } from './dashboard/history-store'
+import { NimProvider } from './dashboard/ai-provider'
+import { InsightEngine } from './dashboard/insight-engine'
+import { SlackPoller } from './dashboard/slack-poller'
 import { loadAppEnv } from './load-app-env'
 import { log } from './logging'
+import { listChannels } from './slack/slack-api-client'
 import { getChromeStayEmbed, getPendingChromeBrowserAuth } from './profiles/chrome-browser-auth'
 import { BrowserViewManager } from './profiles/browser-view-manager'
 import { defaultProfileStorePath, ProfileStore } from './profiles/profile-store'
@@ -218,14 +224,74 @@ if (!gotSingleInstanceLock) {
       encryptionAvailable: (await import('electron')).safeStorage.isEncryptionAvailable()
     })
     const dashboardDeltaStore = new DashboardDeltaStore({ rootDir: dashboardRoot })
-    const dashboardEngine = new DashboardSyncEngine({
+    // v2.2 — NVIDIA NIM rolling insights (universal key/model from .env)
+    const nimKey = process.env.NVIDIA_NIM_API_KEY ?? ''
+    const nimPrimary =
+      process.env.NVIDIA_NIM_MODEL_PRIMARY ?? 'nvidia/nemotron-3.5-super-vl-120b-a12b'
+    const nimFallback = process.env.NVIDIA_NIM_MODEL_FALLBACK ?? 'nvidia/nemotron-3-super-120b-a12b'
+    const nimProvider = nimKey
+      ? new NimProvider({ apiKey: nimKey, modelPrimary: nimPrimary, modelFallback: nimFallback })
+      : null
+    const dashboardHistoryStore = new HistoryStore({ rootDir: dashboardRoot })
+    // The engine always exists: with a key it enriches with NVIDIA NIM,
+    // without one it still keeps every card meaningful via local heuristics.
+    const insightEngine = new InsightEngine({
+      provider: nimProvider,
+      historyStore: dashboardHistoryStore,
+      deltaStore: dashboardDeltaStore,
+      fetchUsers: (token: string) => new SlackPoller().usersList(token),
+      log: (msg) => log.info(msg)
+    })
+    if (!nimProvider) {
+      log.info('[dashboard] NVIDIA_NIM_API_KEY missing — insights fall back to heuristics')
+    }
+    const dashboardEngine = new DashboardInsightSyncEngine({
       monitorStore: dashboardMonitorStore,
       deltaStore: dashboardDeltaStore,
       oauthTokenProvider: { tryGet: (profileId, teamId) => tokenStore.tryGet(profileId, teamId) },
       manualTokenProvider: {
         getManualToken: (key: string) => dashboardMonitorStore.getManualToken(key)
-      }
+      },
+      insightEngine
     })
+
+    // v2.2 — one-time workspace migration: stamp + split legacy mixed cards.
+    try {
+      const poller = new SlackPoller()
+      const migration = await migrateWorkspaceCards({
+        monitorStore: dashboardMonitorStore,
+        listTokenKeys: async () =>
+          (await dashboardMonitorStore.listManualTokens()).map((t) => t.key),
+        resolveTokenMeta: async (key: string) => {
+          const token = await dashboardMonitorStore.getManualToken(key)
+          if (!token) return null
+          const check = await poller.authTest(token)
+          if (!check.valid || !check.teamId || !check.teamName) return null
+          const meta = {
+            teamId: check.teamId,
+            teamName: check.teamName,
+            userName: check.userName
+          }
+          await dashboardMonitorStore.upsertManualTokenMeta(key, meta)
+          return meta
+        },
+        listChannelsForKey: async (key: string) => {
+          const token = await dashboardMonitorStore.getManualToken(key)
+          if (!token) return []
+          const channels = await listChannels(token)
+          return channels.map((c) => ({ id: c.id, name: c.name }))
+        }
+      })
+      if (migration.stamped || migration.split) {
+        log.info('[dashboard] workspace migration applied', {
+          stamped: migration.stamped,
+          split: migration.split,
+          notes: migration.notes
+        })
+      }
+    } catch (err) {
+      log.warn('[dashboard] workspace migration skipped', { err: String(err) })
+    }
     const dashboardScheduler = new DashboardScheduler(dashboardEngine, () =>
       dashboardMonitorStore.syncIntervalSeconds()
     )
@@ -270,7 +336,8 @@ if (!gotSingleInstanceLock) {
       engine: dashboardEngine,
       scheduler: dashboardScheduler,
       getMainWindow: () => mainWindow,
-      oauthTokenProvider: { tryGet: (profileId, teamId) => tokenStore.tryGet(profileId, teamId) }
+      oauthTokenProvider: { tryGet: (profileId, teamId) => tokenStore.tryGet(profileId, teamId) },
+      historyStore: dashboardHistoryStore
     })
     dashboardScheduler.start()
     registerAppIpc({

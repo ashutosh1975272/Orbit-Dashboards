@@ -1,8 +1,8 @@
 import type React from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useDashboardStore } from '../../hooks/useDashboard'
 import ProjectCard from './ProjectCard'
-import SecretsPanel from './SecretsPanel'
+import DashboardWizard from './DashboardWizard'
 
 /**
  * Full dashboard page (rendered in main-column when dashboardOpen):
@@ -15,7 +15,8 @@ export default function DashboardView(): React.ReactElement | null {
   const deleteProject = useDashboardStore((s) => s.deleteProject)
   const syncNow = useDashboardStore((s) => s.syncNow)
   const progress = useDashboardStore((s) => s.progress)
-  const [secretsOpen, setSecretsOpen] = useState(false)
+  const wizardOpenFor = useDashboardStore((s) => s.wizardOpenFor)
+  const openWizard = useDashboardStore((s) => s.openWizard)
 
   useEffect(() => {
     void loadSnapshot()
@@ -42,8 +43,8 @@ export default function DashboardView(): React.ReactElement | null {
             {' '}
             ⟳ Sync all
           </button>
-          <button type="button" className="dash-subtle" onClick={() => setSecretsOpen(true)}>
-            ⚙ Dashboard secrets
+          <button type="button" className="dash-primary" onClick={() => openWizard()}>
+            ＋ Set up new project
           </button>
         </div>
       </header>
@@ -59,13 +60,13 @@ export default function DashboardView(): React.ReactElement | null {
         ))}
         {(snapshot?.projects ?? []).length === 0 ? (
           <p className="dash-empty">
-            No projects yet. Open <b>⚙ Dashboard secrets</b> (bottom of the sidebar) to add a
-            workspace token / project card.
+            No project cards yet — click <b>＋ Set up new project</b> above. A 5-step guide walks
+            you through: create the Slack app → get the token → channels → card → live sync.
           </p>
         ) : null}
       </div>
 
-      {secretsOpen ? <SecretsPanel onClose={() => setSecretsOpen(false)} /> : null}
+      {wizardOpenFor ? <DashboardWizard /> : null}
     </section>
   )
 }

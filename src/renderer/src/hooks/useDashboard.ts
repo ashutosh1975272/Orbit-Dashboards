@@ -3,7 +3,8 @@ import type {
   DashboardManualToken,
   DashboardProject,
   DashboardSnapshot,
-  DashboardSyncProgressPayload
+  DashboardSyncProgressPayload,
+  ValidateTokenResultPayload
 } from '../../../shared/dashboard-contract'
 
 interface DashboardState {
@@ -15,9 +16,16 @@ interface DashboardState {
   syncingProjectIds: string[]
   progress: DashboardSyncProgressPayload | null
   error: string | null
+  /** add-project wizard: open, with optional edit target (project id) */
+  wizardOpenFor: { projectId: string | null } | null
+  /** sidebar Dashboard row: Slack dropdown expanded (survives sidebar re-renders) */
+  dashRailExpanded: boolean
 
   openDashboard: (appId?: 'slack') => void
   closeDashboard: () => void
+  openWizard: (projectId?: string) => void
+  closeWizard: () => void
+  setDashRailExpanded: (expanded: boolean) => void
 
   loadSnapshot: () => Promise<void>
   upsertProject: (
@@ -27,7 +35,10 @@ interface DashboardState {
   ) => Promise<void>
   deleteProject: (projectId: string) => Promise<void>
   syncNow: (projectId?: string) => Promise<void>
-  addManualToken: (key: string, token: string) => Promise<{ valid: boolean; error?: string }>
+  addManualToken: (
+    key: string,
+    token: string
+  ) => Promise<Omit<ValidateTokenResultPayload, 'validated'>>
   applySnapshot: (snapshot: DashboardSnapshot) => void
   applyProgress: (payload: DashboardSyncProgressPayload) => void
 }
@@ -40,9 +51,14 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   syncingProjectIds: [],
   progress: null,
   error: null,
+  wizardOpenFor: null,
+  dashRailExpanded: false,
 
   openDashboard: (appId = 'slack') => set({ dashboardOpen: true, dashboardAppId: appId }),
   closeDashboard: () => set({ dashboardOpen: false }),
+  openWizard: (projectId) => set({ wizardOpenFor: { projectId: projectId ?? null } }),
+  closeWizard: () => set({ wizardOpenFor: null }),
+  setDashRailExpanded: (expanded) => set({ dashRailExpanded: expanded }),
 
   loadSnapshot: async () => {
     set({ loading: true, error: null })
@@ -83,7 +99,15 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     if (result.valid) {
       get().loadSnapshot()
     }
-    return { valid: result.valid, error: result.error }
+    return {
+      key: result.key,
+      valid: result.valid,
+      error: result.error,
+      teamName: result.teamName,
+      teamId: result.teamId,
+      userName: result.userName,
+      scopes: result.scopes
+    }
   },
 
   applySnapshot: (snapshot) => set({ snapshot, loading: false }),

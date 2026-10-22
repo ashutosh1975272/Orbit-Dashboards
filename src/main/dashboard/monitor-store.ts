@@ -2,11 +2,41 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { DashboardProject } from '../../shared/dashboard-contract'
 
+/** Workspace facts discovered when a manual token was validated. */
+export interface ManualTokenMeta {
+  teamId: string
+  teamName: string
+  userName?: string
+}
+
 interface MonitorFile {
   projects: DashboardProject[]
   manualTokens: Record<string, string>
+  /** v2.2 — workspace facts per vault key (never the token itself). */
+  manualTokenMeta?: Record<string, ManualTokenMeta>
+  /** v2.2 — channelId → owning workspace id (enforces 1 workspace = 1 card). */
+  channelOwners?: Record<string, string>
   syncIntervalSeconds?: number
   updatedAt?: string
+}
+
+/** Lazy safeStorage import so constructor stays sync (matches existing seams). */
+interface EncryptedVault {
+  encrypt(plain: string): string
+  decrypt(b64: string): string
+}
+
+let vault: EncryptedVault | null = null
+
+async function getVault(): Promise<EncryptedVault> {
+  if (!vault) {
+    const { safeStorage } = (await import('electron')) as typeof import('electron')
+    vault = {
+      encrypt: (plain) => safeStorage.encryptString(plain).toString('base64'),
+      decrypt: (b64) => safeStorage.decryptString(Buffer.from(b64, 'base64'))
+    }
+  }
+  return vault
 }
 
 /** Persisted monitor config: projects + manual tokens + sync interval. */
@@ -31,24 +61,62 @@ export class MonitorStore {
     const data = await this.read()
     let project: DashboardProject
     const incoming = input.project
-    if ('id' in incoming && incoming.id) {
-      const incomingId = incoming.id
-      const existing = data.projects.find((p) => p.id === incomingId)
-      if (existing) {
-        project = { ...existing, ...incoming }
+    const existingId = 'id' in incoming && incoming.id ? incoming.id : null
+    const existing = existingId ? data.projects.find((p) => p.id === existingId) : undefined
+
+    // v2.2 — one card = one workspace. Stamp the workspace from the vault
+    // metadata when the caller did not provide it, and never let a card
+    // change the workspace it belongs to.
+    const meta = incoming.manualTokenKey
+      ? data.manualTokenMeta?.[incoming.manualTokenKey]
+      : undefined
+    const teamName = incoming.teamName ?? meta?.teamName
+    const teamId =
+      incoming.teamId && incoming.teamId !== 'manual'
+        ? incoming.teamId
+        : (meta?.teamId ?? incoming.teamId)
+    if (existing?.teamName && teamName && existing.teamName !== teamName) {
+      throw new Error(
+        `“${existing.name}” belongs to workspace ${existing.teamName}. A card can only watch one workspace — create a separate card instead.`
+      )
+    }
+
+    // v2.2 — reject channels owned by a different workspace.
+    const owners = data.channelOwners ?? {}
+    for (const monitor of incoming.monitors) {
+      const owner = owners[monitor.channelId]
+      if (owner && teamId && owner !== teamId) {
+        throw new Error(
+          `Channel #${monitor.channelName} belongs to another workspace. One card = one workspace — pick channels from a single workspace.`
+        )
+      }
+    }
+
+    const stamped = { ...incoming, teamName, teamId } as typeof incoming
+    if ('id' in stamped && stamped.id) {
+      const incomingId = stamped.id
+      const found = data.projects.find((p) => p.id === incomingId)
+      if (found) {
+        project = { ...found, ...stamped }
         data.projects = data.projects.filter((p) => p.id !== project.id)
       } else {
         project = {
-          ...(incoming as Omit<DashboardProject, 'createdAt'>),
+          ...(stamped as Omit<DashboardProject, 'createdAt'>),
           createdAt: new Date().toISOString()
         }
       }
     } else {
       project = {
-        ...(incoming as Omit<DashboardProject, 'id' | 'createdAt'>),
+        ...(stamped as Omit<DashboardProject, 'id' | 'createdAt'>),
         id: `proj_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
         createdAt: new Date().toISOString()
       }
+    }
+    // remember channel ownership for the cross-workspace guard
+    if (teamId && teamId !== 'manual') {
+      const nextOwners = { ...owners }
+      for (const monitor of project.monitors) nextOwners[monitor.channelId] = teamId
+      data.channelOwners = nextOwners
     }
     data.projects.push(project)
     await this.write(data)
@@ -62,11 +130,26 @@ export class MonitorStore {
   }
 
   /** os-encrypted when safeStorage available (encrypt b64) else plaintext JSON. */
-  async saveManualToken(key: string, token: string): Promise<{ plaintext: boolean }> {
+  async saveManualToken(
+    key: string,
+    token: string,
+    meta?: ManualTokenMeta
+  ): Promise<{ plaintext: boolean }> {
+    if (meta) {
+      const data = await this.read()
+      data.manualTokenMeta = { ...(data.manualTokenMeta ?? {}), [key]: meta }
+      await this.write(data)
+    }
     if (!this.encryptionAvailable) {
       return { plaintext: await this.savePlain(key, token) }
     }
-    throw new Error('covered by encrypted path — see below')
+    const data = await this.read()
+    data.manualTokens = {
+      ...data.manualTokens,
+      [key]: (await getVault()).encrypt(token)
+    }
+    await this.write(data)
+    return { plaintext: false }
   }
 
   private async savePlain(key: string, token: string): Promise<boolean> {
@@ -77,7 +160,15 @@ export class MonitorStore {
   }
 
   async getManualToken(key: string): Promise<string | null> {
-    return (await this.read()).manualTokens[key] ?? null
+    const raw = (await this.read()).manualTokens[key] ?? null
+    if (raw === null) return null
+    if (!this.encryptionAvailable) return raw
+    try {
+      return (await getVault()).decrypt(raw.replace(/[\r\n]/g, ''))
+    } catch {
+      // legacy plaintext entry written by the fallback path
+      return raw.split('\u0000').join('')
+    }
   }
 
   async deleteManualToken(key: string): Promise<void> {
@@ -93,30 +184,29 @@ export class MonitorStore {
     return Object.keys(data.manualTokens).map((key) => ({ key, persisted: true }))
   }
 
-  /** Store workspace metadata discovered during token validation. */
-  async upsertProjectManualTokenMeta(
-    key: string,
-    meta: { teamId: string; teamName: string }
-  ): Promise<void> {
+  /** Workspace facts for one vault key (team id/name discovered at validation). */
+  async getManualTokenMeta(key: string): Promise<ManualTokenMeta | null> {
     const data = await this.read()
-    const id = `manual_${key}`
-    const existing = data.projects.find((p) => p.id === id)
-    if (existing) {
-      existing.manualTokenKey = key
-    } else {
-      data.projects.push({
-        id,
-        name: meta.teamName,
-        clientName: meta.teamName,
-        profileId: 'manual',
-        teamId: meta.teamId,
-        appId: 'slack',
-        tokenSource: 'manual',
-        manualTokenKey: key,
-        monitors: [],
-        createdAt: new Date().toISOString()
-      })
-    }
+    return data.manualTokenMeta?.[key] ?? null
+  }
+
+  /** All known vault keys with their workspace facts. */
+  async listManualTokenMeta(): Promise<Array<{ key: string } & ManualTokenMeta>> {
+    const data = await this.read()
+    const meta = data.manualTokenMeta ?? {}
+    return Object.entries(meta).map(([key, value]) => ({ key, ...value }))
+  }
+
+  /** Channel → owning workspace map (used by the workspace migration). */
+  async listChannelOwners(): Promise<Record<string, string>> {
+    const data = await this.read()
+    return { ...(data.channelOwners ?? {}) }
+  }
+
+  /** Store workspace metadata discovered during token validation. */
+  async upsertManualTokenMeta(key: string, meta: ManualTokenMeta): Promise<void> {
+    const data = await this.read()
+    data.manualTokenMeta = { ...(data.manualTokenMeta ?? {}), [key]: meta }
     await this.write(data)
   }
 

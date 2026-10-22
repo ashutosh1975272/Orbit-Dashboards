@@ -1,4 +1,5 @@
 import { SlackPoller } from './slack-poller'
+import type { InsightEngine } from './insight-engine'
 import type {
   DashboardChannelDelta,
   DashboardProject,
@@ -36,7 +37,7 @@ export interface DashboardSyncEngineDeps {
 }
 
 export class DashboardSyncEngine {
-  private readonly monitorStore: MonitorStore
+  protected readonly monitorStore: MonitorStore
   private readonly deltaStore: DashboardDeltaStore
   private readonly oauthTokenProvider: OAuthTokenProvider
   private readonly manualTokenProvider?: ManualTokenProvider
@@ -77,7 +78,7 @@ export class DashboardSyncEngine {
     this.emitProgress(payload)
   }
 
-  private async tokenFor(project: DashboardProject): Promise<string | null> {
+  protected async tokenFor(project: DashboardProject): Promise<string | null> {
     if (project.tokenSource === 'manual') {
       if (!project.manualTokenKey || !this.manualTokenProvider) return null
       return this.manualTokenProvider.getManualToken(project.manualTokenKey)
@@ -126,6 +127,7 @@ export class DashboardSyncEngine {
         channelId: monitor.channelId,
         channelName: monitor.channelName,
         messageCount: after?.messageCount ?? stored.added,
+        newMessageCount: stored.added,
         latestMessageAt: new Date(Number(stored.cursor) * 1000).toISOString(),
         cursor: stored.cursor,
         lastSyncAt: stored.lastSyncAt
@@ -295,5 +297,51 @@ export class DashboardSyncEngine {
       out.push(...messages)
     }
     return out
+  }
+}
+
+/**
+ * v2.2 subclass — identical behavior plus an optional post-sync insight
+ * refresh (NVIDIA NIM). Additive: base engine stays untouched.
+ */
+export class DashboardInsightSyncEngine extends DashboardSyncEngine {
+  private insightEngine: InsightEngine | null
+
+  constructor(deps: DashboardSyncEngineDeps & { insightEngine?: InsightEngine | null }) {
+    super(deps)
+    if (deps.insightEngine) {
+      this.insightEngine = deps.insightEngine
+    } else {
+      this.insightEngine = null
+    }
+  }
+
+  /** attach insights later (e.g. after env key detected) */
+  setInsightEngine(engine: InsightEngine | null): void {
+    this.insightEngine = engine
+  }
+
+  private async enrich(
+    project: DashboardProject,
+    snapshot: DashboardProjectSnapshot,
+    token: string
+  ): Promise<DashboardProjectSnapshot> {
+    if (!this.insightEngine) return snapshot
+    try {
+      return await this.insightEngine.refresh(project, token, snapshot)
+    } catch {
+      return snapshot
+    }
+  }
+
+  override async syncProject(projectId: string): Promise<DashboardProjectSnapshot | null> {
+    const snapshot = await super.syncProject(projectId)
+    if (!snapshot || !this.insightEngine) return snapshot
+    const projects = await this.monitorStore.listProjects()
+    const project = projects.find((p) => p.id === projectId)
+    if (!project) return snapshot
+    const token = await this.tokenFor(project)
+    if (!token) return snapshot
+    return await this.enrich(project, snapshot, token)
   }
 }

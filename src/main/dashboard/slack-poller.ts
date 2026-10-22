@@ -24,7 +24,20 @@ interface AuthTestResponse {
   team_id?: string
   team?: string
   user_id?: string
+  user?: string
   url?: string
+  scopes?: string[]
+}
+
+interface UsersListResponse {
+  ok: boolean
+  error?: string
+  members?: Array<{
+    id: string
+    name?: string
+    real_name?: string
+    profile?: { display_name?: string; real_name?: string }
+  }>
 }
 
 async function sleep(ms: number): Promise<void> {
@@ -98,6 +111,8 @@ export class SlackPoller {
     valid: boolean
     teamId?: string
     teamName?: string
+    userName?: string
+    scopes?: string[]
     error?: string
   }> {
     if (this.baseUrl.startsWith('http://_FAKE')) {
@@ -108,7 +123,26 @@ export class SlackPoller {
       valid: true,
       teamId: res.team_id,
       teamName: res.team,
+      userName: res.user,
+      scopes: res.scopes,
       error: undefined
     }
+  }
+
+  /** real/display name map for a workspace — used to label prompts. */
+  async usersList(token: string): Promise<Map<string, string>> {
+    if (this.baseUrl.startsWith('http://_FAKE')) return new Map()
+    const map = new Map<string, string>()
+    try {
+      const res = await callApi<UsersListResponse>('users.list', token, { limit: '200' })
+      for (const m of res.members ?? []) {
+        const name =
+          m.profile?.display_name || m.profile?.real_name || m.real_name || m.name || m.id
+        if (m.id) map.set(m.id, name)
+      }
+    } catch {
+      // name mapping is best-effort; raw IDs still work downstream
+    }
+    return map
   }
 }
