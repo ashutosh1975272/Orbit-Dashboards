@@ -15,7 +15,8 @@ import type {
 import type {
   DashboardSnapshot,
   DashboardSyncProgressPayload,
-  InsightHistoryEntryContract
+  InsightHistoryEntryContract,
+  RecentActivity
 } from '../shared/dashboard-contract'
 
 const api: IpcApi = {
@@ -163,6 +164,8 @@ const api: IpcApi = {
       ipcRenderer.invoke(IpcChannels.DashboardGetHistory, payload) as Promise<
         InsightHistoryEntryContract[]
       >,
+    getRecent: () =>
+      ipcRenderer.invoke(IpcChannels.DashboardGetRecent) as Promise<RecentActivity[]>,
     listChannels: (payload) => ipcRenderer.invoke(IpcChannels.DashboardListChannels, payload),
     upsertProject: (payload) => ipcRenderer.invoke(IpcChannels.DashboardUpsertProject, payload),
     deleteProject: (payload) => ipcRenderer.invoke(IpcChannels.DashboardDeleteProject, payload),

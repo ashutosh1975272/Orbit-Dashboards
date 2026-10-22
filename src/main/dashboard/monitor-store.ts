@@ -7,6 +7,8 @@ export interface ManualTokenMeta {
   teamId: string
   teamName: string
   userName?: string
+  /** Slack user id of the token owner (= the freelancer). */
+  userId?: string
 }
 
 interface MonitorFile {
@@ -75,6 +77,13 @@ export class MonitorStore {
       incoming.teamId && incoming.teamId !== 'manual'
         ? incoming.teamId
         : (meta?.teamId ?? incoming.teamId)
+    // v2.3 — hard rule: a card without a real workspace is never stored.
+    // Without it every workspace would share one message bucket.
+    if (!teamId || teamId === 'manual') {
+      throw new Error(
+        'Workspace unknown — reconnect the connector so the card can be bound to one workspace.'
+      )
+    }
     if (existing?.teamName && teamName && existing.teamName !== teamName) {
       throw new Error(
         `“${existing.name}” belongs to workspace ${existing.teamName}. A card can only watch one workspace — create a separate card instead.`
@@ -113,11 +122,9 @@ export class MonitorStore {
       }
     }
     // remember channel ownership for the cross-workspace guard
-    if (teamId && teamId !== 'manual') {
-      const nextOwners = { ...owners }
-      for (const monitor of project.monitors) nextOwners[monitor.channelId] = teamId
-      data.channelOwners = nextOwners
-    }
+    const nextOwners = { ...owners }
+    for (const monitor of project.monitors) nextOwners[monitor.channelId] = teamId
+    data.channelOwners = nextOwners
     data.projects.push(project)
     await this.write(data)
     return project

@@ -55,8 +55,10 @@ export async function migrateWorkspaceCards(
   const projects = await deps.monitorStore.listProjects()
   if (projects.length === 0) return result
 
-  // Fast path: every card already knows its workspace — no network calls.
-  const needsWork = projects.some((p) => !p.teamName || !p.teamId || p.teamId === 'manual')
+  // Fast path: every card already knows its workspace and who "me" is.
+  const needsWork = projects.some(
+    (p) => !p.teamName || !p.teamId || p.teamId === 'manual' || !p.selfUserId
+  )
   if (!needsWork) {
     result.untouched = projects.length
     return result
@@ -98,8 +100,8 @@ export async function migrateWorkspaceCards(
   for (const project of projects) {
     const projectMeta = project.manualTokenKey ? metaByKey.get(project.manualTokenKey) : undefined
 
-    // already clean — only repair a placeholder teamId
-    if (project.teamName && project.teamId && project.teamId !== 'manual') {
+    // already clean — only repair a placeholder teamId / missing "me"
+    if (project.teamName && project.teamId && project.teamId !== 'manual' && project.selfUserId) {
       result.untouched += 1
       continue
     }
@@ -130,7 +132,12 @@ export async function migrateWorkspaceCards(
           project: {
             ...project,
             teamId: projectMeta.teamId,
-            teamName: projectMeta.teamName
+            teamName: projectMeta.teamName,
+            selfUserId: projectMeta.userId ?? project.selfUserId,
+            clientName:
+              projectMeta.userName && project.clientName === projectMeta.userName
+                ? projectMeta.teamName
+                : project.clientName
           }
         })
         result.stamped += 1
@@ -143,11 +150,25 @@ export async function migrateWorkspaceCards(
 
     if (groups.size === 1) {
       const only = [...groups.values()][0]
+      if (!only.teamId || only.teamId === 'manual') {
+        // workspace could not be resolved — leave the legacy card alone
+        result.untouched += 1
+        result.notes.push(`skipped “${project.name}” — workspace unknown`)
+        continue
+      }
+      const selfUserId = projectMeta?.userId ?? project.selfUserId
       await deps.monitorStore.upsertProject({
         project: {
           ...project,
           teamId: only.teamId,
-          teamName: only.teamName
+          teamName: only.teamName,
+          selfUserId,
+          // the client name used to be auto-filled with the token owner —
+          // replace it with the workspace when it was never edited
+          clientName:
+            projectMeta?.userName && project.clientName === projectMeta.userName
+              ? only.teamName
+              : project.clientName
         }
       })
       result.stamped += 1
@@ -156,7 +177,13 @@ export async function migrateWorkspaceCards(
     }
 
     // mixed card → one clean card per workspace
-    const ordered = [...groups.values()].sort((a, b) => {
+    const ordered = [...groups.values()].filter((g) => g.teamId && g.teamId !== 'manual')
+    if (ordered.length === 0) {
+      result.untouched += 1
+      result.notes.push(`skipped “${project.name}” — workspace unknown`)
+      continue
+    }
+    ordered.sort((a, b) => {
       const aOwn = a.key && a.key === project.manualTokenKey ? 0 : 1
       const bOwn = b.key && b.key === project.manualTokenKey ? 0 : 1
       return aOwn - bOwn
@@ -169,6 +196,7 @@ export async function migrateWorkspaceCards(
         profileId: `manual:${group.key}`,
         teamId: group.teamId,
         teamName: group.teamName,
+        selfUserId: metaByKey.get(group.key)?.userId ?? project.selfUserId,
         appId: project.appId,
         tokenSource: project.tokenSource,
         manualTokenKey: group.key || undefined,

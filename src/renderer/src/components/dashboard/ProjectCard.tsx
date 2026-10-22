@@ -5,6 +5,7 @@ import type {
   InsightHistoryEntryContract
 } from '../../../../shared/dashboard-contract'
 import { useDashboardStore } from '../../hooks/useDashboard'
+import { buildCardView } from './card-view'
 
 interface ProjectCardProps {
   snapshot: DashboardProjectSnapshot
@@ -44,7 +45,6 @@ export default function ProjectCard({
   index,
   onDelete
 }: ProjectCardProps): React.ReactElement {
-  void index
   const project = snapshot.project
   const syncNow = useDashboardStore((s) => s.syncNow)
   const syncingIds = useDashboardStore((s) => s.syncingProjectIds)
@@ -53,6 +53,7 @@ export default function ProjectCard({
 
   const [editOpen, setEditOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
   const [history, setHistory] = useState<InsightHistoryEntryContract[]>([])
 
   useEffect(() => {
@@ -62,30 +63,13 @@ export default function ProjectCard({
       .then(setHistory)
       .catch(() => setHistory([]))
   }, [historyOpen, project.id])
+
   const [startDate, setStartDate] = useState(project.startDate ?? '')
   const [endDate, setEndDate] = useState(project.endDate ?? '')
   const [completion, setCompletion] = useState(String(project.manualCompletion ?? ''))
 
-  const channelNames = useMemo(
-    () => project.monitors.map((m) => m.channelName).join(', '),
-    [project.monitors]
-  )
-
-  // v2.2 — the LLM insight wins over the local heuristics when present.
-  const insight = snapshot.insight ?? null
-  const progress = insight ? insight.progress : snapshot.completion
-  const mood = insight ? insight.mood : snapshot.mood.state
-  const dates = insight
-    ? {
-        startDate: insight.dates.startDate ?? snapshot.effectiveDates.startDate,
-        endDate: insight.dates.endDate ?? snapshot.effectiveDates.endDate,
-        fromChat: Boolean(insight.dates.startDate || insight.dates.endDate)
-      }
-    : {
-        startDate: snapshot.effectiveDates.startDate,
-        endDate: snapshot.effectiveDates.endDate,
-        fromChat: false
-      }
+  const view = useMemo(() => buildCardView(snapshot, index), [snapshot, index])
+  const { identity, centre, detail } = view
 
   const saveMeta = async (): Promise<void> => {
     await useDashboardStore.getState().upsertProject({
@@ -99,24 +83,38 @@ export default function ProjectCard({
   }
 
   return (
-    <article className="dash-card" data-testid={`dash-card-${index}`}>
+    <article
+      className="dash-card dash-card-wide"
+      id={`dash-card-anchor-${project.id}`}
+      data-testid={`dash-card-${index}`}
+    >
+      {/* ================= HEAD ================= */}
       <header className="dash-card-head">
         <div className="dash-card-title">
           <span className="dash-card-index">#{index + 1}</span>
-          <h3>{project.name}</h3>
-          <span className="dash-card-client">{project.clientName}</span>
-          {project.teamName ? (
-            <span className="dash-card-workspace">{project.teamName}</span>
-          ) : null}
+          <h3 title={project.name}>{identity.name}</h3>
+          <span className="dash-card-client" title={identity.clientName}>
+            {identity.clientName}
+          </span>
+          <span
+            className="dash-card-workspace"
+            title="Workspace — one card watches exactly one workspace"
+          >
+            {identity.teamName}
+          </span>
         </div>
         <div className="dash-card-actions">
+          <span className="dash-card-ai-badge" title="When the insight was produced">
+            {view.aiBadge}
+          </span>
           <button
             type="button"
             className="dash-icon-btn"
             onClick={() => setHistoryOpen((v) => !v)}
             title="Insight history over time"
+            data-testid="dash-history-toggle"
           >
-            {historyOpen ? '▾' : '▸'} History
+            {historyOpen ? '▾' : '▸'}
           </button>
           <button
             type="button"
@@ -161,137 +159,251 @@ export default function ProjectCard({
         </div>
       </header>
 
-      <div className="dash-card-meta">
-        <span className="dash-chip" title="Workspace + monitored channels">
-          {channelNames || 'no channels added'}
-        </span>
-        <span
-          className={`dash-chip ${MOOD_BADGE[mood]}`}
-          title={insight?.progressEvidence || snapshot.mood.signal}
-        >
-          mood: {mood}
-        </span>
-        {insight ? (
-          <span className={`dash-chip insight-status-${insight.status}`}>{insight.status}</span>
-        ) : (
-          <span className="dash-chip">
-            {PACE_ARROW[snapshot.pace]} {snapshot.pace}
-          </span>
-        )}
-      </div>
+      <div className="dash-card-body">
+        {/* ================= LEFT: identity & health ================= */}
+        <section className="dash-zone dash-zone-identity">
+          <div className="dash-zone-head">client</div>
+          <div className="dash-identity-client">{identity.clientName}</div>
 
-      <div className="dash-progress-row">
-        <div className="dash-progress-bar" aria-label={`Completion ${progress}%`}>
-          <div className="dash-progress-fill" style={{ width: `${progress}%` }} />
-        </div>
-        <span className="dash-progress-label">{progress}%</span>
-        <span className="dash-progress-new">
-          {snapshot.newMessageCount > 0 ? `+${snapshot.newMessageCount} new` : 'no new msgs'}
-        </span>
-      </div>
+          <div
+            className="dash-progress-row"
+            title={identity.progressEvidence}
+            aria-label={`Completion ${identity.progress}%`}
+          >
+            <div className="dash-progress-bar">
+              <div className="dash-progress-fill" style={{ width: `${identity.progress}%` }} />
+            </div>
+            <span className="dash-progress-label">{identity.progress}%</span>
+          </div>
+          {identity.progressEvidence ? (
+            <p className="dash-insight-evidence">{identity.progressEvidence}</p>
+          ) : null}
 
-      {insight ? (
-        <div className="dash-insight" data-testid="dash-insight">
-          <div className="dash-insight-head">
-            {insight.clientAsk.needsReply ? (
-              <span className="dash-chip insight-needs-reply">⚠ needs my reply</span>
-            ) : null}
-            {snapshot.insightUpdatedAt ? (
-              <span className="dash-insight-updated">
-                {snapshot.insightSource === 'heuristic' ? 'heuristic' : 'AI'} ·{' '}
-                {fmtTime(snapshot.insightUpdatedAt)}
-                {snapshot.insightModel ? ` · ${snapshot.insightModel}` : ''}
-              </span>
+          <div className="dash-identity-mood" title={identity.moodReason} data-testid="dash-mood">
+            <span className={`dash-chip ${MOOD_BADGE[identity.mood]}`}>mood: {identity.mood}</span>
+            {identity.moodQuote ? (
+              <span className="dash-insight-meta"> “{identity.moodQuote}”</span>
             ) : null}
           </div>
-          {insight.situationLine ? (
-            <p className="dash-insight-situation">{insight.situationLine}</p>
+
+          <div className="dash-identity-dates" title={identity.dates.badge}>
+            <span className="dash-zone-head">dates</span>
+            <div className="dash-dates">
+              📅 {identity.dates.startDate ?? '?'} → {identity.dates.endDate ?? '?'}
+              <span className="dash-insight-meta"> ({identity.dates.badge})</span>
+            </div>
+          </div>
+
+          {identity.channels.length > 0 ? (
+            <div className="dash-identity-channels">
+              <span className="dash-zone-head">channels</span>
+              <div className="dash-card-perchannel">
+                {identity.channels.map((c) => (
+                  <span key={c.channelId} className="dash-chip dash-chip-mini">
+                    #{c.channelName}
+                    {c.newCount > 0 ? ` +${c.newCount}` : ''}
+                  </span>
+                ))}
+              </div>
+            </div>
           ) : null}
-          {insight.highlights.length > 0 ? (
-            <ul className="dash-insight-highlights">
-              {insight.highlights.map((h, i) => (
-                <li key={i}>{h}</li>
-              ))}
-            </ul>
-          ) : null}
-          {insight.clientAsk.lastClientMessage ? (
-            <p className="dash-insight-client-msg">
-              ✉ {insight.clientAsk.lastClientMessage.who} ·{' '}
-              {fmtTime(insight.clientAsk.lastClientMessage.whenIso)} — “
-              {insight.clientAsk.lastClientMessage.quote}”
+        </section>
+
+        {/* ================= CENTRE: what matters ================= */}
+        <section className="dash-zone dash-zone-centre">
+          <div className="dash-zone-head">
+            situation
+            {centre.statusChange ? (
+              <span className="dash-insight-meta"> · {centre.statusChange}</span>
+            ) : null}
+          </div>
+          {centre.status ? (
+            <div className="dash-centre-pills">
+              <span
+                className={`dash-chip insight-status-${centre.status}`}
+                title={centre.statusReason}
+              >
+                {centre.status}
+              </span>
+              {centre.needsReply ? (
+                <span
+                  className="dash-chip insight-needs-reply"
+                  title={centre.openQuestions.join('\n')}
+                  data-testid="dash-needs-reply"
+                >
+                  ⚠ needs my reply
+                  {centre.urgency !== 'normal' ? ` (${centre.urgency})` : ''}
+                </span>
+              ) : null}
+            </div>
+          ) : (
+            <div className="dash-centre-pills">
+              <span className="dash-chip">
+                {PACE_ARROW[snapshot.pace]} {snapshot.pace}
+              </span>
+            </div>
+          )}
+          {centre.situationLine ? (
+            <p className="dash-insight-situation" data-testid="dash-situation">
+              {centre.situationLine}
             </p>
           ) : null}
-          {insight.nextStep ? (
-            <p className="dash-insight-next">→ next: {insight.nextStep}</p>
+          {centre.recentLine ? (
+            <p className="dash-insight-recent" data-testid="dash-recent-line">
+              ↻ just changed: {centre.recentLine}
+            </p>
           ) : null}
-          {insight.blockers.length > 0 ? (
-            <ul className="dash-insight-blockers">
-              {insight.blockers.map((b, i) => (
-                <li key={i}>{b}</li>
+          {centre.highlights.length > 0 ? (
+            <ul className="dash-insight-highlights">
+              {centre.highlights.map((h, i) => (
+                <li key={i}>
+                  <span className="dash-insight-what">{h.what}</span>
+                  {h.who ? <span className="dash-insight-meta"> · {h.who}</span> : null}
+                  {h.whenIso ? (
+                    <span className="dash-insight-meta"> · {fmtTime(h.whenIso)}</span>
+                  ) : null}
+                </li>
               ))}
             </ul>
           ) : null}
-          {insight.progressEvidence ? (
-            <p className="dash-insight-evidence">{insight.progressEvidence}</p>
-          ) : null}
-        </div>
-      ) : null}
-
-      <div className="dash-summary">
-        {snapshot.insight ? null : snapshot.summary ? (
-          <pre>{snapshot.summary}</pre>
-        ) : (
-          <p className="dash-empty">Awaiting first sync — hit ⟳ Sync.</p>
-        )}
-      </div>
-
-      {historyOpen ? (
-        <div className="dash-history" data-testid="dash-history">
-          {history.length === 0 ? (
-            <p className="dash-empty">No history yet — it builds each time insights refresh.</p>
+          {centre.lastClientMessage ? (
+            <p className="dash-insight-client-msg">
+              ✉ {centre.lastClientMessage.who} · {fmtTime(centre.lastClientMessage.whenIso)} — “
+              {centre.lastClientMessage.quote}”
+            </p>
           ) : (
-            history.map((entry, i) => (
-              <div key={i} className="dash-history-entry">
-                <span className="dash-history-when">
-                  {fmtTime(entry.atIso)} · +{entry.newMessageCount} msgs · {entry.insight.status} ·{' '}
-                  {entry.insight.progress}%{entry.source === 'heuristic' ? ' · heuristic' : ''}
-                </span>
-                {entry.insight.situationLine ? <p>{entry.insight.situationLine}</p> : null}
-                {entry.insight.highlights.length > 0 ? (
-                  <ul>
-                    {entry.insight.highlights.map((h, j) => (
-                      <li key={j}>{h}</li>
-                    ))}
-                  </ul>
-                ) : null}
-              </div>
-            ))
+            <p className="dash-insight-meta">no client message yet</p>
           )}
-        </div>
-      ) : null}
+          {centre.openQuestions.length > 0 ? (
+            <ul className="dash-insight-questions">
+              {centre.openQuestions.map((q, i) => (
+                <li key={i}>? {q}</li>
+              ))}
+            </ul>
+          ) : null}
+          {centre.nextStep ? (
+            <p className="dash-insight-next" data-testid="dash-next-step">
+              → next: {centre.nextStep}
+            </p>
+          ) : null}
+        </section>
 
-      <footer className="dash-card-foot">
-        <span className="dash-dates">
-          📅 {dates.startDate ?? '?'} → {dates.endDate ?? '?'}
-          {dates.fromChat
-            ? ' (from chat)'
-            : project.startDate || project.endDate
-              ? ' (manual)'
-              : ''}
-        </span>
-        <span className="dash-updated">synced {fmtTime(snapshot.lastUpdatedAt)}</span>
-      </footer>
+        {/* ================= RIGHT: detail ================= */}
+        <section className="dash-zone dash-zone-detail">
+          <div className="dash-zone-head">blocks &amp; next</div>
+          {detail.blockers.length > 0 ? (
+            <ul className="dash-insight-blockers">
+              {detail.blockers.map((b, i) => (
+                <li key={i}>
+                  <span className="dash-insight-what">{b.what}</span>
+                  {b.owner ? <span className="dash-insight-meta"> · {b.owner}</span> : null}
+                  {b.sinceIso ? (
+                    <span className="dash-insight-meta"> · {fmtTime(b.sinceIso)}</span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="dash-insight-meta">no blockers</p>
+          )}
 
-      {snapshot.perChannel.length > 1 ? (
-        <div className="dash-card-perchannel" title="Messages stored per channel">
-          {snapshot.perChannel.map((c) => (
-            <span key={c.channelId} className="dash-chip dash-chip-mini">
-              #{c.channelName}
-              {c.newMessageCount && c.newMessageCount > 0 ? ` +${c.newMessageCount}` : ''}
-            </span>
-          ))}
-        </div>
-      ) : null}
+          {detail.hasMoreDetail ? (
+            <>
+              <button
+                type="button"
+                className="dash-insight-more-toggle"
+                onClick={() => setMoreOpen((v) => !v)}
+              >
+                {moreOpen ? '▾ hide detail' : '▸ more detail'}
+              </button>
+              {moreOpen ? (
+                <div className="dash-insight-detail" data-testid="dash-insight-detail">
+                  {detail.commitments.length > 0 ? (
+                    <div className="dash-insight-detail-block">
+                      <b>commitments</b>
+                      <ul>
+                        {detail.commitments.map((c, i) => (
+                          <li key={i}>
+                            {c.what}
+                            {c.who ? ` · ${c.who}` : ''}
+                            {c.dueIso ? ` · due ${fmtTime(c.dueIso)}` : ''}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  {detail.decisions.length > 0 ? (
+                    <div className="dash-insight-detail-block">
+                      <b>decisions</b>
+                      <ul>
+                        {detail.decisions.map((d, i) => (
+                          <li key={i}>
+                            {d.what}
+                            {d.who ? ` · ${d.who}` : ''}
+                            {d.whenIso ? ` · ${fmtTime(d.whenIso)}` : ''}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  {detail.risks.length > 0 ? (
+                    <div className="dash-insight-detail-block">
+                      <b>risks</b>
+                      <ul>
+                        {detail.risks.map((r, i) => (
+                          <li key={i}>{r}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  {detail.keywords.length > 0 ? (
+                    <p className="dash-insight-keywords">
+                      {detail.keywords.map((k) => (
+                        <span key={k} className="dash-chip dash-chip-mini">
+                          {k}
+                        </span>
+                      ))}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </>
+          ) : null}
+
+          {historyOpen ? (
+            <div className="dash-history" data-testid="dash-history">
+              {history.length === 0 ? (
+                <p className="dash-empty">No history yet — it builds each time insights refresh.</p>
+              ) : (
+                history.map((entry, i) => (
+                  <div key={i} className="dash-history-entry">
+                    <span className="dash-history-when">
+                      {fmtTime(entry.atIso)} · +{entry.newMessageCount} msgs ·{' '}
+                      {entry.previousStatus && entry.previousStatus !== entry.insight.status
+                        ? `${entry.previousStatus} → ${entry.insight.status}`
+                        : entry.insight.status}{' '}
+                      · {entry.insight.progress}%
+                      {entry.source === 'heuristic' ? ' · heuristic' : ''}
+                    </span>
+                    {entry.insight.situationLine ? <p>{entry.insight.situationLine}</p> : null}
+                    {entry.insight.highlights.length > 0 ? (
+                      <ul>
+                        {entry.insight.highlights.map((h, j) => (
+                          <li key={j}>{h.what}</li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                ))
+              )}
+            </div>
+          ) : null}
+
+          <footer className="dash-card-foot">
+            <span className="dash-updated">{view.syncedLabel}</span>
+          </footer>
+        </section>
+      </div>
 
       {editOpen ? (
         <div className="settings-backdrop" onClick={() => setEditOpen(false)}>

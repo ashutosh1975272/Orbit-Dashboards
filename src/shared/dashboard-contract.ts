@@ -30,6 +30,8 @@ export interface DashboardProject {
   manualTokenKey?: string
   /** Workspace display name (v2.2) — stamped at create, drives card header. */
   teamName?: string
+  /** Slack user id of the token owner (= the freelancer, not the client). */
+  selfUserId?: string
   monitors: DashboardMonitor[]
   /** User-set dates (ISO yyyy-mm-dd) — win over extractedDates. */
   startDate?: string
@@ -94,6 +96,45 @@ export interface DashboardSnapshot {
   projects: DashboardProjectSnapshot[]
   manualTokens: DashboardManualToken[]
   syncIntervalSeconds: number
+  /** v2.3 — one line across all workspaces (each item names its workspace). */
+  digest?: DashboardDigest | null
+}
+
+/** v2.3 — cross-workspace digest (the ONLY place workspaces are combined). */
+export interface DashboardDigest {
+  /** ≤20 words — the single most urgent thing across all workspaces. */
+  topPriority: string
+  /** workspaces whose client is waiting on a reply */
+  needsReply: string[]
+  /** workspaces that are at risk / blocked */
+  atRisk: string[]
+  atIso: string
+  source: 'ai' | 'local'
+}
+
+/** v2.3 — one item per workspace for the "Recent" strip. */
+export type RecentActivityKind =
+  'client-question' | 'client-message' | 'decision' | 'delivery' | 'blocker' | 'chatter'
+
+export interface RecentActivity {
+  projectId: string
+  projectName: string
+  /** Workspace name — ALWAYS shown so workspaces are never mixed up. */
+  teamName: string
+  channelName: string
+  who: string
+  text: string
+  /** ISO timestamp of the underlying message */
+  ts: string
+  kind: RecentActivityKind
+  needsReply: boolean
+  status: InsightStatus
+  /** importance score (higher = more important) */
+  score: number
+  /** one meaningful sentence (never raw chat noise) */
+  oneLine: string
+  /** "old → new" when the status changed */
+  delta?: string
 }
 
 export type DashboardSyncProgressPayload = {
@@ -143,6 +184,8 @@ export interface ValidateTokenResultPayload extends DashboardManualToken {
   error?: string
   /** Slack user (display login) from auth.test — used to prefill client name. */
   userName?: string
+  /** Slack user id of the token owner — used to tell "me" from "the client". */
+  userId?: string
 }
 
 /** Public app identity so the wizard can render the exact manifest JSON for the user. */
@@ -154,6 +197,7 @@ export interface DashboardAppClientConfig {
 /* ===== v2.2 — NVIDIA NIM insight engine ===== */
 export type InsightStatus = 'on-track' | 'at-risk' | 'blocked' | 'waiting-on-client'
 export type InsightMood = 'good' | 'neutral' | 'tense'
+export type InsightUrgency = 'low' | 'normal' | 'high'
 
 export interface InsightClientMessage {
   who: string
@@ -161,18 +205,65 @@ export interface InsightClientMessage {
   quote: string
 }
 
+/** One thing that happened (evidence-linked). */
+export interface InsightHighlight {
+  what: string
+  who?: string
+  whenIso?: string
+}
+
+/** Something that is stuck, and who owns it. */
+export interface InsightBlocker {
+  what: string
+  owner?: string
+  sinceIso?: string
+}
+
+/** A promise made in chat (owner + what). */
+export interface InsightCommitment {
+  who?: string
+  what: string
+  dueIso?: string
+}
+
+/** An agreed decision in chat. */
+export interface InsightDecision {
+  what: string
+  who?: string
+  whenIso?: string
+}
+
 export interface ProjectInsight {
   status: InsightStatus
+  /** Why that status (≤15 words, evidence based). */
+  statusReason: string
+  /** "old → new" when the status changed with this refresh (else empty). */
+  statusChange: string
   mood: InsightMood
+  /** Why that mood (≤12 words). */
+  moodReason: string
+  /** Verbatim client quote behind the mood (empty when none). */
+  moodQuote: string
   /** 0-100 */
   progress: number
   progressEvidence: string
   situationLine: string
-  highlights: string[]
-  blockers: string[]
+  /** ≤12 words — the single most important thing that just changed. */
+  recentLine: string
+  highlights: InsightHighlight[]
+  blockers: InsightBlocker[]
   nextStep: string
-  dates: { startDate?: string; endDate?: string }
-  clientAsk: { needsReply: boolean; lastClientMessage: InsightClientMessage | null }
+  dates: { startDate?: string; endDate?: string; evidence?: string }
+  clientAsk: {
+    needsReply: boolean
+    urgency: InsightUrgency
+    lastClientMessage: InsightClientMessage | null
+    openQuestions: string[]
+  }
+  commitments: InsightCommitment[]
+  decisions: InsightDecision[]
+  risks: string[]
+  keywords: string[]
 }
 
 export interface InsightHistoryEntryContract {
@@ -183,4 +274,8 @@ export interface InsightHistoryEntryContract {
   cursorAtSummarize?: string
   /** 'ai' = NVIDIA NIM, 'heuristic' = local fallback (no key / API failure). */
   source?: 'ai' | 'heuristic'
+  /** model that produced this insight (shown on the card) */
+  model?: string
+  /** Status before this refresh — lets the timeline show "at-risk → on-track". */
+  previousStatus?: InsightStatus
 }

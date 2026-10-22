@@ -60,13 +60,13 @@ export class InsightEngine {
   private async newMessagesFor(
     project: DashboardProject,
     sinceTs: string
-  ): Promise<Array<{ msg: DashboardStoredMessage }>> {
-    const out: Array<{ msg: DashboardStoredMessage }> = []
+  ): Promise<Array<{ msg: DashboardStoredMessage; channel: string }>> {
+    const out: Array<{ msg: DashboardStoredMessage; channel: string }> = []
     for (const monitor of project.monitors) {
       const delta = await this.deltaStore.load(project.profileId, project.teamId, monitor.channelId)
       for (const msg of delta?.messages ?? []) {
         if (compareTs(msg.ts, sinceTs) > 0 && !msg.subtype && (msg.text ?? '').trim()) {
-          out.push({ msg })
+          out.push({ msg, channel: monitor.channelName })
         }
       }
     }
@@ -75,21 +75,26 @@ export class InsightEngine {
   }
 
   private toChatInput(
-    raw: Array<{ msg: DashboardStoredMessage }>,
+    raw: Array<{ msg: DashboardStoredMessage; channel: string }>,
     userNames: Map<string, string>,
     project: DashboardProject
   ): InsightChatMessageInput[] {
     const clientNames = new Set(
       [project.clientName.toLowerCase(), 'client'].filter((n) => n.length >= 3)
     )
-    return raw.map(({ msg }) => {
+    return raw.map(({ msg, channel }) => {
       const who = (msg.user && userNames.get(msg.user)) || msg.user || 'unknown'
-      const isClient = Boolean(msg.user && clientNames.has(who.toLowerCase()))
+      // "the client" = anybody who is not the token owner (the freelancer)
+      const isClient = Boolean(
+        msg.user &&
+        (project.selfUserId ? msg.user !== project.selfUserId : clientNames.has(who.toLowerCase()))
+      )
       return {
         ts: new Date(Number(msg.ts) * 1000).toISOString(),
         who,
         text: (msg.text ?? '').slice(0, 400),
-        isClient
+        isClient,
+        channel
       }
     })
   }
@@ -121,18 +126,19 @@ export class InsightEngine {
         if (due) {
           try {
             const userNames = await this.fetchUsers(token)
+            const chatInput = this.toChatInput(raw, userNames, project)
             const messages = buildInsightMessages({
               projectName: project.name,
               workspaceName: project.teamName ?? project.teamId,
+              clientName: project.clientName,
               previous,
-              newMessages: this.toChatInput(raw, userNames, project),
+              newMessages: chatInput,
               newCount
             })
-            const res = await this.provider.chatJson(messages, {
-              maxTokens: 1400,
-              temperature: 0.2
-            })
-            merged = mergeInsight(res.data, previous)
+            const res = await this.provider.chatJson(messages, { temperature: 0.2 })
+            // only quotes that really exist in the chat may reach the card
+            const quotes = chatInput.map((m) => m.text)
+            merged = mergeInsight(res.data, previous, quotes)
             modelUsed = res.modelUsed
             source = 'ai'
             this.log(
@@ -155,6 +161,11 @@ export class InsightEngine {
       source = 'heuristic'
     }
 
+    // the status transition is computed locally — the model may forget it
+    if (merged && previous && merged.status !== previous.status) {
+      merged = { ...merged, statusChange: `${previous.status} → ${merged.status}` }
+    }
+
     let insightUpdatedAtIso: string | null = null
     if (merged && source) {
       const list = await this.historyStore.append(project.id, {
@@ -162,6 +173,8 @@ export class InsightEngine {
         newMessageCount: newCount,
         insight: merged,
         source,
+        model: modelUsed ?? undefined,
+        previousStatus: previous?.status,
         cursorAtSummarize: raw.at(-1)?.msg.ts ?? sinceTs
       })
       insightUpdatedAtIso = list[0]?.atIso ?? null

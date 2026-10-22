@@ -9,6 +9,7 @@ import type {
   ManualTokenPayload,
   ProjectDeletePayload,
   ProjectUpsertPayload,
+  RecentActivity,
   SyncNowPayload,
   ValidateTokenResultPayload
 } from './dashboard-contract'
@@ -97,6 +98,7 @@ export const IpcChannels = {
   DashboardGetSnapshot: 'dashboard:get-snapshot',
   DashboardGetAppConfig: 'dashboard:get-app-config',
   DashboardGetHistory: 'dashboard:get-history',
+  DashboardGetRecent: 'dashboard:get-recent',
   DashboardListChannels: 'dashboard:list-channels',
   DashboardViewSet: 'dashboard:view-set',
   DashboardUpsertProject: 'dashboard:upsert-project',
@@ -243,6 +245,7 @@ export interface IpcApi {
     getSnapshot: () => Promise<DashboardSnapshot>
     getAppConfig: () => Promise<DashboardAppClientConfig>
     getHistory: (payload: { projectId: string }) => Promise<InsightHistoryEntryContract[]>
+    getRecent: () => Promise<RecentActivity[]>
     listChannels: (payload: DashboardListChannelsPayload) => Promise<SlackChannelSummary[]>
     upsertProject: (payload: ProjectUpsertPayload) => Promise<DashboardSnapshot>
     deleteProject: (payload: ProjectDeletePayload) => Promise<DashboardSnapshot>

@@ -135,10 +135,62 @@ export function computeMood(messages: DashboardStoredMessage[]): {
   }
 }
 
-/** Local literal-activity summary: last few newest message texts. */
+/** v2.3 — noise that must never reach a card: join/leave notices, bot
+ * posts, system messages and pure greetings/filler. */
+const GREETINGS = new Set([
+  'hi',
+  'hii',
+  'hiii',
+  'hiiii',
+  'hiiiiiiiiiiiiiiii',
+  'hey',
+  'hello',
+  'yo',
+  'ok',
+  'okay',
+  'kk',
+  'k',
+  'thanks',
+  'thank you',
+  'thx',
+  'bye',
+  'yes',
+  'no',
+  'sure',
+  'done',
+  'nice',
+  'lol',
+  'hmm'
+])
+
+const SYSTEM_PATTERNS = [
+  /has joined the channel/i,
+  /has left the channel/i,
+  /set the channel topic/i,
+  /pinned a message/i,
+  /unpinned a message/i,
+  /renamed the channel/i,
+  /uploaded a file/i,
+  /added an integration/i,
+  /^<@[A-Z0-9]+>\s*$/i
+]
+
+export function isNoise(message: { text?: string; subtype?: string }): boolean {
+  if (message.subtype && message.subtype !== 'message') return true
+  const text = (message.text ?? '').trim()
+  if (!text) return true
+  if (SYSTEM_PATTERNS.some((re) => re.test(text))) return true
+  if (GREETINGS.has(text.toLowerCase().replace(/[!.]+$/, ''))) return true
+  // short filler without any content words
+  if (text.length <= 4 && !/[a-z]{4,}/i.test(text)) return true
+  return false
+}
+
+/** Local literal-activity summary: last few newest meaningful message texts. */
 export function buildSummary(messages: DashboardStoredMessage[]): string[] {
   return messages
     .filter((m) => (m.text ?? '').trim().length > 0 && m.subtype !== 'message_changed')
+    .filter((m) => !isNoise(m))
     .slice(-5)
     .map((m) => {
       const text = (m.text ?? '').replace(/\s+/g, ' ').trim()

@@ -20,6 +20,26 @@ afterEach(async () => {
   dirs.length = 0
 })
 
+/** Write a legacy card straight into the store file (as old versions did). */
+async function writeLegacyProject(
+  rootDir: string,
+  project: Record<string, unknown>
+): Promise<void> {
+  const { readFile, writeFile } = await import('node:fs/promises')
+  const path = join(rootDir, 'monitors.json')
+  let file: { projects: unknown[]; manualTokens: Record<string, string> } = {
+    projects: [],
+    manualTokens: {}
+  }
+  try {
+    file = JSON.parse(await readFile(path, 'utf8'))
+  } catch {
+    /* fresh file */
+  }
+  file.projects.push(project)
+  await writeFile(path, JSON.stringify(file, null, 2), 'utf8')
+}
+
 async function tmpDir(): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'dash-v22-'))
   dirs.push(dir)
@@ -287,21 +307,21 @@ describe('workspace migration', () => {
   it('splits a mixed card into one card per workspace', async () => {
     const dir = await tmpDir()
     const store = new MonitorStore({ rootDir: dir, encryptionAvailable: false })
-    // legacy card: created before workspaces were stamped
-    await store.upsertProject({
-      project: {
-        name: 'Mixed',
-        clientName: 'Mixed',
-        profileId: 'manual:KEY_A',
-        teamId: 'manual',
-        appId: 'slack',
-        tokenSource: 'manual',
-        manualTokenKey: 'KEY_A',
-        monitors: [
-          { channelId: 'CA', channelName: 'a-channel' },
-          { channelId: 'CB', channelName: 'b-channel' }
-        ]
-      }
+    // legacy card: written by an old version, before workspaces were stamped
+    await writeLegacyProject(dir, {
+      id: 'legacy-1',
+      name: 'Mixed',
+      clientName: 'Mixed',
+      profileId: 'manual:KEY_A',
+      teamId: 'manual',
+      appId: 'slack',
+      tokenSource: 'manual',
+      manualTokenKey: 'KEY_A',
+      monitors: [
+        { channelId: 'CA', channelName: 'a-channel' },
+        { channelId: 'CB', channelName: 'b-channel' }
+      ],
+      createdAt: new Date().toISOString()
     })
 
     await store.saveManualToken('KEY_A', 'xoxp-a', { teamId: 'T1', teamName: 'Workspace A' })
@@ -333,17 +353,17 @@ describe('workspace migration', () => {
   it('stamps a legacy card that only watches one workspace', async () => {
     const dir = await tmpDir()
     const store = new MonitorStore({ rootDir: dir, encryptionAvailable: false })
-    await store.upsertProject({
-      project: {
-        name: 'Legacy',
-        clientName: 'Legacy',
-        profileId: 'manual:KEY_A',
-        teamId: 'manual',
-        appId: 'slack',
-        tokenSource: 'manual',
-        manualTokenKey: 'KEY_A',
-        monitors: [{ channelId: 'CA', channelName: 'a-channel' }]
-      }
+    await writeLegacyProject(dir, {
+      id: 'legacy-2',
+      name: 'Legacy',
+      clientName: 'Legacy',
+      profileId: 'manual:KEY_A',
+      teamId: 'manual',
+      appId: 'slack',
+      tokenSource: 'manual',
+      manualTokenKey: 'KEY_A',
+      monitors: [{ channelId: 'CA', channelName: 'a-channel' }],
+      createdAt: new Date().toISOString()
     })
 
     await store.saveManualToken('KEY_A', 'xoxp-a', { teamId: 'T1', teamName: 'Workspace A' })
@@ -374,6 +394,7 @@ describe('workspace migration', () => {
         appId: 'slack',
         tokenSource: 'manual',
         manualTokenKey: 'KEY_A',
+        selfUserId: 'U_ME',
         monitors: []
       }
     })
@@ -389,5 +410,47 @@ describe('workspace migration', () => {
     })
     expect(called).toBe(false)
     expect(result.untouched).toBe(1)
+  })
+})
+
+describe('one card = one workspace (hard rule)', () => {
+  it('refuses to store a card without a real workspace', async () => {
+    const dir = await tmpDir()
+    const store = new MonitorStore({ rootDir: dir, encryptionAvailable: false })
+    await expect(
+      store.upsertProject({
+        project: {
+          name: 'No workspace',
+          clientName: 'No workspace',
+          profileId: 'manual:K1',
+          teamId: 'manual',
+          appId: 'slack',
+          tokenSource: 'manual',
+          manualTokenKey: 'K1',
+          monitors: [{ channelId: 'C1', channelName: 'general' }]
+        }
+      })
+    ).rejects.toThrow(/workspace unknown/i)
+    expect(await store.listProjects()).toHaveLength(0)
+  })
+
+  it('stamps the workspace from the vault metadata when it is missing', async () => {
+    const dir = await tmpDir()
+    const store = new MonitorStore({ rootDir: dir, encryptionAvailable: false })
+    await store.saveManualToken('K1', 'xoxp-1', { teamId: 'T1', teamName: 'Workspace A' })
+    const created = await store.upsertProject({
+      project: {
+        name: 'Acme',
+        clientName: 'Acme',
+        profileId: 'manual:K1',
+        teamId: 'manual',
+        appId: 'slack',
+        tokenSource: 'manual',
+        manualTokenKey: 'K1',
+        monitors: [{ channelId: 'C1', channelName: 'general' }]
+      }
+    })
+    expect(created.teamId).toBe('T1')
+    expect(created.teamName).toBe('Workspace A')
   })
 })

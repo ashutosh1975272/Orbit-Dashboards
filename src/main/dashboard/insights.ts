@@ -1,23 +1,49 @@
 /** ProjectInsight prompt + schema (v2.2). Rolling merge: previous insight +
- * only NEW messages → merged insight. Nothing is fabricated; quotes come
- * from chat only. If the model omits a field, previous value carries over. */
+ * ONLY the NEW messages → merged insight. Nothing is fabricated; quotes come
+ * from chat only. If the model omits a field, the previous value carries over.
+ *
+ * The prompt is the product: it tells the model exactly which fields the card
+ * shows, what counts as evidence for each, and what to leave empty when the
+ * chat does not say. */
 
 import type { NimChatMessage } from './ai-provider'
-import type { InsightMood, InsightStatus, ProjectInsight } from '../../shared/dashboard-contract'
+import type {
+  InsightBlocker,
+  InsightCommitment,
+  InsightDecision,
+  InsightHighlight,
+  InsightMood,
+  InsightStatus,
+  InsightUrgency,
+  ProjectInsight
+} from '../../shared/dashboard-contract'
 
 export { extractJsonObject } from './ai-provider'
-export type { InsightMood, InsightStatus, ProjectInsight }
+export type {
+  InsightBlocker,
+  InsightCommitment,
+  InsightDecision,
+  InsightHighlight,
+  InsightMood,
+  InsightStatus,
+  InsightUrgency,
+  ProjectInsight
+}
 
 export interface InsightChatMessageInput {
   ts: string
   who: string
   text: string
   isClient: boolean
+  /** Channel name (never the channel id) — gives the model context. */
+  channel?: string
 }
 
 export interface InsightInput {
   projectName: string
   workspaceName: string
+  /** The client (the person the work is for) — helps attribute messages. */
+  clientName?: string
   previous: ProjectInsight | null
   newMessages: InsightChatMessageInput[]
   newCount: number
@@ -25,19 +51,86 @@ export interface InsightInput {
 
 const STATUSES: InsightStatus[] = ['on-track', 'at-risk', 'blocked', 'waiting-on-client']
 const MOODS: InsightMood[] = ['good', 'neutral', 'tense']
+const URGENCIES: InsightUrgency[] = ['low', 'normal', 'high']
 
-const BASE_INSIGHT: ProjectInsight = {
+export const BASE_INSIGHT: ProjectInsight = {
   status: 'on-track',
+  statusReason: '',
+  statusChange: '',
   mood: 'neutral',
+  moodReason: '',
+  moodQuote: '',
   progress: 0,
   progressEvidence: '',
   situationLine: '',
+  recentLine: '',
   highlights: [],
   blockers: [],
   nextStep: '',
   dates: {},
-  clientAsk: { needsReply: false, lastClientMessage: null }
+  clientAsk: { needsReply: false, urgency: 'normal', lastClientMessage: null, openQuestions: [] },
+  commitments: [],
+  decisions: [],
+  risks: [],
+  keywords: []
 }
+
+const SYSTEM_PROMPT = [
+  'You are a project analyst for a freelance client project. You read Slack messages and produce a structured project insight.',
+  '',
+  'INPUT',
+  '- ONE WORKSPACE ONLY: every message below comes from the same workspace. Never mix in another workspace, another project or another client. Ignore messages that look unrelated to this workspace.',
+  '- PREVIOUS INSIGHT: the insight from the last refresh (may be "none").',
+  '- NEW MESSAGES: only the messages that arrived since then, oldest first, each as [ISO timestamp] Display Name #channel (CLIENT if they are the client): text.',
+  '- A message marked (CLIENT) comes from someone who is NOT you — that is the client side. Never mark your own messages as CLIENT.',
+  '',
+  'HOW TO THINK',
+  '1. Treat NEW MESSAGES as the only new facts. Everything in PREVIOUS INSIGHT that is not contradicted stays.',
+  '2. Never invent. Every claim must be traceable to a message. Quotes must be copied verbatim (max 160 chars) with who said it and when.',
+  '3. If a field has no evidence, keep the previous value, or use "", [] or null as specified. Never guess dates, percentages, names or quotes.',
+  '4. Reply in the language used in the messages.',
+  '',
+  'FIELDS (exact JSON keys, no extras)',
+  '{',
+  '  "status": "on-track" | "at-risk" | "blocked" | "waiting-on-client",',
+  '  "statusReason": "<=15 words, why>",',
+  '  "statusChange": "previous status → new status, or empty",',
+  '  "progress": <0-100 integer>,',
+  '  "progressEvidence": "<=15 words + verbatim quote>",',
+  '  "mood": "good" | "neutral" | "tense",',
+  '  "moodReason": "<=12 words>",',
+  '  "moodQuote": "<verbatim quote from the client, or empty>",',
+  '  "situationLine": "<=25 words, where the project stands right now>",',
+  '  "recentLine": "<=12 words — the single most important thing that just changed",',
+  '  "highlights": [ {"what": "<=12 words>", "who": "<name>", "whenIso": "<timestamp>"} ],',
+  '  "blockers": [ {"what": "<=12 words>", "owner": "<name or unassigned>", "sinceIso": "<timestamp>"} ],',
+  '  "clientAsk": {',
+  '    "needsReply": true | false,',
+  '    "urgency": "low" | "normal" | "high",',
+  '    "lastClientMessage": { "who": "<name>", "whenIso": "<timestamp>", "quote": "<verbatim>" } | null,',
+  '    "openQuestions": ["<question the client waits on>"]',
+  '  },',
+  '  "dates": { "startDate": "yyyy-mm-dd or empty", "endDate": "yyyy-mm-dd or empty", "evidence": "<verbatim quote>" },',
+  '  "nextStep": "<=15 words, exactly one action for the freelancer>",',
+  '  "commitments": [ {"who": "<name>", "what": "<=12 words>", "dueIso": "<timestamp>"} ],',
+  '  "decisions": [ {"what": "<=12 words>", "who": "<name>", "whenIso": "<timestamp>"} ],',
+  '  "risks": ["<short risk>"],',
+  '  "keywords": ["<=6 short tags"]',
+  '}',
+  '',
+  'DECISION RULES',
+  '- status: blocked = work cannot continue and an obstacle is named; at-risk = a deadline or scope is slipping; waiting-on-client = the client owes an answer or action; on-track = otherwise.',
+  '- progress: keep the previous number unless there is evidence of change. Scale: 0-10 discovery, 10-30 design, 30-60 build, 60-85 review/QA, 85-99 handover, 100 delivered.',
+  '- mood: judge the CLIENT tone in the newest client messages, not your own. good = satisfied or grateful, tense = frustrated or urgent, neutral = businesslike. moodQuote must be verbatim (empty if none).',
+  '- clientAsk.needsReply: true only if the client asked something still unanswered (no reply from us after their message). false if we already answered or nothing was asked.',
+  '- nextStep: exactly one, imperative, addressed to the freelancer, derived from clientAsk and blockers.',
+  '- dates: only dates explicitly written in the chat. Convert "Nov 10" to the current year. If a date is only implied, leave it out.',
+  '- recentLine: describe only what changed in the NEW messages — the newest meaningful event (a question, a decision, a delivery, a blocker). Ignore greetings, reactions and system notices.',
+  '- statusChange: fill it only when the status actually changed compared to PREVIOUS INSIGHT, as "old → new".',
+  '',
+  'OUTPUT',
+  'Reply with ONLY the JSON object. No markdown, no explanation, no code fences.'
+].join('\n')
 
 function previousBlock(prev: ProjectInsight | null): string {
   if (!prev) return 'none (first insight)'
@@ -47,42 +140,35 @@ function previousBlock(prev: ProjectInsight | null): string {
 export function buildInsightMessages(input: InsightInput): NimChatMessage[] {
   const lines = input.newMessages
     .slice(-120)
-    .map((m) => `[${m.ts}] ${m.who}${m.isClient ? ' (CLIENT)' : ''}: ${m.text}`)
+    .map((m) => {
+      const channel = m.channel ? ` #${m.channel}` : ''
+      return `[${m.ts}] ${m.who}${channel}${m.isClient ? ' (CLIENT)' : ''}: ${m.text}`
+    })
     .join('\n')
-  const system = [
-    'You are a project analyst reading a Slack client-project channel.',
-    'Merge the PREVIOUS INSIGHT with ONLY the NEW messages into an updated insight.',
-    'Rules: never invent facts; quotes must be copied from messages; dates only if stated in chat as yyyy-mm-dd.',
-    'progress: 0-100 with one-line evidence. status in: on-track|at-risk|blocked|waiting-on-client. mood in: good|neutral|tense.',
-    'highlights: max 3 short bullets of what changed. blockers: what is stuck and who owns it.',
-    'clientAsk.needsReply: true only if the CLIENT asked a question or awaits an answer.',
-    'nextStep: the single most important action for the freelancer.',
-    'Reply with ONLY a JSON object:',
-    '{"status":"...","mood":"...","progress":0,"progressEvidence":"...","situationLine":"one sentence",',
-    '"highlights":["..."],"blockers":["..."],"nextStep":"...",',
-    '"dates":{"startDate":"yyyy-mm-dd?","endDate":"yyyy-mm-dd?"},',
-    '"clientAsk":{"needsReply":false,"lastClientMessage":{"who":"...","whenIso":"...","quote":"..."}}}'
-  ].join(' ')
   const user = [
-    `Project: ${input.projectName} (workspace: ${input.workspaceName})`,
+    `Workspace: ${input.workspaceName}`,
+    `Project: ${input.projectName}`,
+    `Client name (use it when you name them): ${input.clientName || 'unknown'}`,
     `PREVIOUS INSIGHT: ${previousBlock(input.previous)}`,
     `NEW MESSAGES (${input.newCount}):`,
     lines || '(none)'
   ].join('\n')
   return [
-    { role: 'system', content: system },
+    { role: 'system', content: SYSTEM_PROMPT },
     { role: 'user', content: user }
   ]
 }
+
+/* ---------- validation helpers ---------- */
 
 function asString(v: unknown): string | undefined {
   return typeof v === 'string' && v.trim() ? v.trim() : undefined
 }
 
-function asStringArray(v: unknown): string[] | undefined {
+function asStringArray(v: unknown, max = 5): string[] | undefined {
   if (!Array.isArray(v)) return undefined
   const out = v.filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
-  return out.length ? out.slice(0, 5) : undefined
+  return out.length ? out.slice(0, max) : undefined
 }
 
 export function asDateOnly(v: unknown): string | undefined {
@@ -90,20 +176,127 @@ export function asDateOnly(v: unknown): string | undefined {
   return s && /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : undefined
 }
 
-/** Merge parsed LLM JSON over the previous insight; unknown fields carry over. */
+function asObjectArray(v: unknown): Record<string, unknown>[] | undefined {
+  if (!Array.isArray(v)) return undefined
+  return v.filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
+}
+
+/** Normalize highlights: accepts objects (new) or plain strings (legacy). */
+function parseHighlights(v: unknown): InsightHighlight[] | undefined {
+  if (!Array.isArray(v)) return undefined
+  const out: InsightHighlight[] = []
+  for (const item of v) {
+    if (typeof item === 'string' && item.trim()) {
+      out.push({ what: item.trim() })
+      continue
+    }
+    if (item && typeof item === 'object') {
+      const what = asString((item as Record<string, unknown>).what)
+      if (!what) continue
+      out.push({
+        what,
+        who: asString((item as Record<string, unknown>).who),
+        whenIso: asString((item as Record<string, unknown>).whenIso)
+      })
+    }
+  }
+  return out.length ? out.slice(0, 3) : undefined
+}
+
+function parseBlockers(v: unknown): InsightBlocker[] | undefined {
+  if (!Array.isArray(v)) return undefined
+  const out: InsightBlocker[] = []
+  for (const item of v) {
+    if (typeof item === 'string' && item.trim()) {
+      out.push({ what: item.trim() })
+      continue
+    }
+    if (item && typeof item === 'object') {
+      const what = asString((item as Record<string, unknown>).what)
+      if (!what) continue
+      out.push({
+        what,
+        owner: asString((item as Record<string, unknown>).owner),
+        sinceIso: asString((item as Record<string, unknown>).sinceIso)
+      })
+    }
+  }
+  return out.length ? out.slice(0, 3) : undefined
+}
+
+function parseCommitments(v: unknown): InsightCommitment[] | undefined {
+  const items = asObjectArray(v)
+  if (!items) return undefined
+  const out: InsightCommitment[] = []
+  for (const item of items) {
+    const what = asString(item.what)
+    if (!what) continue
+    out.push({
+      what,
+      who: asString(item.who),
+      dueIso: asString(item.dueIso)
+    })
+  }
+  return out.length ? out.slice(0, 3) : undefined
+}
+
+function parseDecisions(v: unknown): InsightDecision[] | undefined {
+  const items = asObjectArray(v)
+  if (!items) return undefined
+  const out: InsightDecision[] = []
+  for (const item of items) {
+    const what = asString(item.what)
+    if (!what) continue
+    out.push({
+      what,
+      who: asString(item.who),
+      whenIso: asString(item.whenIso)
+    })
+  }
+  return out.length ? out.slice(0, 3) : undefined
+}
+
+/**
+ * Merge parsed LLM JSON over the previous insight; unknown fields carry over.
+ * `quotes` (the message texts we supplied) are used to drop quotes that the
+ * model invented — the card must never show a quote that is not in the chat.
+ */
 export function mergeInsight(
   parsed: Record<string, unknown> | null,
-  previous: ProjectInsight | null
+  previous: ProjectInsight | null,
+  quotes: string[] = []
 ): ProjectInsight {
-  const base: ProjectInsight = previous ?? {
-    ...BASE_INSIGHT,
-    dates: {},
-    clientAsk: { needsReply: false, lastClientMessage: null }
-  }
+  const base: ProjectInsight = previous
+    ? {
+        ...previous,
+        dates: { ...previous.dates },
+        clientAsk: {
+          ...previous.clientAsk,
+          openQuestions: [...previous.clientAsk.openQuestions]
+        },
+        highlights: [...previous.highlights],
+        blockers: [...previous.blockers],
+        commitments: [...previous.commitments],
+        decisions: [...previous.decisions],
+        risks: [...previous.risks],
+        keywords: [...previous.keywords]
+      }
+    : {
+        ...BASE_INSIGHT,
+        dates: {},
+        clientAsk: {
+          needsReply: false,
+          urgency: 'normal',
+          lastClientMessage: null,
+          openQuestions: []
+        }
+      }
   if (!parsed) return base
 
   const status = asString(parsed.status) as InsightStatus | undefined
   const mood = asString(parsed.mood) as InsightMood | undefined
+  const urgency = asString((parsed.clientAsk as Record<string, unknown> | undefined)?.urgency) as
+    InsightUrgency | undefined
   const progress =
     typeof parsed.progress === 'number' && parsed.progress >= 0 && parsed.progress <= 100
       ? Math.round(parsed.progress)
@@ -112,32 +305,58 @@ export function mergeInsight(
   const clientAsk = (parsed.clientAsk ?? {}) as Record<string, unknown>
   const lastClient = (clientAsk.lastClientMessage ?? null) as Record<string, unknown> | null
 
+  const quoteIsReal = (quote: string): boolean => {
+    if (quotes.length === 0) return true
+    const needle = quote.trim().toLowerCase()
+    if (needle.length < 2) return false
+    return quotes.some((q) => q.toLowerCase().includes(needle))
+  }
+
+  const moodQuote = asString(parsed.moodQuote)
+  const clientQuote = lastClient ? asString(lastClient.quote) : undefined
+  const dateEvidence = asString(dates.evidence)
+
+  const nextStatus: InsightStatus = status && STATUSES.includes(status) ? status : base.status
+  const nextProgress = progress ?? base.progress
+
   return {
-    status: status && STATUSES.includes(status) ? status : base.status,
+    status: nextStatus,
+    statusReason: asString(parsed.statusReason) ?? base.statusReason,
+    statusChange: asString(parsed.statusChange) ?? base.statusChange,
+    recentLine: asString(parsed.recentLine) ?? base.recentLine,
     mood: mood && MOODS.includes(mood) ? mood : base.mood,
-    progress: progress ?? base.progress,
+    moodReason: asString(parsed.moodReason) ?? base.moodReason,
+    moodQuote: moodQuote && quoteIsReal(moodQuote) ? moodQuote : base.moodQuote,
+    progress: nextProgress,
     progressEvidence: asString(parsed.progressEvidence) ?? base.progressEvidence,
     situationLine: asString(parsed.situationLine) ?? base.situationLine,
-    highlights: asStringArray(parsed.highlights) ?? base.highlights,
-    blockers: asStringArray(parsed.blockers) ?? base.blockers,
+    highlights: parseHighlights(parsed.highlights) ?? base.highlights,
+    blockers: parseBlockers(parsed.blockers) ?? base.blockers,
     nextStep: asString(parsed.nextStep) ?? base.nextStep,
     dates: {
       startDate: asDateOnly(dates.startDate) ?? base.dates.startDate,
-      endDate: asDateOnly(dates.endDate) ?? base.dates.endDate
+      endDate: asDateOnly(dates.endDate) ?? base.dates.endDate,
+      evidence: dateEvidence && quoteIsReal(dateEvidence) ? dateEvidence : base.dates.evidence
     },
     clientAsk: {
       needsReply:
         typeof clientAsk.needsReply === 'boolean'
           ? clientAsk.needsReply
           : base.clientAsk.needsReply,
+      urgency: urgency && URGENCIES.includes(urgency) ? urgency : base.clientAsk.urgency,
       lastClientMessage:
-        lastClient && asString(lastClient.quote)
+        clientQuote && quoteIsReal(clientQuote)
           ? {
-              who: asString(lastClient.who) ?? 'client',
-              whenIso: asString(lastClient.whenIso) ?? new Date(0).toISOString(),
-              quote: asString(lastClient.quote) as string
+              who: asString(lastClient?.who) ?? 'client',
+              whenIso: asString(lastClient?.whenIso) ?? new Date(0).toISOString(),
+              quote: clientQuote
             }
-          : base.clientAsk.lastClientMessage
-    }
+          : base.clientAsk.lastClientMessage,
+      openQuestions: asStringArray(clientAsk.openQuestions, 3) ?? base.clientAsk.openQuestions
+    },
+    commitments: parseCommitments(parsed.commitments) ?? base.commitments,
+    decisions: parseDecisions(parsed.decisions) ?? base.decisions,
+    risks: asStringArray(parsed.risks, 3) ?? base.risks,
+    keywords: asStringArray(parsed.keywords, 6) ?? base.keywords
   }
 }

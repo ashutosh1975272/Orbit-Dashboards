@@ -1,6 +1,11 @@
 /** NVIDIA NIM provider (v2.2) — OpenAI-compatible chat for dashboard insights.
  * Universal: one key + model pair in .env, used everywhere; falls back
- * automatically from primary to fallback model. No raw secrets ever logged. */
+ * automatically from primary to fallback model. No raw secrets ever logged.
+ *
+ * Reasoning models (nemotron-3.x) spend the whole token budget on
+ * "reasoning_content" and then return an empty answer, so the request can
+ * disable thinking explicitly (`chat_template_kwargs.enable_thinking`).
+ */
 
 const DEFAULT_BASE_URL = 'https://integrate.api.nvidia.com/v1'
 
@@ -21,6 +26,10 @@ export interface NimProviderConfig {
   modelFallback?: string
   baseUrl?: string
   timeoutMs?: number
+  /** Disable the model's reasoning trace (fast + always answers). */
+  enableThinking?: boolean
+  /** Default completion budget per call. */
+  maxTokens?: number
 }
 
 export interface NimChatResult {
@@ -29,10 +38,16 @@ export interface NimChatResult {
   tokens: number
 }
 
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
+}
+
 export class NimProvider {
   private readonly apiKey: string
   private readonly baseUrl: string
   private readonly defaultTimeoutMs: number
+  private readonly defaultMaxTokens: number
+  private readonly enableThinking: boolean
   readonly modelPrimary: string
   readonly modelFallback: string | undefined
 
@@ -42,7 +57,9 @@ export class NimProvider {
     this.baseUrl = (config.baseUrl || DEFAULT_BASE_URL).replace(/\/$/, '')
     this.modelPrimary = config.modelPrimary
     this.modelFallback = config.modelFallback || undefined
-    this.defaultTimeoutMs = config.timeoutMs ?? 45_000
+    this.defaultTimeoutMs = config.timeoutMs ?? 90_000
+    this.defaultMaxTokens = config.maxTokens ?? 2000
+    this.enableThinking = config.enableThinking ?? false
   }
 
   private async chatOnce(
@@ -53,6 +70,15 @@ export class NimProvider {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? this.defaultTimeoutMs)
     try {
+      const payload: Record<string, unknown> = {
+        model,
+        messages,
+        max_tokens: opts.maxTokens ?? this.defaultMaxTokens,
+        temperature: opts.temperature ?? 0.2
+      }
+      if (!this.enableThinking) {
+        payload.chat_template_kwargs = { enable_thinking: false }
+      }
       const res = await fetch(`${this.baseUrl}/chat/completions`, {
         method: 'POST',
         signal: controller.signal,
@@ -60,12 +86,7 @@ export class NimProvider {
           Authorization: `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          model,
-          messages,
-          max_tokens: opts.maxTokens ?? 1024,
-          temperature: opts.temperature ?? 0.2
-        })
+        body: JSON.stringify(payload)
       })
       if (!res.ok) {
         throw new Error(`nim http ${res.status}`)
@@ -89,11 +110,19 @@ export class NimProvider {
 
   /** Try primary, then fallback — network/timeout/HTTP errors only. */
   async chat(messages: NimChatMessage[], opts: NimChatOptions = {}): Promise<NimChatResult> {
+    let primaryError: unknown
     try {
       return await this.chatOnce(this.modelPrimary, messages, opts)
     } catch (err) {
+      primaryError = err
       if (!this.modelFallback) throw err
+    }
+    try {
       return await this.chatOnce(this.modelFallback, messages, opts)
+    } catch (err) {
+      throw new Error(
+        `nim primary failed (${errorMessage(primaryError)}); fallback failed (${errorMessage(err)})`
+      )
     }
   }
 

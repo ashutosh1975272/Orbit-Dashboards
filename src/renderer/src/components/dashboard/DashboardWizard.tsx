@@ -72,6 +72,7 @@ interface TokenResult {
   teamName?: string
   teamId?: string
   userName?: string
+  userId?: string
   scopes?: string[]
   error?: string
 }
@@ -238,12 +239,14 @@ export default function DashboardWizard(): React.ReactElement {
         teamName: r.teamName,
         teamId: r.teamId,
         userName: r.userName,
+        userId: r.userId,
         scopes: r.scopes
       })
       setSavedKey(vaultKey.trim())
       setSavedTokenMask(maskToken(tokenValue.trim()))
       setTokenValue('')
-      if (!clientName) setClientName(r.userName ?? r.teamName ?? '')
+      // the client is the person you work for — not the token owner, so the
+      // field stays empty until the user names them
       setStep(3)
     } finally {
       setConnecting(false)
@@ -258,6 +261,13 @@ export default function DashboardWizard(): React.ReactElement {
 
   async function createCard(): Promise<void> {
     if (!projectName.trim() || selected.size === 0) return
+    // v2.3 — hard rule: a card must be bound to exactly one workspace
+    if (!result?.teamId) {
+      setCreateError(
+        'Workspace unknown — reconnect the connector so the card can be bound to one workspace.'
+      )
+      return
+    }
     setCreating(true)
     setCreateError(null)
     try {
@@ -273,8 +283,9 @@ export default function DashboardWizard(): React.ReactElement {
         name: projectName.trim(),
         clientName: clientName.trim() || projectName.trim(),
         profileId: `manual:${savedKey}`,
-        teamId: result?.teamId ?? 'manual',
-        teamName: result?.teamName,
+        teamId: result.teamId,
+        teamName: result.teamName,
+        selfUserId: result?.userId,
         appId: 'slack',
         tokenSource: 'manual',
         manualTokenKey: savedKey,
@@ -527,8 +538,12 @@ export default function DashboardWizard(): React.ReactElement {
               <input value={projectName} onChange={(e) => setProjectName(e.target.value)} />
             </label>
             <label className="settings-row">
-              <p className="settings-hint">Client</p>
-              <input value={clientName} onChange={(e) => setClientName(e.target.value)} />
+              <p className="settings-hint">Client — who you work for (used for AI attribution)</p>
+              <input
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
+                placeholder="e.g. Acme"
+              />
             </label>
             <p className="settings-hint">
               {selected.size} channel{selected.size === 1 ? '' : 's'} ·{' '}

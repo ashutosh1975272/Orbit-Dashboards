@@ -6,6 +6,7 @@ import dockIcon from '../../resources/dockIcon.png?asset'
 import trayIcon from '../../resources/trayIcon.png?asset'
 import { APP_BUNDLE_ID, APP_DISPLAY_NAME } from '../shared/brand'
 import { IpcChannels } from '../shared/ipc-contract'
+import type { DashboardDigest, RecentActivity } from '../shared/dashboard-contract'
 import { AdminAuthController, defaultAdminSessionPath } from './admin-auth'
 import { AppLockController, notifyUnreadIncrease } from './app-lock'
 import { AppSettingsStore, defaultAppSettingsPath } from './app-settings'
@@ -19,6 +20,8 @@ import { MonitorStore } from './dashboard/monitor-store'
 import { DashboardInsightSyncEngine } from './dashboard/sync-engine'
 import { DashboardScheduler } from './dashboard/scheduler'
 import { migrateWorkspaceCards } from './dashboard/workspace-migration'
+import { buildRecentFeed } from './dashboard/recent-feed'
+import { DashboardDigestStore, refreshDigest } from './dashboard/digest'
 import { HistoryStore } from './dashboard/history-store'
 import { NimProvider } from './dashboard/ai-provider'
 import { InsightEngine } from './dashboard/insight-engine'
@@ -228,9 +231,22 @@ if (!gotSingleInstanceLock) {
     const nimKey = process.env.NVIDIA_NIM_API_KEY ?? ''
     const nimPrimary =
       process.env.NVIDIA_NIM_MODEL_PRIMARY ?? 'nvidia/nemotron-3.5-super-vl-120b-a12b'
-    const nimFallback = process.env.NVIDIA_NIM_MODEL_FALLBACK ?? 'nvidia/nemotron-3-super-120b-a12b'
+    const nimFallback =
+      process.env.NVIDIA_NIM_MODEL_FALLBACK ?? 'nvidia/nemotron-3.5-lightning-30b-a3b'
+    const nimTimeoutMs = Number(process.env.NVIDIA_NIM_TIMEOUT_MS ?? 90_000)
+    const nimMaxTokens = Number(process.env.NVIDIA_NIM_MAX_TOKENS ?? 2000)
+    // reasoning models burn the whole token budget on reasoning and answer
+    // nothing, so thinking is off by default (re-enable from .env)
+    const nimEnableThinking = process.env.NVIDIA_NIM_ENABLE_THINKING === 'true'
     const nimProvider = nimKey
-      ? new NimProvider({ apiKey: nimKey, modelPrimary: nimPrimary, modelFallback: nimFallback })
+      ? new NimProvider({
+          apiKey: nimKey,
+          modelPrimary: nimPrimary,
+          modelFallback: nimFallback,
+          timeoutMs: Number.isFinite(nimTimeoutMs) ? nimTimeoutMs : 90_000,
+          maxTokens: Number.isFinite(nimMaxTokens) ? nimMaxTokens : 2000,
+          enableThinking: nimEnableThinking
+        })
       : null
     const dashboardHistoryStore = new HistoryStore({ rootDir: dashboardRoot })
     // The engine always exists: with a key it enriches with NVIDIA NIM,
@@ -245,6 +261,24 @@ if (!gotSingleInstanceLock) {
     if (!nimProvider) {
       log.info('[dashboard] NVIDIA_NIM_API_KEY missing — insights fall back to heuristics')
     }
+    const digestStore = new DashboardDigestStore({ rootDir: dashboardRoot })
+    const refreshDigestNow = async (): Promise<DashboardDigest | null> => {
+      const projects = await dashboardMonitorStore.listProjects()
+      const workspaces = await Promise.all(
+        projects.map(async (p) => ({
+          teamName: p.teamName ?? p.teamId,
+          projectName: p.name,
+          insight: await insightEngine.existingInsight(p.id)
+        }))
+      )
+      return refreshDigest({
+        workspaces,
+        store: digestStore,
+        provider: nimProvider,
+        log: (msg) => log.info(msg)
+      })
+    }
+
     const dashboardEngine = new DashboardInsightSyncEngine({
       monitorStore: dashboardMonitorStore,
       deltaStore: dashboardDeltaStore,
@@ -252,45 +286,70 @@ if (!gotSingleInstanceLock) {
       manualTokenProvider: {
         getManualToken: (key: string) => dashboardMonitorStore.getManualToken(key)
       },
-      insightEngine
+      insightEngine,
+      insightReader: {
+        getLastInsight: (projectId: string) => insightEngine.existingInsight(projectId),
+        getLastEntry: async (projectId: string) =>
+          (await dashboardHistoryStore.read(projectId))[0] ?? null
+      },
+      onSynced: () => {
+        void refreshDigestNow().catch((err) =>
+          log.warn('[dashboard] digest refresh failed', { err: String(err) })
+        )
+      },
+      log: (msg) => log.info(msg)
     })
 
-    // v2.2 — one-time workspace migration: stamp + split legacy mixed cards.
-    try {
-      const poller = new SlackPoller()
-      const migration = await migrateWorkspaceCards({
+    // v2.3 — the "Recent" strip (local data only) and the top digest
+    const buildRecent = async (): Promise<RecentActivity[]> =>
+      buildRecentFeed({
         monitorStore: dashboardMonitorStore,
-        listTokenKeys: async () =>
-          (await dashboardMonitorStore.listManualTokens()).map((t) => t.key),
-        resolveTokenMeta: async (key: string) => {
-          const token = await dashboardMonitorStore.getManualToken(key)
-          if (!token) return null
-          const check = await poller.authTest(token)
-          if (!check.valid || !check.teamId || !check.teamName) return null
-          const meta = {
-            teamId: check.teamId,
-            teamName: check.teamName,
-            userName: check.userName
-          }
-          await dashboardMonitorStore.upsertManualTokenMeta(key, meta)
-          return meta
-        },
-        listChannelsForKey: async (key: string) => {
-          const token = await dashboardMonitorStore.getManualToken(key)
-          if (!token) return []
-          const channels = await listChannels(token)
-          return channels.map((c) => ({ id: c.id, name: c.name }))
-        }
+        deltaStore: dashboardDeltaStore,
+        getLastInsight: (projectId: string) => insightEngine.existingInsight(projectId),
+        getNewMessageCount: (projectId: string) => dashboardEngine.newMessageCountFor(projectId)
       })
-      if (migration.stamped || migration.split) {
-        log.info('[dashboard] workspace migration applied', {
-          stamped: migration.stamped,
-          split: migration.split,
-          notes: migration.notes
+    const getDigest = async (): Promise<DashboardDigest | null> => refreshDigestNow()
+
+    // v2.2 — one-time workspace migration: stamp + split legacy mixed cards.
+    // Runs in the background: it talks to Slack and must never block startup.
+    const runWorkspaceMigration = async (): Promise<void> => {
+      const poller = new SlackPoller()
+      try {
+        const migration = await migrateWorkspaceCards({
+          monitorStore: dashboardMonitorStore,
+          listTokenKeys: async () =>
+            (await dashboardMonitorStore.listManualTokens()).map((t) => t.key),
+          resolveTokenMeta: async (key: string) => {
+            const token = await dashboardMonitorStore.getManualToken(key)
+            if (!token) return null
+            const check = await poller.authTest(token)
+            if (!check.valid || !check.teamId || !check.teamName) return null
+            const meta = {
+              teamId: check.teamId,
+              teamName: check.teamName,
+              userName: check.userName,
+              userId: check.userId
+            }
+            await dashboardMonitorStore.upsertManualTokenMeta(key, meta)
+            return meta
+          },
+          listChannelsForKey: async (key: string) => {
+            const token = await dashboardMonitorStore.getManualToken(key)
+            if (!token) return []
+            const channels = await listChannels(token)
+            return channels.map((c) => ({ id: c.id, name: c.name }))
+          }
         })
+        if (migration.stamped || migration.split) {
+          log.info('[dashboard] workspace migration applied', {
+            stamped: migration.stamped,
+            split: migration.split,
+            notes: migration.notes
+          })
+        }
+      } catch (err) {
+        log.warn('[dashboard] workspace migration skipped', { err: String(err) })
       }
-    } catch (err) {
-      log.warn('[dashboard] workspace migration skipped', { err: String(err) })
     }
     const dashboardScheduler = new DashboardScheduler(dashboardEngine, () =>
       dashboardMonitorStore.syncIntervalSeconds()
@@ -337,8 +396,11 @@ if (!gotSingleInstanceLock) {
       scheduler: dashboardScheduler,
       getMainWindow: () => mainWindow,
       oauthTokenProvider: { tryGet: (profileId, teamId) => tokenStore.tryGet(profileId, teamId) },
-      historyStore: dashboardHistoryStore
+      historyStore: dashboardHistoryStore,
+      buildRecent,
+      getDigest
     })
+    void runWorkspaceMigration()
     dashboardScheduler.start()
     registerAppIpc({
       settingsStore,

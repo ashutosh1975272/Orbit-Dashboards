@@ -1441,8 +1441,11 @@ body.is-resizing-sidebar webview {
 
 .dash-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  max-width: 1280px;
+  margin: 0 auto;
+  width: 100%;
 }
 .dash-card {
   display: flex;
@@ -1893,4 +1896,329 @@ body.is-resizing-sidebar webview {
   color: var(--muted);
   font-size: 11.5px;
   font-style: italic;
+}
+
+/* ===== v2.2.1 — card layout fixes + richer insight ===== */
+.dash-card-title {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+.dash-card-workspace {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.dash-card-client {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dash-card-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.dash-insight-status-reason {
+  font-size: 11.5px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dash-insight-what {
+  color: var(--text);
+}
+.dash-insight-meta {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.dash-insight-questions {
+  margin: 0;
+  padding-left: 16px;
+  color: #d9a35a;
+  font-size: 12.5px;
+}
+.dash-insight-more-toggle {
+  justify-self: start;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 11.5px;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+.dash-insight-detail {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: rgb(0 0 0 / 15%);
+  font-size: 12px;
+  color: var(--muted);
+}
+.dash-insight-detail-line {
+  margin: 0;
+}
+.dash-insight-detail-block b {
+  color: var(--text);
+}
+.dash-insight-detail-block ul {
+  margin: 2px 0 0;
+  padding-left: 16px;
+}
+.dash-insight-keywords {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* ===== v2.3 — full-width card, three zones ===== */
+.dash-card-wide {
+  padding: 18px 20px;
+  gap: 14px;
+}
+.dash-card-wide .dash-card-head {
+  align-items: center;
+}
+.dash-card-wide .dash-card-title h3 {
+  font-size: 1.15rem;
+}
+.dash-card-ai-badge {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  margin-right: 4px;
+}
+.dash-card-body {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr) 300px;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .dash-card-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.dash-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.dash-zone-head {
+  font-size: 10.5px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+  opacity: 0.75;
+}
+.dash-zone-identity {
+  border-right: 1px dashed var(--border);
+  padding-right: 18px;
+}
+.dash-zone-detail {
+  border-left: 1px dashed var(--border);
+  padding-left: 18px;
+}
+@media (max-width: 900px) {
+  .dash-zone-identity,
+  .dash-zone-detail {
+    border: none;
+    padding: 0;
+  }
+}
+.dash-identity-client {
+  font-size: 1rem;
+  font-weight: 600;
+}
+.dash-identity-mood {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.dash-identity-dates .dash-dates {
+  font-size: 0.85rem;
+}
+.dash-identity-channels .dash-card-perchannel {
+  padding: 0;
+  border: none;
+}
+.dash-centre-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.dash-insight-situation {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--text);
+  margin: 0;
+}
+.dash-insight-highlights,
+.dash-insight-questions,
+.dash-insight-blockers {
+  font-size: 0.85rem;
+}
+.dash-insight-client-msg,
+.dash-insight-next {
+  font-size: 0.85rem;
+}
+.dash-insight-next {
+  font-weight: 600;
+  color: var(--text);
+}
+.dash-card.is-flash {
+  animation: dash-flash 1.4s ease;
+}
+@keyframes dash-flash {
+  0%,
+  100% {
+    box-shadow: none;
+  }
+  25% {
+    box-shadow: 0 0 0 3px rgb(124 92 255 / 55%);
+  }
+}
+
+/* ===== v2.3 — Recent strip ===== */
+.dash-recent {
+  max-width: 1280px;
+  margin: 0 auto 18px;
+  width: 100%;
+}
+.dash-recent-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.dash-recent-head h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.dash-recent-toggle {
+  display: flex;
+  gap: 4px;
+}
+.dash-recent-toggle button {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.dash-recent-toggle button.is-active {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.dash-recent-strip {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+.dash-recent-card {
+  flex: 0 0 236px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 11px 12px;
+  cursor: pointer;
+  color: var(--text);
+}
+.dash-recent-card:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.dash-recent-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.dash-recent-workspace {
+  font-size: 10.5px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 7px;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dash-recent-project {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+.dash-recent-line {
+  font-size: 0.8rem;
+  color: var(--text);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.dash-recent-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.dash-recent-badge {
+  color: #d9a35a;
+  font-weight: 600;
+}
+.dash-recent-channel {
+  opacity: 0.7;
+}
+
+/* ===== v2.3 — top digest ===== */
+.dash-digest {
+  max-width: 1280px;
+  margin: 0 auto 14px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.dash-digest-label {
+  font-size: 10.5px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.dash-digest-text {
+  font-size: 0.92rem;
+  color: var(--text);
+}
+.dash-digest-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
 }

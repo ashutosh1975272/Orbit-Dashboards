@@ -4,9 +4,11 @@ import type {
   DashboardChannelDelta,
   DashboardProject,
   DashboardProjectSnapshot,
-  DashboardSyncProgressPayload
+  DashboardSyncProgressPayload,
+  ProjectInsight
 } from '../../shared/dashboard-contract'
 import type { DashboardDeltaStore, DashboardStoredMessage } from './delta-store'
+import type { InsightHistoryEntry } from './history-store'
 import type { MonitorStore } from './monitor-store'
 import { summarizeProject } from './summary-engine'
 
@@ -27,6 +29,12 @@ export interface ManualTokenProvider {
   getManualToken(key: string): Promise<string | null>
 }
 
+/** v2.3 — lets the engine show the last AI insight without a network sync. */
+export interface InsightReader {
+  getLastInsight: (projectId: string) => Promise<ProjectInsight | null>
+  getLastEntry: (projectId: string) => Promise<InsightHistoryEntry | null>
+}
+
 export interface DashboardSyncEngineDeps {
   monitorStore: MonitorStore
   deltaStore: DashboardDeltaStore
@@ -34,6 +42,12 @@ export interface DashboardSyncEngineDeps {
   manualTokenProvider?: ManualTokenProvider
   pollerFactory?: () => DashboardPoller
   onProgress?: (payload: DashboardSyncProgressPayload) => void
+  /** diagnostics (never secrets) */
+  log?: (msg: string) => void
+  /** v2.3 — read-only access to the stored insights (cold start) */
+  insightReader?: InsightReader
+  /** v2.3 — called after a background sync (e.g. to refresh the digest) */
+  onSynced?: (snapshots: DashboardProjectSnapshot[]) => void
 }
 
 export class DashboardSyncEngine {
@@ -42,6 +56,9 @@ export class DashboardSyncEngine {
   private readonly oauthTokenProvider: OAuthTokenProvider
   private readonly manualTokenProvider?: ManualTokenProvider
   private readonly pollerFactory: () => DashboardPoller
+  private readonly log: (msg: string) => void
+  private readonly insightReader: InsightReader | undefined
+  private readonly onSynced: ((snapshots: DashboardProjectSnapshot[]) => void) | undefined
   private readonly progressCallbacks: Array<(payload: DashboardSyncProgressPayload) => void> = []
   /** per-project cached snapshot — rebuilt after any sync */
   private readonly lastResults: Map<string, DashboardProjectSnapshot> = new Map()
@@ -52,6 +69,9 @@ export class DashboardSyncEngine {
     this.oauthTokenProvider = deps.oauthTokenProvider
     this.manualTokenProvider = deps.manualTokenProvider
     this.pollerFactory = deps.pollerFactory ?? (() => new SlackPoller())
+    this.log = deps.log ?? (() => undefined)
+    this.insightReader = deps.insightReader
+    this.onSynced = deps.onSynced
     if (deps.onProgress) this.progressCallbacks.push(deps.onProgress)
   }
 
@@ -62,6 +82,11 @@ export class DashboardSyncEngine {
       const idx = this.progressCallbacks.indexOf(cb)
       if (idx >= 0) this.progressCallbacks.splice(idx, 1)
     }
+  }
+
+  /** protected so subclasses can report diagnostics */
+  protected logInfo(msg: string): void {
+    this.log(msg)
   }
 
   private emitProgress(payload: DashboardSyncProgressPayload): void {
@@ -208,8 +233,13 @@ export class DashboardSyncEngine {
       return snapshot
     } catch (err) {
       const hint = err instanceof Error ? err.message : 'sync failed'
+      this.log(`[dashboard] sync failed (${project.name}): ${hint}`)
       const perChannel = await this.storedDeltas(project)
-      const base = this.buildFallbackSnapshot(project, perChannel)
+      const base = this.buildFallbackSnapshot(
+        project,
+        perChannel,
+        await this.collectMessages(project)
+      )
       base.syncState = 'error'
       base.mood = { state: 'neutral', signal: hint }
       this.lastResults.set(project.id, base)
@@ -233,6 +263,11 @@ export class DashboardSyncEngine {
       const snap = await this.syncProject(project.id)
       if (snap) results.push(snap)
     }
+    try {
+      this.onSynced?.(results)
+    } catch (err) {
+      this.logInfo(`[dashboard] post-sync hook failed: ${String(err)}`)
+    }
     return results
   }
 
@@ -248,9 +283,43 @@ export class DashboardSyncEngine {
         continue
       }
       const perChannel = await this.storedDeltas(project)
-      out.push(this.buildFallbackSnapshot(project, perChannel))
+      // cold start: summarize what is ALREADY stored, so the card is never
+      // blank while waiting for the first network sync
+      const messages = await this.collectMessages(project)
+      const snapshot = this.buildFallbackSnapshot(project, perChannel, messages)
+      out.push(await this.attachLastInsight(project, snapshot))
     }
     return out
+  }
+
+  /** v2.3 — the AI insight is shown even before the first sync of the session. */
+  private async attachLastInsight(
+    project: DashboardProject,
+    snapshot: DashboardProjectSnapshot
+  ): Promise<DashboardProjectSnapshot> {
+    if (!this.insightReader) return snapshot
+    try {
+      const insight = await this.insightReader.getLastInsight(project.id)
+      if (!insight) return snapshot
+      const entry = await this.insightReader.getLastEntry(project.id)
+      return {
+        ...snapshot,
+        insight,
+        insightUpdatedAt: entry?.atIso ?? null,
+        insightSource: entry?.source ?? null,
+        insightModel: entry?.model ?? null
+      }
+    } catch (err) {
+      this.logInfo(
+        `[dashboard] could not load the stored insight for ${project.name}: ${String(err)}`
+      )
+      return snapshot
+    }
+  }
+
+  /** how many messages the last sync added (activity signal for the feed) */
+  newMessageCountFor(projectId: string): number {
+    return this.lastResults.get(projectId)?.newMessageCount ?? 0
   }
 
   private async storedDeltas(project: DashboardProject): Promise<DashboardChannelDelta[]> {
@@ -270,16 +339,12 @@ export class DashboardSyncEngine {
 
   private buildFallbackSnapshot(
     project: DashboardProject,
-    perChannel: DashboardChannelDelta[]
+    perChannel: DashboardChannelDelta[],
+    messages: DashboardStoredMessage[] = []
   ): DashboardProjectSnapshot {
-    const summarySource: DashboardStoredMessage[] = perChannel.map((c) => ({
-      ts: (Number(new Date(c.latestMessageAt).getTime()) / 1000).toFixed(6),
-      text: ''
-    }))
-    void summarySource
     return summarizeProject({
       project,
-      messages: [],
+      messages,
       netNewCount: 0,
       perChannel,
       lastUpdatedAt: perChannel[0]?.lastSyncAt ?? null
@@ -341,7 +406,10 @@ export class DashboardInsightSyncEngine extends DashboardSyncEngine {
     const project = projects.find((p) => p.id === projectId)
     if (!project) return snapshot
     const token = await this.tokenFor(project)
-    if (!token) return snapshot
+    if (!token) {
+      this.logInfo(`[dashboard] no token for ${project.name} — insight refresh skipped`)
+      return snapshot
+    }
     return await this.enrich(project, snapshot, token)
   }
 }

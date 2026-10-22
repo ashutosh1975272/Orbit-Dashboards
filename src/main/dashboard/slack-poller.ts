@@ -44,19 +44,31 @@ async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+const SLACK_TIMEOUT_MS = 20_000
+
 async function callApi<T extends { ok: boolean; error?: string }>(
   method: string,
   token: string,
   params: Record<string, string>
 ): Promise<T> {
-  const res = await fetch(`https://slack.com/api/${method}`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    body: new URLSearchParams(params)
-  })
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), SLACK_TIMEOUT_MS)
+  let res: Response
+  try {
+    res = await fetch(`https://slack.com/api/${method}`, {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams(params)
+    })
+  } catch (err) {
+    throw new Error(`slack ${method}: ${err instanceof Error ? err.message : 'request failed'}`)
+  } finally {
+    clearTimeout(timer)
+  }
   const body = (await res.json()) as T
   if (!body.ok) {
     if (body.error === 'ratelimited') {
@@ -112,6 +124,7 @@ export class SlackPoller {
     teamId?: string
     teamName?: string
     userName?: string
+    userId?: string
     scopes?: string[]
     error?: string
   }> {
@@ -124,6 +137,7 @@ export class SlackPoller {
       teamId: res.team_id,
       teamName: res.team,
       userName: res.user,
+      userId: res.user_id,
       scopes: res.scopes,
       error: undefined
     }

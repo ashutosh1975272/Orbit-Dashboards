@@ -4,6 +4,7 @@ import type {
   DashboardProject,
   DashboardSnapshot,
   DashboardSyncProgressPayload,
+  RecentActivity,
   ValidateTokenResultPayload
 } from '../../../shared/dashboard-contract'
 
@@ -20,6 +21,8 @@ interface DashboardState {
   wizardOpenFor: { projectId: string | null } | null
   /** sidebar Dashboard row: Slack dropdown expanded (survives sidebar re-renders) */
   dashRailExpanded: boolean
+  /** v2.3 — the "Recent" strip (one item per workspace, importance ranked) */
+  recent: RecentActivity[]
 
   openDashboard: (appId?: 'slack') => void
   closeDashboard: () => void
@@ -28,6 +31,7 @@ interface DashboardState {
   setDashRailExpanded: (expanded: boolean) => void
 
   loadSnapshot: () => Promise<void>
+  loadRecent: () => Promise<void>
   upsertProject: (
     project:
       | Omit<DashboardProject, 'id' | 'createdAt'>
@@ -47,6 +51,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   dashboardOpen: false,
   dashboardAppId: null,
   snapshot: null,
+  recent: [],
   loading: false,
   syncingProjectIds: [],
   progress: null,
@@ -73,6 +78,15 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     }
   },
 
+  loadRecent: async () => {
+    try {
+      const recent = await window.api.dashboard.getRecent()
+      set({ recent })
+    } catch {
+      set({ recent: [] })
+    }
+  },
+
   upsertProject: async (project) => {
     const snapshot = await window.api.dashboard.upsertProject({ project })
     set({ snapshot })
@@ -89,6 +103,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       await window.api.dashboard.syncNow({ projectId })
       const snapshot = await window.api.dashboard.getSnapshot()
       set({ snapshot })
+      void get().loadRecent()
     } catch (err) {
       set({ error: err instanceof Error ? err.message : 'sync failed' })
     }
@@ -106,6 +121,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       teamName: result.teamName,
       teamId: result.teamId,
       userName: result.userName,
+      userId: result.userId,
       scopes: result.scopes
     }
   },

@@ -7,6 +7,7 @@ import type {
   ManualTokenPayload,
   ProjectDeletePayload,
   ProjectUpsertPayload,
+  RecentActivity,
   ValidateTokenResultPayload
 } from '../../shared/dashboard-contract'
 import type { DashboardSyncEngine } from '../dashboard/sync-engine'
@@ -26,6 +27,10 @@ export interface DashboardIpcDeps {
   oauthTokenProvider: { tryGet(profileId: string, teamId: string): Promise<string | null> }
   /** v2.2 — insight history (optional, additive) */
   historyStore?: HistoryStore
+  /** v2.3 — the "Recent" strip feed (built from local data, no LLM call) */
+  buildRecent?: () => Promise<RecentActivity[]>
+  /** v2.3 — the top digest across workspaces */
+  getDigest?: () => Promise<DashboardSnapshot['digest']>
 }
 
 export interface DashboardIpcRegistration {
@@ -59,7 +64,8 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
     return {
       projects,
       manualTokens,
-      syncIntervalSeconds: await deps.monitorStore.syncIntervalSeconds()
+      syncIntervalSeconds: await deps.monitorStore.syncIntervalSeconds(),
+      digest: deps.getDigest ? await deps.getDigest() : null
     }
   }
 
@@ -128,6 +134,11 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
       (await deps.historyStore?.read(payload.projectId)) ?? []
   )
 
+  handleInvoke(
+    IpcChannels.DashboardGetRecent,
+    async (): Promise<RecentActivity[]> => (await deps.buildRecent?.()) ?? []
+  )
+
   handleInvoke(IpcChannels.DashboardAddManualToken, async (payload: ManualTokenPayload) => {
     const poller = new SlackPoller()
     let validated = false
@@ -136,6 +147,7 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
     let vaultTeamName: string | undefined
     let vaultTeamId: string | undefined
     let vaultUserName: string | undefined
+    let vaultUserId: string | undefined
     let vaultScopes: string[] | undefined
     try {
       const check = await poller.authTest(payload.token)
@@ -145,7 +157,12 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
       } else {
         const meta =
           check.teamId && check.teamName
-            ? { teamId: check.teamId, teamName: check.teamName, userName: check.userName }
+            ? {
+                teamId: check.teamId,
+                teamName: check.teamName,
+                userName: check.userName,
+                userId: check.userId
+              }
             : undefined
         const stored = await deps.monitorStore.saveManualToken(payload.key, payload.token, meta)
         if (!stored.plaintext)
@@ -154,6 +171,7 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
         if (check.teamName) vaultTeamName = check.teamName
         if (check.teamId) vaultTeamId = check.teamId
         if (check.userName) vaultUserName = check.userName
+        if (check.userId) vaultUserId = check.userId
         if (check.scopes) vaultScopes = check.scopes
       }
     } catch (err) {
@@ -167,6 +185,7 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
       teamId: vaultTeamId,
       teamName: vaultTeamName,
       userName: vaultUserName,
+      userId: vaultUserId,
       scopes: vaultScopes
     }
     await broadcastSnapshot()

@@ -96,11 +96,11 @@ describe('insights prompt + merge', () => {
     )
     const merged = mergeInsight(
       { status: 'on-track', progress: 60, situationLine: 'moving' },
-      { ...prev, blockers: ['assets'] }
+      { ...prev, blockers: [{ what: 'assets' }] }
     )
     expect(merged.status).toBe('on-track')
     expect(merged.progress).toBe(60)
-    expect(merged.blockers).toEqual(['assets'])
+    expect(merged.blockers).toEqual([{ what: 'assets' }])
     expect(merged.dates.endDate).toBe('2026-12-01')
   })
 
