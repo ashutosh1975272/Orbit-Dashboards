@@ -49,6 +49,8 @@ if (loadedEnvPath) {
 
 /** One process / one tray — second launches focus the existing window. */
 app.disableHardwareAcceleration()
+app.commandLine.appendSwitch('disable-gpu')
+app.commandLine.appendSwitch('no-sandbox')
 const gotSingleInstanceLock = app.requestSingleInstanceLock()
 if (!gotSingleInstanceLock) {
   app.quit()

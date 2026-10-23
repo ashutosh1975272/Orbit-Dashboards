@@ -109,9 +109,9 @@ export default function RecentStrip({
       <div className="flex gap-3 overflow-x-auto pb-2 -mx-px px-px" role="list" aria-label="Recent workspaces">
         {visible.length === 0 ? (
           <p className="text-muted-dark text-sm self-center whitespace-nowrap">Nothing matches this filter.</p>
-        ) : visible.map((item) => (
+        ) : visible.map((item, idx) => (
           <button
-            key={`${item.projectId}-${item.ts}`}
+            key={`${item.projectId}-${item.ts}-${idx}`}
             type="button"
             role="listitem"
             className="dash-recent-card flex-none flex flex-col gap-2 w-[320px] h-[160px] p-4 bg-surface-dark border border-border-dark rounded-xl cursor-pointer text-left text-text-dark transition-all hover:border-accent hover:bg-accent/10 hover:shadow-lg"
