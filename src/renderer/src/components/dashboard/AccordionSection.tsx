@@ -179,7 +179,7 @@ export default function AccordionSidebar({
         data-sidebar={sidebarId}
         style={{ width: `${NARROW_WIDTH}px` }}
         role="navigation"
-        aria-label={`${sidebarId === 'left' ? 'Project Guide' : 'Attention & Activity'} (loading)`}
+        aria-label={`${sidebarId === 'left' ? 'PROJECT GUIDE' : 'ATTENTION'} (loading)`}
       >
         <div className="flex-1 flex items-center justify-center">
           <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
@@ -195,7 +195,7 @@ export default function AccordionSidebar({
         data-sidebar={sidebarId}
         style={{ width: `${COLLAPSED_RAIL_WIDTH}px` }}
         role="navigation"
-        aria-label={`${sidebarId === 'left' ? 'Project Guide' : 'Attention & Activity'} (collapsed)`}
+        aria-label={`${sidebarId === 'left' ? 'PROJECT GUIDE' : 'ATTENTION'} (collapsed)`}
       >
         <div className="dash-sidebar-rail flex flex-col items-center p-3 gap-3 h-full">
           <button
@@ -271,11 +271,11 @@ export default function AccordionSidebar({
       data-sidebar={sidebarId}
       style={{ width: `${width}px` }}
       role="navigation"
-      aria-label={`${sidebarId === 'left' ? 'Project Guide' : 'Attention & Activity'} (expanded)`}
+      aria-label={`${sidebarId === 'left' ? 'PROJECT GUIDE' : 'ATTENTION'} (expanded)`}
     >
       <div className="dash-sidebar-header flex items-center justify-between p-3 border-b border-border-dark bg-surface-2-dark flex-shrink-0">
         <h3 className="dash-sidebar-title text-xs font-semibold uppercase tracking-wider text-muted-dark">
-          {sidebarId === 'left' ? 'Project Guide' : 'Attention & Activity'}
+          {sidebarId === 'left' ? 'PROJECT GUIDE' : 'ATTENTION'}
         </h3>
         <div className="dash-sidebar-header-actions flex gap-2">
           <button
@@ -285,7 +285,13 @@ export default function AccordionSidebar({
             aria-label={`Switch to ${width === WIDE_WIDTH ? 'narrow' : 'wide'} width`}
             title={width === WIDE_WIDTH ? 'Narrow (290px)' : 'Wide (380px)'}
           >
-            {width === WIDE_WIDTH ? '◀' : '▶'}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3" />
+              <path d="M16 3h3a2 2 0 0 0 2 2v14a2 2 0 0 0-2 2h-3" />
+              <path d="M12 20v-2" />
+              <path d="M12 14v-2" />
+              <path d="M12 8V6" />
+            </svg>
           </button>
           <button
             type="button"
@@ -355,7 +361,7 @@ function AccordionSectionItem({
     <div className={`dash-sidebar-section rounded-lg overflow-hidden`}>
       <button
         type="button"
-        className={`dash-sidebar-section-header w-full flex items-center gap-3 p-2.5 border border-border-dark rounded-lg bg-surface-2-dark text-text-dark text-sm font-medium cursor-pointer text-left transition-colors ${
+        className={`dash-sidebar-section-header w-full flex items-start gap-3 p-3 border border-border-dark rounded-lg bg-surface-2-dark cursor-pointer text-left transition-colors ${
           isOpen ? 'bg-accent/10 border-accent' : 'hover:bg-accent/5 hover:border-accent'
         }`}
         role="tab"
@@ -371,11 +377,13 @@ function AccordionSectionItem({
         }`}>
           {section.number}
         </span>
-        <span className="dash-sidebar-section-title truncate min-w-0 flex-1">{section.title}</span>
-        <span className="dash-sidebar-section-hint text-xs text-muted-dark font-normal max-w-[120px] truncate flex-shrink-0">
-          {section.hint}
-        </span>
-        <span className={`dash-sidebar-section-chevron w-5 h-5 flex items-center justify-center text-muted-dark flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`}>
+        <div className="flex flex-col min-w-0 flex-1 gap-0.5">
+          <span className="dash-sidebar-section-title text-sm font-semibold" style={{ color: 'var(--text)' }}>{section.title}</span>
+          <span className="dash-sidebar-section-hint text-xs" style={{ color: 'var(--text-muted)' }}>
+            {section.hint}
+          </span>
+        </div>
+        <span className={`dash-sidebar-section-chevron w-5 h-5 flex items-center justify-center flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} style={{ color: 'var(--text-muted)' }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M6 9l6 6 6-6" />
           </svg>

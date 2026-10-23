@@ -38,12 +38,6 @@ function fmtTime(iso: string | null): string {
       })
 }
 
-const MOOD_CLASSES: Record<string, string> = {
-  good: 'bg-green-500/15 text-green-400 border-green-500/30',
-  neutral: 'bg-gray-500/15 text-gray-400 border-gray-500/30',
-  tense: 'bg-red-500/15 text-red-400 border-red-500/30'
-}
-
 function ProjectCardInner({
   snapshot,
   index,
@@ -122,7 +116,7 @@ function ProjectCardInner({
             {identity.name}
           </h3>
           <span className="text-sm text-muted-dark truncate max-w-[200px]" title={identity.clientName}>
-            {identity.clientName}
+            Client · {identity.clientName || 'Not set'}
           </span>
           <span
             className="text-xs px-2 py-1 rounded-full bg-accent/20 text-accent border border-accent/30 whitespace-nowrap flex-shrink-0"
@@ -133,9 +127,7 @@ function ProjectCardInner({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted-dark whitespace-nowrap">{aiBadge}</span>
-          <span className={`dash-chip px-2 py-1 rounded-full text-xs font-medium border ${MOOD_CLASSES[identity.mood]}`}>
-            mood: {identity.mood}
-          </span>
+
           {centre.needsReply && (
             <span className="dash-chip px-2 py-1 rounded-full text-xs font-semibold border bg-red-500/15 text-red-400 border-red-500/30">
               ⚠ needs my reply

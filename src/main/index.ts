@@ -1,4 +1,4 @@
-import { app, BrowserWindow, nativeImage, session, shell } from 'electron'
+import { app, BrowserWindow, nativeImage, nativeTheme, session, shell } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -135,7 +135,7 @@ if (!gotSingleInstanceLock) {
       show: false,
       autoHideMenuBar: true,
       title: APP_DISPLAY_NAME,
-      backgroundColor: '#100e16',
+      backgroundColor: '#14121c',
       icon,
       webPreferences: {
         preload: join(__dirname, '../preload/index.js'),
@@ -229,6 +229,8 @@ if (!gotSingleInstanceLock) {
   process.on('unhandledRejection', (reason) => {
     log.error('unhandledRejection', { reason: String(reason) })
   })
+
+  nativeTheme.themeSource = 'dark'
 
   app.whenReady().then(async () => {
     electronApp.setAppUserModelId(APP_BUNDLE_ID)

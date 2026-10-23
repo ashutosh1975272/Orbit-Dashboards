@@ -114,10 +114,11 @@ export default function RecentStrip({
             key={`${item.projectId}-${item.ts}-${idx}`}
             type="button"
             role="listitem"
-            className="dash-recent-card flex-none flex flex-col gap-2 w-[320px] h-[160px] p-4 bg-surface-dark border border-border-dark rounded-xl cursor-pointer text-left text-text-dark transition-all hover:border-accent hover:bg-accent/10 hover:shadow-lg"
+            className="dash-recent-card flex-none flex flex-col gap-2 p-3 rounded-xl cursor-pointer text-left transition-all hover:border-accent"
             data-testid={`dash-recent-${item.projectId}`}
             onClick={() => onSelect?.(item.projectId)}
             title={item.oneLine}
+            style={{ width: "236px", flex: "0 0 236px", padding: "12px 14px", borderRadius: "12px", border: "2px solid var(--border-card)", background: "var(--bg-card)" }}
           >
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs text-muted-dark border border-border-dark rounded-full px-2 py-0.5 whitespace-nowrap truncate max-w-[120px]">

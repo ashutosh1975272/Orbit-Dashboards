@@ -130,9 +130,9 @@ export default function CentreVisuals({ visuals }: CentreVisualsProps): React.Re
       <div className="dash-visuals-row dash-visuals-row-bottom">
         <div className="dash-panel dash-visuals-panel dash-activity-panel">
           <div className="dash-visuals-panel-title text-xs font-semibold uppercase tracking-wider text-muted-dark mb-3">Last 7 Days Activity</div>
-          <div className="dash-activity-bars flex items-end gap-2 h-24 px-1" role="img" aria-label="Messages per day for the last 7 days">
+          <div className="dash-activity-bars flex items-end gap-2 px-1" style={{ height: "70px" }} role="img" aria-label="Messages per day for the last 7 days">
             {sevenDayBars.map((bar, i) => {
-              const barHeight = `${Math.max(4, (bar.count / maxBarCount) * 100)}%`
+              const barHeight = `${Math.round((bar.count / Math.max(maxBarCount, 1)) * 34) + 3}px`
               const barColor = bar.isToday ? 'var(--success)' : 'var(--accent)'
               const gradient = bar.isToday
                 ? 'linear-gradient(180deg, var(--success), var(--success))'
@@ -144,7 +144,7 @@ export default function CentreVisuals({ visuals }: CentreVisualsProps): React.Re
                   style={{ '--bar-height': barHeight } as React.CSSProperties}
                   title={`${formatDateShort(bar.date)}: ${bar.count} messages`}
                 >
-                  <div className="dash-activity-bar-fill w-full rounded-t" style={{ height: 'var(--bar-height)', background: gradient } as React.CSSProperties} />
+                  <div className="dash-activity-bar-fill w-full rounded-t" style={{ height: barHeight, background: gradient } as React.CSSProperties} />
                   <span className="dash-activity-bar-date text-xs text-muted-dark uppercase tracking-wider">
                     {bar.isToday ? 'T' : new Date(bar.date).toLocaleDateString(undefined, { weekday: 'narrow' })}
                   </span>

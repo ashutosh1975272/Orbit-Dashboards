@@ -20,106 +20,71 @@ function formatTime(iso: string): string {
 
 export default function CentreContent({ centre }: CentreContentProps): React.ReactElement {
   return (
-    <div className="dash-centre-content p-4 space-y-3">
-      {/* Status & Needs Reply Pills */}
-      <div className="dash-centre-pills flex flex-wrap gap-2">
-        {centre.status ? (
-          <span
-            className={`dash-chip px-2 py-1 rounded-full text-xs font-medium border ${
-              centre.status === 'on-track' ? 'bg-green-500/15 text-green-400 border-green-500/30' :
-              centre.status === 'at-risk' ? 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30' :
-              centre.status === 'blocked' ? 'bg-red-500/15 text-red-400 border-red-500/30' :
-              'bg-purple-500/15 text-purple-400 border-purple-500/30'
-            }`}
-            title={centre.statusReason}
-          >
-            {centre.status}
-          </span>
-        ) : null}
-        {centre.needsReply ? (
-          <span
-            className="dash-chip px-2 py-1 rounded-full text-xs font-semibold border bg-red-500/15 text-red-400 border-red-500/30"
-            title={centre.openQuestions.join('\n')}
-            data-testid="dash-needs-reply"
-          >
-            ⚠ needs my reply
-            {centre.urgency !== 'normal' ? ` (${centre.urgency})` : ''}
-          </span>
-        ) : null}
-        {centre.statusChange && (
-          <span className="dash-chip px-2 py-1 rounded-full text-xs font-medium border bg-purple-500/15 text-purple-400 border-purple-500/30" title="Status changed this refresh">
-            {centre.statusChange}
-          </span>
+    <div className="dash-centre-content flex flex-col gap-4">
+      {/* SUMMARY panel */}
+      <div className="dash-panel" style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-panel)', borderRadius: '14px', padding: '16px 20px' }}>
+        <span className="dash-panel-label" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700, color: 'var(--text-label)', display: 'block', marginBottom: '12px' }}>Summary</span>
+        {centre.situationLine && (
+          <p style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text)', lineHeight: 1.4, marginBottom: '8px' }} data-testid="dash-situation">
+            {centre.situationLine}
+          </p>
+        )}
+        {centre.recentLine && (
+          <p style={{ fontSize: '14px', color: 'var(--text-soft)', marginBottom: '12px' }} data-testid="dash-recent-line">
+            <span style={{ color: 'var(--accent)', fontWeight: 700 }}>Just changed:</span> {centre.recentLine}
+          </p>
+        )}
+        {centre.nextStep && (
+          <div style={{ marginTop: '4px', padding: '12px 16px', borderRadius: '10px', background: 'var(--accent)', color: 'var(--on-accent)', fontSize: '15px', fontWeight: 600 }} data-testid="dash-next-step">
+            <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '4px', opacity: 0.8 }}>Next Step</span>
+            {centre.nextStep}
+          </div>
         )}
       </div>
 
-      {/* Situation Line - Largest text, read first */}
-      {centre.situationLine && (
-        <p className="dash-insight-situation text-lg font-medium leading-relaxed text-text-dark" data-testid="dash-situation">
-          {centre.situationLine}
-        </p>
-      )}
-
-      {/* Just Changed */}
-      {centre.recentLine && (
-        <p className="dash-insight-recent text-sm text-muted-dark" data-testid="dash-recent-line">
-          ↻ just changed: {centre.recentLine}
-        </p>
-      )}
-
-      {/* Highlights (up to 3) */}
+      {/* HIGHLIGHTS panel */}
       {centre.highlights.length > 0 && (
-        <ul className="dash-insight-highlights list-disc list-inside space-y-1 text-sm text-text-dark">
+        <div className="dash-panel" style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-panel)', borderRadius: '14px', padding: '16px 20px' }}>
+          <span className="dash-panel-label" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700, color: 'var(--text-label)', display: 'block', marginBottom: '12px' }}>Highlights</span>
           {centre.highlights.slice(0, 3).map((h, i) => (
-            <li key={i} className="flex items-start gap-2">
-              <span className="dash-insight-what">{h.what}</span>
-              {h.who && <span className="dash-insight-meta text-xs text-muted-dark"> · {h.who}</span>}
-              {h.whenIso && <span className="dash-insight-meta text-xs text-muted-dark"> · {formatTime(h.whenIso)}</span>}
-            </li>
+            <div key={i} style={{ padding: '8px 0', borderTop: i > 0 ? '1px solid var(--border-panel)' : 'none', display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '14px', color: 'var(--text)', flex: 1, minWidth: '200px' }}>{h.what}</span>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                {h.who && `${h.who}`}{h.whenIso && ` · ${formatTime(h.whenIso)}`}
+              </span>
+            </div>
           ))}
-        </ul>
-      )}
-
-      {/* Last Client Message Box */}
-      {centre.lastClientMessage ? (
-        <div className="dash-insight-client-box p-3 bg-purple-500/8 border border-border-dark rounded-lg border-l-3 border-accent">
-          <p className="dash-insight-client-quote text-sm leading-relaxed italic text-text-dark mb-2">"{centre.lastClientMessage.quote}"</p>
-          <div className="dash-insight-client-meta flex flex-wrap items-center gap-2">
-            <span className="dash-insight-meta text-xs text-muted-dark">{centre.lastClientMessage.who}</span>
-            <span className="dash-insight-meta text-xs text-muted-dark">{formatTime(centre.lastClientMessage.whenIso)}</span>
-            {centre.needsReply && (
-              <>
-                <span className="dash-chip px-2 py-0.5 rounded-full text-xs font-semibold border bg-red-500/15 text-red-400 border-red-500/30">needs reply</span>
-                <span className={`dash-chip px-2 py-0.5 rounded-full text-xs font-medium border ${
-                  centre.urgency === 'high' ? 'bg-red-500/15 text-red-400 border-red-500/30' :
-                  centre.urgency === 'low' ? 'bg-gray-500/15 text-gray-400 border-gray-500/30' :
-                  'bg-purple-500/15 text-purple-400 border-purple-500/30'
-                }`}>
-                  {centre.urgency}
-                </span>
-              </>
-            )}
-          </div>
         </div>
-      ) : (
-        <p className="dash-insight-meta text-sm text-muted-dark italic">no client message yet</p>
       )}
 
-      {/* Open Questions */}
-      {centre.openQuestions.length > 0 && (
-        <ul className="dash-insight-questions list-disc list-inside space-y-1 text-sm text-yellow-400">
-          {centre.openQuestions.slice(0, 3).map((q, i) => (
-            <li key={i}>? {q}</li>
-          ))}
-        </ul>
-      )}
-
-      {/* Next Step Bar - Prominent */}
-      {centre.nextStep && (
-        <p className="dash-insight-next mt-2 px-3 py-2 bg-purple-500/15 border border-purple-500/30 rounded-lg text-sm font-semibold text-purple-400" data-testid="dash-next-step">
-          → next: {centre.nextStep}
-        </p>
-      )}
+      {/* LAST CLIENT MESSAGE panel */}
+      <div className="dash-panel" style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-panel)', borderRadius: '14px', padding: '16px 20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700, color: 'var(--text-label)' }}>Last Client Message</span>
+          {centre.needsReply && (
+            <span style={{ fontSize: '12px', fontWeight: 600, color: '#ff9a9a' }}>Needs my reply · {centre.urgency} urgency</span>
+          )}
+        </div>
+        {centre.lastClientMessage ? (
+          <>
+            <p style={{ fontSize: '15px', color: 'var(--text)', lineHeight: 1.5, marginBottom: '8px' }}>
+              "{centre.lastClientMessage.quote}"
+            </p>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
+              {centre.lastClientMessage.who} · {formatTime(centre.lastClientMessage.whenIso)}
+            </p>
+            {centre.openQuestions.length > 0 && (
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                {centre.openQuestions.slice(0, 3).map((q, i) => (
+                  <li key={i} style={{ fontSize: '13px', color: '#f5c46b', marginBottom: '4px' }}>? {q}</li>
+                ))}
+              </ul>
+            )}
+          </>
+        ) : (
+          <p style={{ fontSize: '14px', color: 'var(--text-muted)', fontStyle: 'italic' }}>No client message yet</p>
+        )}
+      </div>
     </div>
   )
 }
