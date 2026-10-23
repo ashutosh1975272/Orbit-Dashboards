@@ -132,8 +132,8 @@ export default function DashboardView(): React.ReactElement | null {
             <span className="text-base font-medium">{digest.topPriority}</span>
             {(digest.needsReply?.length ?? 0) > 0 && (
               <span className="flex gap-2 flex-wrap">
-                {(digest.needsReply ?? []).map((w) => (
-                  <span key={w} className="px-2 py-1 bg-red-500/15 text-red-400 border border-red-500/30 rounded-full text-xs font-medium">
+                {(digest.needsReply ?? []).map((w, i) => (
+                  <span key={`nr-${w}-${i}`} className="px-2 py-1 bg-red-500/15 text-red-400 border border-red-500/30 rounded-full text-xs font-medium">
                     ⚠ {w}
                   </span>
                 ))}
@@ -141,8 +141,8 @@ export default function DashboardView(): React.ReactElement | null {
             )}
             {(digest.atRisk?.length ?? 0) > 0 && (
               <span className="flex gap-2 flex-wrap">
-                {(digest.atRisk ?? []).map((w) => (
-                  <span key={w} className="px-2 py-1 bg-yellow-500/15 text-yellow-400 border border-yellow-500/30 rounded-full text-xs font-medium">
+                {(digest.atRisk ?? []).map((w, i) => (
+                  <span key={`ar-${w}-${i}`} className="px-2 py-1 bg-yellow-500/15 text-yellow-400 border border-yellow-500/30 rounded-full text-xs font-medium">
                     {w}
                   </span>
                 ))}
