@@ -26,9 +26,9 @@ export default function CentreVisuals({ visuals }: CentreVisualsProps): React.Re
   return (
     <div className="dash-centre-visuals space-y-4 p-4">
       {/* Row 1: Progress Donut + Time Elapsed */}
-      <div className="dash-visuals-row dash-visuals-row-top grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="dash-at-a-glance">
         {/* Progress Donut */}
-        <div className="dash-visuals-panel dash-donut-panel bg-surface-dark border border-border-dark rounded-xl p-4 flex items-center justify-center">
+        <div className="dash-panel dash-visuals-panel dash-donut-panel flex items-center justify-center">
           <div className="dash-donut-wrapper relative" style={{ width: donutSize, height: donutSize }}>
             <svg width={donutSize} height={donutSize} className="dash-donut-svg" role="img" aria-label={`Progress ${progressPercent}%`} style={{ transform: 'rotate(-90deg)' }}>
               <circle
@@ -66,7 +66,7 @@ export default function CentreVisuals({ visuals }: CentreVisualsProps): React.Re
         </div>
 
         {/* Time Elapsed Bars */}
-        <div className="dash-visuals-panel dash-time-panel bg-surface-dark border border-border-dark rounded-xl p-4">
+        <div className="dash-panel dash-visuals-panel dash-time-panel">
           <div className="dash-visuals-panel-title text-xs font-semibold uppercase tracking-wider text-muted-dark mb-3">Time Elapsed</div>
           {timeElapsed.hasDates ? (
             <>
@@ -128,7 +128,7 @@ export default function CentreVisuals({ visuals }: CentreVisualsProps): React.Re
 
       {/* Row 2: Last 7 Days Activity Bars */}
       <div className="dash-visuals-row dash-visuals-row-bottom">
-        <div className="dash-visuals-panel dash-activity-panel bg-surface-dark border border-border-dark rounded-xl p-4">
+        <div className="dash-panel dash-visuals-panel dash-activity-panel">
           <div className="dash-visuals-panel-title text-xs font-semibold uppercase tracking-wider text-muted-dark mb-3">Last 7 Days Activity</div>
           <div className="dash-activity-bars flex items-end gap-2 h-24 px-1" role="img" aria-label="Messages per day for the last 7 days">
             {sevenDayBars.map((bar, i) => {
@@ -146,7 +146,7 @@ export default function CentreVisuals({ visuals }: CentreVisualsProps): React.Re
                 >
                   <div className="dash-activity-bar-fill w-full rounded-t" style={{ height: 'var(--bar-height)', background: gradient } as React.CSSProperties} />
                   <span className="dash-activity-bar-date text-xs text-muted-dark uppercase tracking-wider">
-                    {bar.isToday ? 'Today' : formatDateShort(bar.date).split(' ')[1]}
+                    {bar.isToday ? 'T' : new Date(bar.date).toLocaleDateString(undefined, { weekday: 'narrow' })}
                   </span>
                   {bar.count > 0 && <span className="dash-activity-bar-count text-xs font-semibold" style={{ color: barColor } as React.CSSProperties}>{bar.count}</span>}
                 </div>

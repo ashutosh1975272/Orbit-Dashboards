@@ -2466,3 +2466,96 @@ body.is-resizing-sidebar webview {
   background: var(--accent-soft);
   border-color: var(--accent);
 }
+
+/* ===== Alignment rules: unified panel style ===== */
+.dash-panel {
+  background: #231f33;
+  border: 1px solid #2f2a47;
+  border-radius: 14px;
+  padding: 16px 20px;
+}
+.dash-panel-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 12px;
+  display: block;
+}
+.dash-at-a-glance {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+.dash-at-a-glance > * {
+  min-height: 100%;
+}
+.dash-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #2f2a47;
+  white-space: nowrap;
+}
+.dash-sidebar-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+.dash-icon-btn-44 {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid #2f2a47;
+  background: #231f33;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.dash-icon-btn-44:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.dash-pill {
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.dash-centre-panels {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.dash-accordion-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dash-weekday-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+}
