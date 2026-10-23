@@ -1,4 +1,5 @@
 import type React from 'react'
+import CardHead from './CardHead'
 import type { CardSummary } from './card-view'
 
 interface CompactCardProps {
@@ -6,17 +7,41 @@ interface CompactCardProps {
   expanded: boolean
   onToggle: () => void
   onExpandSection?: (section: number) => void
-  onDelete: (id: string) => void
   onSync: (id: string) => void
   onEdit: () => void
   onSettings: () => void
   syncing: boolean
 }
 
-const MOOD_CLASSES: Record<string, string> = {
-  good: 'bg-green-500/15 text-green-400 border-green-500/30',
-  neutral: 'bg-gray-500/15 text-gray-400 border-gray-500/30',
-  tense: 'bg-red-500/15 text-red-400 border-red-500/30'
+const PACE_COLOR: Record<string, string> = {
+  behind: 'var(--danger)',
+  ahead: 'var(--accent)',
+  'on-pace': 'var(--success)'
+}
+
+function chip(label: string, onClick: () => void): React.ReactElement {
+  return (
+    <button
+      type="button"
+      style={{
+        height: '36px',
+        padding: '0 12px',
+        borderRadius: '999px',
+        border: '1px solid var(--border-btn)',
+        background: 'var(--bg-panel)',
+        color: 'var(--text-soft)',
+        fontSize: '12px',
+        fontWeight: 600,
+        cursor: 'pointer',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '6px'
+      }}
+      onClick={(e) => { e.stopPropagation(); onClick() }}
+    >
+      {label}
+    </button>
+  )
 }
 
 export default function CompactCard({
@@ -24,15 +49,14 @@ export default function CompactCard({
   expanded,
   onToggle,
   onExpandSection,
-  onDelete: _onDelete,
-  onSync: _onSync,
-  onEdit: _onEdit,
-  onSettings: _onSettings,
-  syncing: _syncing
+  onSync,
+  onEdit,
+  onSettings,
+  syncing
 }: CompactCardProps): React.ReactElement {
   const {
     projectId, index, name, workspaceName, clientName, status, needsReply, inactive,
-    situationLine, recentLine, nextStep, progress, dates, daysUsed, daysTotal, pace, paceLabel,
+    situationLine, justChanged, nextStep, progress, dates, daysUsed, daysTotal, pace, paceLabel,
     week, lastClientAt, myLastReplyAt, counts
   } = summary
 
@@ -48,147 +72,134 @@ export default function CompactCard({
     return `${Math.round(hours / 24)}d ago`
   }
 
-  const paceClass = pace === 'behind'
-    ? 'text-red-400'
-    : pace === 'ahead'
-      ? 'text-purple-400'
-      : 'text-green-400'
-
   return (
     <article
-      className="dash-card dash-card-compact bg-surface-2-dark border border-border-dark rounded-xl overflow-hidden transition-all duration-200"
+      style={{
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border-card)',
+        borderRadius: '16px',
+        padding: '16px 20px',
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '14px',
+        overflow: 'hidden'
+      }}
       id={`dash-card-anchor-${projectId}`}
       data-testid={`dash-card-${index}`}
-      style={{ borderRadius: '12px' }}
     >
-      <div
-        className="dash-card-head-compact flex items-center justify-between gap-4 p-4 cursor-pointer"
+      <CardHead
+        index={index}
+        name={name}
+        workspaceName={workspaceName}
+        clientName={clientName}
+        status={status}
+        needsReply={needsReply}
+        inactive={inactive}
+        syncing={syncing}
+        onSync={() => void onSync(projectId)}
+        onEdit={onEdit}
+        onSettings={onSettings}
+        onToggle={onToggle}
+        expanded={expanded}
+      />
+
+      {/* ROW 1: three zones */}
+      <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', width: '100%' }}>
+        {/* Zone A: situation + just changed + next step */}
+        <div style={{ flex: 3, minWidth: '420px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <p style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text)', lineHeight: 1.5, margin: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} data-testid="dash-situation">
+            {situationLine || 'No summary yet'}
+          </p>
+          {justChanged && (
+            <p style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent)', margin: 0, whiteSpace: 'nowrap' }} data-testid="dash-just-changed">
+              Just changed: {justChanged}
+            </p>
+          )}
+          {nextStep && (
+            <div style={{ padding: '10px 14px', borderRadius: '10px', background: 'var(--accent)', color: 'var(--on-accent)', fontSize: '15px', fontWeight: 600, lineHeight: 1.4, display: 'inline-flex', alignItems: 'center', gap: '8px' }} data-testid="dash-next-step">
+              <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', opacity: 0.8 }}>NEXT STEP</span>
+              {nextStep}
+            </div>
+          )}
+        </div>
+
+        {/* Zone B: progress + time + pace */}
+        <div style={{ flex: 2, minWidth: '300px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-panel)', borderRadius: '10px', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8px' }}>
+              <span style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)' }}>{progress}%</span>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{daysUsed != null && daysTotal != null ? `${daysUsed} of ${daysTotal} days` : '—'}</span>
+            </div>
+            <div style={{ height: '10px', width: '100%', background: 'var(--track)', borderRadius: '5px', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${Math.min(100, progress)}%`, background: 'var(--accent)', borderRadius: '5px' }} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{dates.startDate && dates.endDate ? `${fmtAge(dates.startDate)} → ${fmtAge(dates.endDate)}` : 'Dates not stated'}</span>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: PACE_COLOR[pace] ?? 'var(--text-muted)' }}>{paceLabel}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Zone C: last 7 days + last messages */}
+        <div style={{ flex: 1.2, minWidth: '200px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-panel)', borderRadius: '10px', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-label)' }}>LAST 7 DAYS</span>
+            <div style={{ display: 'flex', alignItems: 'end', gap: '5px', height: '36px' }}>
+              {week.map((bar) => (
+                <div
+                  key={bar.date}
+                  style={{ display: 'flex', flexDirection: 'column-reverse', alignItems: 'center', gap: '2px', flex: 1 }}
+                  title={`${bar.date}: ${bar.count} messages`}
+                >
+                  <div style={{ width: '100%', borderRadius: '2px 2px 0 0', height: `${Math.round((bar.count / Math.max(maxBar, 1)) * 34) + 3}px`, background: bar.isToday ? 'var(--success)' : '#5b4f86' }} />
+                  <span style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{bar.isToday ? 'T' : new Date(bar.date).toLocaleDateString(undefined, { weekday: 'narrow' })}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Client {fmtAge(lastClientAt)}</span>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Me {fmtAge(myLastReplyAt)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ROW 2: count chips */}
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+        {counts.questions > 0 && chip(`${counts.questions} open question${counts.questions === 1 ? '' : 's'}`, () => { onToggle(); onExpandSection?.(1) })}
+        {counts.blockers > 0 && chip(`${counts.blockers} blocker${counts.blockers === 1 ? '' : 's'}`, () => { onToggle(); onExpandSection?.(2) })}
+        {counts.risks > 0 && chip(`${counts.risks} risk${counts.risks === 1 ? '' : 's'}`, () => { onToggle(); onExpandSection?.(3) })}
+        {counts.files > 0 && chip(`${counts.files} file${counts.files === 1 ? '' : 's'}`, () => { onToggle(); onExpandSection?.(6) })}
+        {counts.requirements > 0 && chip(`${counts.requirements} requirement${counts.requirements === 1 ? '' : 's'}`, () => { onToggle(); onExpandSection?.(5) })}
+      </div>
+
+      {/* Minimise / Expand toggle */}
+      <button
+        type="button"
+        style={{
+          padding: '8px 14px',
+          borderRadius: '10px',
+          background: 'transparent',
+          border: '1px solid var(--accent)',
+          color: 'var(--accent)',
+          fontSize: '13px',
+          fontWeight: 600,
+          minHeight: '44px',
+          cursor: 'pointer',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px'
+        }}
         onClick={onToggle}
-        role="button"
-        tabIndex={0}
         aria-expanded={expanded}
-        aria-label={`${expanded ? 'Collapse' : 'Expand'} ${name}`}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle() } }}
+        aria-label={`${expanded ? 'Minimise' : 'Expand'} ${name}`}
       >
-        {/* LEFT: Identity */}
-        <div className="flex items-center gap-3 min-w-0 flex-shrink-0" style={{ maxWidth: '35%' }}>
-          <span className="text-xs text-muted-dark/60">#{index + 1}</span>
-          <div className="min-w-0">
-            <h3 className="text-base font-semibold truncate" title={name}>{name}</h3>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-xs text-muted-dark truncate">{clientName}</span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-accent/20 text-accent border border-accent/30 whitespace-nowrap">
-                {workspaceName}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* CENTRE: Situation + Next Step */}
-        <div className="flex-1 min-w-0 px-4">
-          <p className="text-sm text-text-dark line-clamp-2 leading-relaxed">{situationLine || 'No summary yet'}</p>
-          {recentLine && <p className="text-xs text-muted-dark mt-1 truncate">Just changed: {recentLine}</p>}
-          {nextStep && <p className="text-xs font-medium mt-1 truncate" style={{ color: 'var(--accent)' }}>→ {nextStep}</p>}
-        </div>
-
-        {/* RIGHT: Numbers */}
-        <div className="flex items-center gap-4 flex-shrink-0" style={{ maxWidth: '30%' }}>
-          {/* Progress */}
-          <div className="flex flex-col items-center gap-1">
-            <span className="text-lg font-bold text-text-dark">{progress}%</span>
-            <div className="w-16 h-1.5 bg-border-dark rounded-full overflow-hidden">
-              <div className="h-full rounded-full" style={{ width: `${progress}%`, background: 'linear-gradient(90deg, var(--accent), var(--accent-dim))' }} />
-            </div>
-          </div>
-
-          {/* Time + Pace */}
-          <div className="flex flex-col items-end gap-0.5">
-            {dates.startDate && dates.endDate ? (
-              <>
-                <span className="text-xs text-muted-dark">{daysUsed ?? 0}d / {daysTotal ?? 0}d</span>
-                <span className={`text-xs font-medium ${paceClass}`}>{paceLabel}</span>
-              </>
-            ) : (
-              <span className="text-xs text-muted-dark">Dates not stated</span>
-            )}
-          </div>
-
-          {/* 7-day bars */}
-          <div className="flex items-end gap-0.5 h-8">
-            {week.map((bar, i) => (
-              <div
-                key={i}
-                className="w-1.5 rounded-sm"
-                style={{
-                  height: `${Math.max(2, (bar.count / maxBar) * 100)}%`,
-                  background: bar.isToday ? 'var(--success)' : 'var(--accent)',
-                  opacity: bar.isToday ? 1 : 0.6
-                }}
-                title={`${bar.date}: ${bar.count}`}
-              />
-            ))}
-          </div>
-
-          {/* Last messages */}
-          <div className="flex flex-col gap-0.5 text-xs text-muted-dark">
-            <span>Client: {fmtAge(lastClientAt)}</span>
-            <span>Me: {fmtAge(myLastReplyAt)}</span>
-          </div>
-
-          {/* Expand button */}
-          <button
-            type="button"
-            className="w-8 h-8 rounded-lg border border-border-dark text-text-dark hover:bg-accent/10 hover:border-accent transition-colors flex items-center justify-center flex-shrink-0"
-            onClick={(e) => { e.stopPropagation(); onToggle() }}
-            aria-label={expanded ? 'Collapse' : 'Expand'}
-            title={expanded ? 'Collapse' : 'Expand'}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
-              <path d="M6 9l6 6 6-6" />
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      {/* Status pills row */}
-      <div className="flex items-center gap-2 px-4 pb-3 flex-wrap">
-        {status && (
-          <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${MOOD_CLASSES[status === 'at-risk' ? 'tense' : status === 'blocked' ? 'tense' : 'neutral']}`}>
-            {status}
-          </span>
-        )}
-        {needsReply && (
-          <span className="px-2 py-0.5 rounded-full text-xs font-semibold border bg-red-500/15 text-red-400 border-red-500/30">
-            ⚠ needs reply
-          </span>
-        )}
-        {inactive && (
-          <span className="px-2 py-0.5 rounded-full text-xs font-medium border bg-yellow-500/15 text-yellow-400 border-yellow-500/30">
-            Inactive 24h+
-          </span>
-        )}
-        {/* Footer chips */}
-        {counts.questions > 0 && (
-          <button type="button" className="px-2 py-0.5 rounded-full text-xs border border-border-dark text-muted-dark hover:border-accent hover:text-accent transition-colors" onClick={(e) => { e.stopPropagation(); onToggle(); onExpandSection?.(1) }}>
-            {counts.questions} questions
-          </button>
-        )}
-        {counts.blockers > 0 && (
-          <button type="button" className="px-2 py-0.5 rounded-full text-xs border border-border-dark text-muted-dark hover:border-accent hover:text-accent transition-colors" onClick={(e) => { e.stopPropagation(); onToggle(); onExpandSection?.(2) }}>
-            {counts.blockers} blockers
-          </button>
-        )}
-        {counts.risks > 0 && (
-          <button type="button" className="px-2 py-0.5 rounded-full text-xs border border-border-dark text-muted-dark hover:border-accent hover:text-accent transition-colors" onClick={(e) => { e.stopPropagation(); onToggle(); onExpandSection?.(3) }}>
-            {counts.risks} risks
-          </button>
-        )}
-        {counts.files > 0 && (
-          <button type="button" className="px-2 py-0.5 rounded-full text-xs border border-border-dark text-muted-dark hover:border-accent hover:text-accent transition-colors" onClick={(e) => { e.stopPropagation(); onToggle(); onExpandSection?.(6) }}>
-            {counts.files} files
-          </button>
-        )}
-      </div>
+        {expanded ? 'Minimise' : 'Expand'}
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
     </article>
   )
 }

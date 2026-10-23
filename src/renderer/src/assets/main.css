@@ -20,27 +20,27 @@ h1, h2, h3, h4, strong, b {
 :root[data-theme='dark'] {
   color-scheme: dark;
   /* Design tokens (section 1) */
-  --bg-page: #14121c;
-  --bg-app-side: #181624;
-  --bg-card: #1c1928;
-  --bg-panel: #231f33;
-  --bg-panel-open: #1f1b2e;
-  --bg-chip: #2b2542;
-  --bg-track: #2e2945;
-  --border-card: #322c47;
-  --border-card-open: #4a4070;
-  --border-panel: #2f2a47;
-  --border-side: #2a2540;
-  --border-btn: #3a3358;
-  --text: #ece9f5;
-  --text-soft: #cfc9e6;
-  --text-muted: #a49fb8;
-  --text-label: #9c97b3;
-  --accent: #b79cf0;
-  --on-accent: #1a1426;
-  --info: #7fb2ff;
-  --success: #62d6a0;
-  --danger: #ff7a7a;
+  --bg-page: #171412;
+  --bg-app-side: #211B19;
+  --bg-card: #26201F;
+  --bg-panel: #2D2523;
+  --bg-panel-open: #382D2A;
+  --bg-chip: #382D2A;
+  --bg-track: #382D2A;
+  --border-card: #453734;
+  --border-card-open: #5B4640;
+  --border-panel: #453734;
+  --border-side: #453734;
+  --border-btn: #5B4640;
+  --text: #FFFFFF;
+  --text-soft: #F5F0ED;
+  --text-muted: #AA9B94;
+  --text-label: #AA9B94;
+  --accent: #B49AE8;
+  --on-accent: #171412;
+  --info: #83C8FF;
+  --success: #55D6A5;
+  --danger: #FF7785;
   --font: 'Inter', system-ui, -apple-system, sans-serif;
   --radius-card: 16px;
   --radius-panel: 14px;
@@ -56,7 +56,7 @@ h1, h2, h3, h4, strong, b {
   --text: var(--text);
   --muted: var(--text-muted);
   --accent-soft: rgba(183, 156, 240, 0.18);
-  --accent-dim: #9a7fd4;
+  --accent-dim: #C8B4F5;
   --sidebar-tint: var(--bg-app-side);
   --danger: #ff7a7a;
   --success: #62d6a0;
@@ -2601,3 +2601,47 @@ body.is-resizing-sidebar webview {
   white-space: nowrap;
   overflow: hidden;
 }
+
+
+/* ===== Focus ring (accessibility) ===== */
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ===== prefers-reduced-motion ===== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ===== Container queries (responsive) ===== */
+@container (max-width: 1030px) {
+  .dash-card-body-v24 {
+    grid-template-columns: var(--left-w, 290px) minmax(0, 1fr) 66px !important;
+  }
+}
+
+@container (max-width: 760px) {
+  .dash-card-body-v24 {
+    grid-template-columns: 66px minmax(0, 1fr) 66px !important;
+  }
+}
+
+@container (max-width: 560px) {
+  .dash-card-body-v24 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Compatibility aliases for legacy Tailwind-ish utility classes used in dashboard */
+.text-text-dark { color: var(--text); }
+.text-muted-dark { color: var(--text-muted); }
+.text-soft-dark { color: var(--text-soft); }
+.bg-background-dark { background: var(--bg-page); }
+.bg-surface-dark { background: var(--bg-app-side); }
+.bg-surface-2-dark { background: var(--bg-card); }
+.border-border-dark { border-color: var(--border-card); }
