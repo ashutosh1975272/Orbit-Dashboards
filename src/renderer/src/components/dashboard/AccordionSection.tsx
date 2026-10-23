@@ -123,6 +123,8 @@ export default function AccordionSidebar({
     document.body.style.cursor = 'col-resize'
     document.body.style.userSelect = 'none'
     e.preventDefault()
+    window.addEventListener('mousemove', handleDragMove)
+    window.addEventListener('mouseup', handleDragEnd)
   }
 
   const handleDragMove = useCallback((e: MouseEvent): void => {
@@ -138,8 +140,10 @@ export default function AccordionSidebar({
       isDragging.current = false
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
+      window.removeEventListener('mousemove', handleDragMove)
+      window.removeEventListener('mouseup', handleDragEnd)
     }
-  }, [])
+  }, [handleDragMove])
 
   useEffect(() => {
     if (isDragging.current) {
@@ -222,7 +226,12 @@ export default function AccordionSidebar({
                 role="tab"
                 aria-selected={openSection === section.number}
                 aria-label={`Section ${section.number}: ${section.title}`}
-                onClick={() => handleSectionClick(section.number)}
+                onClick={() => {
+                  setCollapsed(false)
+                  setOpenSection(section.number)
+                  onCollapseChange?.(false)
+                  onSectionChange?.(section.number)
+                }}
                 onKeyDown={(e) => handleKeyDown(e, section.number)}
                 title={`${section.number}. ${section.title}`}
               >
