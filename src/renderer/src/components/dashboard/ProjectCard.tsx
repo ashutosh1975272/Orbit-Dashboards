@@ -1,4 +1,5 @@
 import type React from 'react'
+import { memo } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import type {
   DashboardProjectSnapshot,
@@ -43,7 +44,7 @@ const MOOD_CLASSES: Record<string, string> = {
   tense: 'bg-red-500/15 text-red-400 border-red-500/30'
 }
 
-export default function ProjectCard({
+function ProjectCardInner({
   snapshot,
   index,
   expanded,
@@ -328,3 +329,10 @@ export default function ProjectCard({
     </article>
   )
 }
+
+export default memo(ProjectCardInner, (prev, next) => {
+  return prev.snapshot.project.id === next.snapshot.project.id &&
+    prev.snapshot.lastUpdatedAt === next.snapshot.lastUpdatedAt &&
+    prev.expanded === next.expanded &&
+    prev.index === next.index
+})
