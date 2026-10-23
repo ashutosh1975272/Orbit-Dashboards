@@ -110,7 +110,7 @@ function ProjectCardInner({
 
   return (
     <article
-      className="dash-card dash-card-v24 bg-surface-2-dark border border-border-dark rounded-2xl overflow-hidden shadow-xl"
+      className="dash-card dash-card-v24" style={{ background: "var(--bg-card)", border: "1px solid var(--border-card)", borderRadius: "16px", padding: "18px 20px" }}
       id={`dash-card-anchor-${project.id}`}
       data-testid={`dash-card-${index}`}
     >
@@ -201,7 +201,7 @@ function ProjectCardInner({
         </div>
       </header>
 
-      <div className="dash-card-body-v24 grid grid-cols-[minmax(240px,320px)_minmax(0,1fr)_minmax(240px,320px)] gap-0 min-h-[600px]">
+      <div className="dash-card-body-v24" style={{ display: "grid", gridTemplateColumns: "var(--left-w, 290px) minmax(0, 1fr) var(--right-w, 290px)", gap: "16px", alignItems: "stretch", minHeight: "500px" }}>
         {/* ================= LEFT SIDEBAR: Project Guide ================= */}
         <LeftSidebar
           data={leftSidebar}
