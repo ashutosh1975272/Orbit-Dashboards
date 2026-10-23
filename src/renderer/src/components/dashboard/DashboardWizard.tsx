@@ -48,9 +48,7 @@ function buildManifest(_clientId: string, redirectUri: string): string {
         redirect_urls: redirectUri ? [redirectUri] : [],
         scopes: { user: USER_SCOPES }
       },
-      token_management_enabled: true,
-      settings: {
-        event_subscriptions: { user_events: ['message', 'channel', 'im', 'mpim'] },
+    settings: {
         org_deploy_enabled: false,
         socket_mode_enabled: false,
         is_hosted: false,

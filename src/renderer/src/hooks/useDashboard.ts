@@ -66,6 +66,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   setDashRailExpanded: (expanded) => set({ dashRailExpanded: expanded }),
 
   loadSnapshot: async () => {
+    const state = get()
+    if (state.loading) return
     set({ loading: true, error: null })
     try {
       const snapshot = await window.api.dashboard.getSnapshot()

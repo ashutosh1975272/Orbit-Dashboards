@@ -190,6 +190,11 @@ export interface CardView {
   syncedLabel: string
 }
 
+/** Correct English plurals: plural(1, 'file') → 'file', plural(2, 'file') → 'files'. */
+export function plural(n: number, word: string): string {
+  return n === 1 ? word : `${word}s`
+}
+
 export interface CardSummary {
   projectId: string
   index: number
@@ -199,8 +204,10 @@ export interface CardSummary {
   status: InsightStatus | null
   needsReply: boolean
   inactive: boolean
+  urgency: InsightUrgency
   situationLine: string
-  recentLine: string
+  /** The single most important thing that just changed (maps to insight.recentLine). */
+  justChanged: string
   nextStep: string
   progress: number
   dates: CardDates
@@ -211,7 +218,7 @@ export interface CardSummary {
   week: Array<{ date: string; count: number; isToday: boolean }>
   lastClientAt: string | null
   myLastReplyAt: string | null
-  counts: { questions: number; blockers: number; risks: number; files: number }
+  counts: { questions: number; blockers: number; risks: number; files: number; requirements: number }
   score: number
   aiBadge: string
   syncedLabel: string
@@ -569,9 +576,11 @@ export function buildCardSummary(snapshot: DashboardProjectSnapshot, index = 0):
   const progress = insight ? insight.progress : snapshot.completion
   const timeElapsed = computeTimeElapsed(dates.startDate, dates.endDate, progress)
   const sevenDayBars = computeSevenDayBars(perChannel)
-  const { messages24h } = computeActivityCounts(perChannel)
+  const { messages24h: _unused } = computeActivityCounts(perChannel)
+  void _unused
 
   const needsReply = insight ? insight.clientAsk.needsReply : false
+  const urgency: InsightUrgency = insight ? insight.clientAsk.urgency : 'normal'
   const inactive = !insight?.clientAsk?.lastClientMessage && (Date.now() - new Date(snapshot.lastUpdatedAt ?? Date.now()).getTime()) > 24 * 60 * 60 * 1000
 
   const lastClientAt = insight?.clientAsk?.lastClientMessage?.whenIso ?? null
@@ -581,17 +590,28 @@ export function buildCardSummary(snapshot: DashboardProjectSnapshot, index = 0):
     questions: insight?.clientAsk?.openQuestions?.length ?? 0,
     blockers: insight?.blockers?.length ?? 0,
     risks: insight?.risks?.length ?? 0,
-    files: insight?.files?.length ?? 0
+    files: insight?.files?.length ?? 0,
+    requirements: insight?.requirements?.length ?? 0
   }
 
   // Importance score (higher = more urgent)
+  // (needsReply ? 35 : 0) + (urgency high ? 15 : 0) +
+  // statusWeight(blocked 30, at-risk 24, waiting-on-client 20, on-track 8) +
+  // 20*exp(-hoursSinceLastMessage/12) + min(15, newMessages) - (noMessageFor48h ? 10 : 0)
+  const lastActivityIso = lastClientAt ?? snapshot.lastUpdatedAt ?? null
+  const hoursSinceLastMessage = lastActivityIso
+    ? Math.max(0, (Date.now() - new Date(lastActivityIso).getTime()) / 3_600_000)
+    : 48
+  const noMessageFor48h = hoursSinceLastMessage >= 48
+  const statusWeight = { blocked: 30, 'at-risk': 24, 'waiting-on-client': 20, 'on-track': 8 } as Record<string, number>
+  const statusScore = insight ? statusWeight[insight.status] ?? 0 : 0
   let score = 0
-  if (needsReply) score += 50
-  if (insight?.status === 'blocked') score += 40
-  if (insight?.status === 'at-risk') score += 30
-  if (inactive) score += 20
-  score += (snapshot.newMessageCount ?? 0) * 2
-  score += (messages24h > 0 ? 10 : 0)
+  score += needsReply ? 35 : 0
+  score += urgency === 'high' ? 15 : 0
+  score += statusScore
+  score += 20 * Math.exp(-hoursSinceLastMessage / 12)
+  score += Math.min(15, snapshot.newMessageCount ?? 0)
+  if (noMessageFor48h) score -= 10
 
   const aiBadge = snapshot.insightUpdatedAt
     ? `${snapshot.insightSource === 'heuristic' ? 'heuristic' : 'AI'} · ${fmtAge(snapshot.insightUpdatedAt)}${snapshot.insightModel ? ` · ${snapshot.insightModel}` : ''}`
@@ -606,8 +626,9 @@ export function buildCardSummary(snapshot: DashboardProjectSnapshot, index = 0):
     status: insight ? insight.status : null,
     needsReply,
     inactive,
+    urgency,
     situationLine: insight ? insight.situationLine : (snapshot.summary.split('\n').find((l) => l.trim()) ?? ''),
-    recentLine: insight ? insight.recentLine : '',
+    justChanged: insight ? insight.recentLine : '',
     nextStep: insight ? insight.nextStep : '',
     progress,
     dates,
