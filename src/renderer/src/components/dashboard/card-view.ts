@@ -190,6 +190,35 @@ export interface CardView {
   syncedLabel: string
 }
 
+export interface CardSummary {
+  projectId: string
+  index: number
+  name: string
+  workspaceName: string
+  clientName: string
+  status: InsightStatus | null
+  needsReply: boolean
+  inactive: boolean
+  situationLine: string
+  recentLine: string
+  nextStep: string
+  progress: number
+  dates: CardDates
+  daysUsed?: number
+  daysTotal?: number
+  pace: 'behind' | 'on-pace' | 'ahead'
+  paceLabel: string
+  week: Array<{ date: string; count: number; isToday: boolean }>
+  lastClientAt: string | null
+  myLastReplyAt: string | null
+  counts: { questions: number; blockers: number; risks: number; files: number }
+  score: number
+  aiBadge: string
+  syncedLabel: string
+}
+
+
+
 function fmtAge(iso: string | null): string {
   if (!iso) return 'never'
   const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60_000))
@@ -522,6 +551,75 @@ export function buildCardView(snapshot: DashboardProjectSnapshot, index = 0): Ca
       keywords: insight ? insight.keywords : [],
       hasMoreDetail
     },
+    aiBadge,
+    syncedLabel: `synced ${fmtAge(snapshot.lastUpdatedAt)}`
+  }
+}
+export function buildCardSummary(snapshot: DashboardProjectSnapshot, index = 0): CardSummary {
+  const insight = normalizeInsight(snapshot.insight)
+  const project = snapshot.project
+  const perChannel = Array.isArray(snapshot.perChannel) ? snapshot.perChannel : []
+
+  const dates: CardDates = insight
+    ? insight.dates.startDate || insight.dates.endDate
+      ? { startDate: insight.dates.startDate ?? snapshot.effectiveDates.startDate, endDate: insight.dates.endDate ?? snapshot.effectiveDates.endDate, badge: 'from chat' }
+      : { startDate: snapshot.effectiveDates.startDate, endDate: snapshot.effectiveDates.endDate, badge: project.startDate || project.endDate ? 'manual' : 'not stated in chat' }
+    : { startDate: snapshot.effectiveDates.startDate, endDate: snapshot.effectiveDates.endDate, badge: project.startDate || project.endDate ? 'manual' : 'not stated in chat' }
+
+  const progress = insight ? insight.progress : snapshot.completion
+  const timeElapsed = computeTimeElapsed(dates.startDate, dates.endDate, progress)
+  const sevenDayBars = computeSevenDayBars(perChannel)
+  const { messages24h } = computeActivityCounts(perChannel)
+
+  const needsReply = insight ? insight.clientAsk.needsReply : false
+  const inactive = !insight?.clientAsk?.lastClientMessage && (Date.now() - new Date(snapshot.lastUpdatedAt ?? Date.now()).getTime()) > 24 * 60 * 60 * 1000
+
+  const lastClientAt = insight?.clientAsk?.lastClientMessage?.whenIso ?? null
+  const myLastReplyAt = null
+
+  const counts = {
+    questions: insight?.clientAsk?.openQuestions?.length ?? 0,
+    blockers: insight?.blockers?.length ?? 0,
+    risks: insight?.risks?.length ?? 0,
+    files: insight?.files?.length ?? 0
+  }
+
+  // Importance score (higher = more urgent)
+  let score = 0
+  if (needsReply) score += 50
+  if (insight?.status === 'blocked') score += 40
+  if (insight?.status === 'at-risk') score += 30
+  if (inactive) score += 20
+  score += (snapshot.newMessageCount ?? 0) * 2
+  score += (messages24h > 0 ? 10 : 0)
+
+  const aiBadge = snapshot.insightUpdatedAt
+    ? `${snapshot.insightSource === 'heuristic' ? 'heuristic' : 'AI'} · ${fmtAge(snapshot.insightUpdatedAt)}${snapshot.insightModel ? ` · ${snapshot.insightModel}` : ''}`
+    : 'no insight yet'
+
+  return {
+    projectId: project.id,
+    index,
+    name: project.name,
+    workspaceName: project.teamName ?? project.teamId,
+    clientName: project.clientName || project.teamName || '—',
+    status: insight ? insight.status : null,
+    needsReply,
+    inactive,
+    situationLine: insight ? insight.situationLine : (snapshot.summary.split('\n').find((l) => l.trim()) ?? ''),
+    recentLine: insight ? insight.recentLine : '',
+    nextStep: insight ? insight.nextStep : '',
+    progress,
+    dates,
+    daysUsed: timeElapsed.daysUsed,
+    daysTotal: timeElapsed.totalDays,
+    pace: timeElapsed.pace,
+    paceLabel: timeElapsed.paceLabel,
+    week: sevenDayBars,
+    lastClientAt,
+    myLastReplyAt,
+    counts,
+    score,
     aiBadge,
     syncedLabel: `synced ${fmtAge(snapshot.lastUpdatedAt)}`
   }

@@ -24,6 +24,9 @@ export default function DashboardView(): React.ReactElement | null {
   const recent = useDashboardStore((s) => s.recent)
   const loadRecent = useDashboardStore((s) => s.loadRecent)
   const [renderError, setRenderError] = useState<Error | null>(null)
+  const [viewMode, setViewMode] = useState<'compact' | 'expanded' | 'mixed'>('mixed')
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [accordionMode] = useState(false)
 
   useEffect(() => {
     void loadSnapshot()
@@ -153,16 +156,84 @@ export default function DashboardView(): React.ReactElement | null {
 
         <RecentStrip items={recent} onSelect={focusProject} />
 
+        {/* WORKSPACES heading row */}
+        <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
+          <div className="flex items-center gap-3">
+            <h3 className="text-lg font-semibold">Workspaces</h3>
+            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-accent/20 text-accent border border-accent/30">
+              {snapshot?.projects?.length ?? 0}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              className="px-3 py-1.5 text-xs font-medium border border-border-dark rounded-lg text-muted-dark hover:border-accent hover:text-accent transition-colors"
+              onClick={() => setExpandedIds(new Set())}
+            >
+              Collapse all
+            </button>
+            <button
+              type="button"
+              className="px-3 py-1.5 text-xs font-medium border border-border-dark rounded-lg text-muted-dark hover:border-accent hover:text-accent transition-colors"
+              onClick={() => setExpandedIds(new Set((snapshot?.projects ?? []).map((p) => p.project.id)))}
+            >
+              Expand all
+            </button>
+            <div className="flex border border-border-dark rounded-lg overflow-hidden">
+              {(['compact', 'expanded', 'mixed'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                    viewMode === mode
+                      ? 'bg-accent text-accent-on'
+                      : 'text-muted-dark hover:bg-accent/10 hover:text-text-dark'
+                  }`}
+                  onClick={() => {
+                    setViewMode(mode)
+                    if (mode === 'compact') setExpandedIds(new Set())
+                    else if (mode === 'expanded') setExpandedIds(new Set((snapshot?.projects ?? []).map((p) => p.project.id)))
+                  }}
+                >
+                  {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
         <div className="dash-grid w-full max-w-7xl mx-auto space-y-6" data-testid="dash-grid">
-          {(snapshot?.projects ?? []).map((projectSnapshot, index) => (
+          {(snapshot?.projects ?? []).map((projectSnapshot, index) => {
+            const isExpanded = viewMode === 'expanded' || (viewMode === 'mixed' && expandedIds.has(projectSnapshot.project.id))
+            return (
             <ErrorBoundary key={projectSnapshot.project.id} label={`card-${index}`}>
               <ProjectCard
                 snapshot={projectSnapshot}
                 index={index}
+                expanded={isExpanded}
+                onToggle={() => {
+                  setExpandedIds((prev) => {
+                    const next = new Set(prev)
+                    if (next.has(projectSnapshot.project.id)) next.delete(projectSnapshot.project.id)
+                    else {
+                      if (accordionMode) next.clear()
+                      next.add(projectSnapshot.project.id)
+                    }
+                    return next
+                  })
+                  // Scroll to card
+                  const el = document.getElementById(`dash-card-anchor-${projectSnapshot.project.id}`)
+                  if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('is-flash'); setTimeout(() => el.classList.remove('is-flash'), 1400) }
+                }}
                 onDelete={(id) => void deleteProject(id)}
+                onExpandSection={(_section) => {
+                  // Expand the card and open that section
+                  setExpandedIds((prev) => { const next = new Set(prev); next.add(projectSnapshot.project.id); return next })
+                }}
               />
             </ErrorBoundary>
-          ))}
+            )
+          })}
           {(snapshot?.projects ?? []).length === 0 && (
             <p className="text-muted-dark text-center py-12">
               No project cards yet — click <b>＋ Set up new project</b> above. A 5-step guide walks

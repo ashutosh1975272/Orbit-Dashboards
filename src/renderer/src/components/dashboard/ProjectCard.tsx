@@ -9,12 +9,17 @@ import { buildCardView } from './card-view'
 import LeftSidebar from './LeftSidebar'
 import CentreVisuals from './CentreVisuals'
 import CentreContent from './CentreContent'
+import CompactCard from './CompactCard'
+import { buildCardSummary } from './card-view'
 import RightSidebar from './RightSidebar'
 
 interface ProjectCardProps {
   snapshot: DashboardProjectSnapshot
   index: number
+  expanded: boolean
+  onToggle: () => void
   onDelete: (projectId: string) => void
+  onExpandSection?: (section: number) => void
 }
 
 function fmtTime(iso: string | null): string {
@@ -41,7 +46,10 @@ const MOOD_CLASSES: Record<string, string> = {
 export default function ProjectCard({
   snapshot,
   index,
-  onDelete
+  expanded,
+  onToggle,
+  onDelete,
+  onExpandSection
 }: ProjectCardProps): React.ReactElement {
   const project = snapshot.project
   const syncNow = useDashboardStore((s) => s.syncNow)
@@ -66,6 +74,7 @@ export default function ProjectCard({
   const [completion, setCompletion] = useState(String(project.manualCompletion ?? ''))
 
   const view = useMemo(() => buildCardView(snapshot, index), [snapshot, index])
+  const summary = useMemo(() => buildCardSummary(snapshot, index), [snapshot, index])
   const { identity, leftSidebar, centre, rightSidebar, aiBadge } = view
 
   const saveMeta = async (): Promise<void> => {
@@ -81,6 +90,22 @@ export default function ProjectCard({
 
   const timeElapsed = centre.visuals.timeElapsed
   const daysLeft = timeElapsed.daysLeft ?? 0
+
+  if (!expanded) {
+    return (
+      <CompactCard
+        summary={summary}
+        expanded={false}
+        onToggle={onToggle}
+        onExpandSection={onExpandSection}
+        onDelete={onDelete}
+        onSync={(id) => void syncNow(id)}
+        onEdit={() => { setStartDate(project.startDate ?? ''); setEndDate(project.endDate ?? ''); setCompletion(project.manualCompletion != null ? String(project.manualCompletion) : ''); setEditOpen(true) }}
+        onSettings={() => openWizard(project.id)}
+        syncing={syncing}
+      />
+    )
+  }
 
   return (
     <article
