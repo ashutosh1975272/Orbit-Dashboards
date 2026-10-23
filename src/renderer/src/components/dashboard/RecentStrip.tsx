@@ -22,7 +22,8 @@ const STATUS_CLASSES: Record<string, string> = {
 }
 
 function fmtAge(iso: string): string {
-  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60_000))
+  const t = new Date(iso).getTime()
+  const mins = Number.isFinite(t) ? Math.max(0, Math.round((Date.now() - t) / 60_000)) : 0
   if (mins < 1) return 'now'
   if (mins < 60) return `${mins}m`
   const hours = Math.round(mins / 60)
@@ -31,9 +32,10 @@ function fmtAge(iso: string): string {
 }
 
 export default function RecentStrip({
-  items,
+  items: rawItems,
   onSelect
 }: RecentStripProps): React.ReactElement | null {
+  const items = Array.isArray(rawItems) ? rawItems : []
   const [filter, setFilter] = useState<'all' | 'urgent' | 'inactive'>('all')
 
   const now = Date.now()

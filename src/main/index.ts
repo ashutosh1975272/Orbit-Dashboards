@@ -48,6 +48,7 @@ if (loadedEnvPath) {
 }
 
 /** One process / one tray — second launches focus the existing window. */
+app.disableHardwareAcceleration()
 const gotSingleInstanceLock = app.requestSingleInstanceLock()
 if (!gotSingleInstanceLock) {
   app.quit()
@@ -154,6 +155,25 @@ if (!gotSingleInstanceLock) {
       mainWindow.show()
     })
 
+    mainWindow.webContents.on('did-finish-load', () => {
+      log.info('renderer did-finish-load', { url: mainWindow?.webContents.getURL() })
+    })
+    mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+      log.error('renderer did-fail-load', { errorCode, errorDescription, validatedURL })
+    })
+    mainWindow.webContents.on('render-process-gone', (_event, details) => {
+      log.error('renderer render-process-gone', { reason: details.reason, exitCode: details.exitCode })
+    })
+    mainWindow.webContents.on('unresponsive', () => {
+      log.error('renderer unresponsive')
+    })
+    mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+      log.info('renderer console', { level, message, line, sourceId })
+    })
+    mainWindow.webContents.on('preload-error', (_event, preloadPath, error) => {
+      log.error('preload-error', { preloadPath, error: String(error) })
+    })
+
     mainWindow.webContents.on('before-input-event', (event, input) => {
       if (!(input.control || input.meta) || input.type !== 'keyDown') return
       const key = input.key.toLowerCase()
@@ -195,7 +215,18 @@ if (!gotSingleInstanceLock) {
     } else {
       void mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
     }
+
+    if (is.dev) {
+      mainWindow.webContents.openDevTools({ mode: 'detach' })
+    }
   }
+
+  process.on('uncaughtException', (err) => {
+    log.error('uncaughtException', { err: String(err), stack: err.stack })
+  })
+  process.on('unhandledRejection', (reason) => {
+    log.error('unhandledRejection', { reason: String(reason) })
+  })
 
   app.whenReady().then(async () => {
     electronApp.setAppUserModelId(APP_BUNDLE_ID)

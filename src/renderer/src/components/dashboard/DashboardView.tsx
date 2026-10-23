@@ -4,6 +4,7 @@ import { useDashboardStore } from '../../hooks/useDashboard'
 import ProjectCard from './ProjectCard'
 import DashboardWizard from './DashboardWizard'
 import RecentStrip from './RecentStrip'
+import ErrorBoundary from './ErrorBoundary'
 
 /**
  * Dashboard page (v2.4): header → top digest → "Recent" strip (mini cards,
@@ -97,6 +98,7 @@ export default function DashboardView(): React.ReactElement | null {
 
   try {
     return (
+      <ErrorBoundary label="dashboard-view">
       <section className="dash-view flex flex-col h-full w-full bg-background-dark text-text-dark p-6 overflow-y-auto" data-testid="dashboard-view">
         <header className="flex items-center justify-between gap-4 flex-wrap mb-6">
           <h2 className="text-xl font-semibold">Client projects — Slack</h2>
@@ -128,18 +130,18 @@ export default function DashboardView(): React.ReactElement | null {
               {digest.source === 'ai' ? 'AI digest' : 'digest'}
             </span>
             <span className="text-base font-medium">{digest.topPriority}</span>
-            {digest.needsReply.length > 0 && (
+            {(digest.needsReply?.length ?? 0) > 0 && (
               <span className="flex gap-2 flex-wrap">
-                {digest.needsReply.map((w) => (
+                {(digest.needsReply ?? []).map((w) => (
                   <span key={w} className="px-2 py-1 bg-red-500/15 text-red-400 border border-red-500/30 rounded-full text-xs font-medium">
                     ⚠ {w}
                   </span>
                 ))}
               </span>
             )}
-            {digest.atRisk.length > 0 && (
+            {(digest.atRisk?.length ?? 0) > 0 && (
               <span className="flex gap-2 flex-wrap">
-                {digest.atRisk.map((w) => (
+                {(digest.atRisk ?? []).map((w) => (
                   <span key={w} className="px-2 py-1 bg-yellow-500/15 text-yellow-400 border border-yellow-500/30 rounded-full text-xs font-medium">
                     {w}
                   </span>
@@ -153,12 +155,13 @@ export default function DashboardView(): React.ReactElement | null {
 
         <div className="dash-grid w-full max-w-7xl mx-auto space-y-6" data-testid="dash-grid">
           {(snapshot?.projects ?? []).map((projectSnapshot, index) => (
-            <ProjectCard
-              key={projectSnapshot.project.id}
-              snapshot={projectSnapshot}
-              index={index}
-              onDelete={(id) => void deleteProject(id)}
-            />
+            <ErrorBoundary key={projectSnapshot.project.id} label={`card-${index}`}>
+              <ProjectCard
+                snapshot={projectSnapshot}
+                index={index}
+                onDelete={(id) => void deleteProject(id)}
+              />
+            </ErrorBoundary>
           ))}
           {(snapshot?.projects ?? []).length === 0 && (
             <p className="text-muted-dark text-center py-12">
@@ -170,6 +173,7 @@ export default function DashboardView(): React.ReactElement | null {
 
         {wizardOpenFor ? <DashboardWizard /> : null}
       </section>
+      </ErrorBoundary>
     )
   } catch (err) {
     setRenderError(err instanceof Error ? err : new Error(String(err)))

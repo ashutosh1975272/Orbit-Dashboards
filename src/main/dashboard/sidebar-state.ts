@@ -44,7 +44,20 @@ export class DashboardSidebarStateStore {
 
   async get(projectId: string): Promise<ProjectSidebarState> {
     await this.load()
-    return this.cache[projectId] ?? defaultProjectSidebarState()
+    const raw = this.cache[projectId]
+    if (!raw || typeof raw !== 'object') return defaultProjectSidebarState()
+    const validate = (s: any): SidebarState => {
+      if (!s || typeof s !== 'object') return defaultSidebarState()
+      return {
+        collapsed: typeof s.collapsed === 'boolean' ? s.collapsed : false,
+        width: typeof s.width === 'number' && s.width >= 240 && s.width <= 420 ? s.width : 290,
+        openSection: typeof s.openSection === 'number' || s.openSection === null ? s.openSection : 1
+      }
+    }
+    return {
+      left: validate(raw.left),
+      right: validate(raw.right)
+    }
   }
 
   async set(projectId: string, state: ProjectSidebarState): Promise<void> {

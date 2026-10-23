@@ -212,6 +212,9 @@ function computeTimeElapsed(
   }
   const startMs = new Date(`${startDate}T00:00:00Z`).getTime()
   const endMs = new Date(`${endDate}T23:59:59Z`).getTime()
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) {
+    return { hasDates: false, pace: 'on-pace', paceLabel: 'Dates not stated in chat' }
+  }
   const totalDays = Math.max(1, Math.ceil((endMs - startMs) / (1000 * 60 * 60 * 24)))
   const daysUsed = Math.max(0, Math.ceil((now - startMs) / (1000 * 60 * 60 * 24)))
   const daysLeft = Math.max(0, Math.ceil((endMs - now) / (1000 * 60 * 60 * 24)))
@@ -254,9 +257,11 @@ function computeSevenDayBars(
     const dayEnd = dayStart + 24 * 60 * 60 * 1000
     let count = 0
     for (const ch of perChannel) {
+      if (!ch.latestMessageAt) continue
       const msgTime = new Date(ch.latestMessageAt).getTime()
+      if (!Number.isFinite(msgTime)) continue
       if (msgTime >= dayStart && msgTime < dayEnd) {
-        count += ch.messageCount
+        count += ch.messageCount ?? 0
       }
     }
     bars.push({
@@ -278,16 +283,63 @@ function computeActivityCounts(
   let messages24h = 0
   let messages7d = 0
   for (const ch of perChannel) {
+    if (!ch.latestMessageAt) continue
     const msgTime = new Date(ch.latestMessageAt).getTime()
+    if (!Number.isFinite(msgTime)) continue
     const age = now - msgTime
-    if (age <= day7) messages7d += ch.messageCount
-    if (age <= day24) messages24h += ch.messageCount
+    if (age <= day7) messages7d += ch.messageCount ?? 0
+    if (age <= day24) messages24h += ch.messageCount ?? 0
   }
   return { messages24h, messages7d }
 }
 
+/** Normalize an insight so every v2.4 field exists (handles old saved insights). */
+function normalizeInsight(insight: any): any {
+  if (!insight) return null
+  return {
+    ...insight,
+    statusChange: insight.statusChange ?? '',
+    recentLine: insight.recentLine ?? '',
+    requirements: Array.isArray(insight.requirements) ? insight.requirements : [],
+    scope: insight.scope && typeof insight.scope === 'object'
+      ? { in: Array.isArray(insight.scope.in) ? insight.scope.in : [], out: Array.isArray(insight.scope.out) ? insight.scope.out : [] }
+      : { in: [], out: [] },
+    deliverables: Array.isArray(insight.deliverables) ? insight.deliverables : [],
+    files: Array.isArray(insight.files) ? insight.files : [],
+    people: Array.isArray(insight.people) ? insight.people : [],
+    milestones: Array.isArray(insight.milestones) ? insight.milestones : [],
+    highlights: Array.isArray(insight.highlights) ? insight.highlights : [],
+    blockers: Array.isArray(insight.blockers) ? insight.blockers : [],
+    commitments: Array.isArray(insight.commitments) ? insight.commitments : [],
+    decisions: Array.isArray(insight.decisions) ? insight.decisions : [],
+    risks: Array.isArray(insight.risks) ? insight.risks : [],
+    keywords: Array.isArray(insight.keywords) ? insight.keywords : [],
+    dates: insight.dates && typeof insight.dates === 'object' ? insight.dates : {},
+    clientAsk: insight.clientAsk && typeof insight.clientAsk === 'object'
+      ? {
+          needsReply: !!insight.clientAsk.needsReply,
+          urgency: insight.clientAsk.urgency ?? 'normal',
+          lastClientMessage: insight.clientAsk.lastClientMessage ?? null,
+          openQuestions: Array.isArray(insight.clientAsk.openQuestions) ? insight.clientAsk.openQuestions : []
+        }
+      : { needsReply: false, urgency: 'normal', lastClientMessage: null, openQuestions: [] }
+  }
+}
+
 export function buildCardView(snapshot: DashboardProjectSnapshot, index = 0): CardView {
-  const insight = snapshot.insight ?? null
+  if (!snapshot || !snapshot.project) {
+    // Return a minimal safe card view
+    return {
+      identity: { index, name: 'Unknown', clientName: '—', teamName: '—', progress: 0, progressEvidence: '', mood: 'neutral', moodReason: '', moodQuote: '', dates: { badge: 'not stated in chat' }, channels: [] },
+      leftSidebar: { startTimeline: { startDate: undefined, endDate: undefined, dateBadge: 'not stated in chat', milestones: [] }, requirements: [], scopeDeliverables: { inScope: [], outOfScope: [], deliverables: [] }, decisions: [], commitments: [], files: [], peopleChannels: { people: [], channels: [], quietChannelCount: 0 } },
+      centre: { status: null, statusReason: '', statusChange: '', situationLine: '', recentLine: '', highlights: [], lastClientMessage: null, needsReply: false, urgency: 'normal', openQuestions: [], nextStep: '', visuals: { progressPercent: 0, timeElapsed: { hasDates: false, pace: 'on-pace', paceLabel: 'Dates not stated in chat' }, sevenDayBars: [] } },
+      rightSidebar: { needsReplyOpenQuestions: { needsReply: false, urgency: 'normal', openQuestions: [], lastClientMessage: null }, blockers: [], risks: [], nextSteps: [], moodSignals: { mood: 'neutral', moodReason: '', moodQuote: '' }, activity: { messages24h: 0, messages7d: 0, lastClientMessage: null, myLastReply: null }, history: [] },
+      detail: { blockers: [], commitments: [], decisions: [], risks: [], keywords: [], hasMoreDetail: false },
+      aiBadge: 'no insight yet',
+      syncedLabel: 'never'
+    }
+  }
+  const insight = normalizeInsight(snapshot.insight)
   const project = snapshot.project
 
   const dates: CardDates = insight
@@ -308,7 +360,8 @@ export function buildCardView(snapshot: DashboardProjectSnapshot, index = 0): Ca
         badge: project.startDate || project.endDate ? 'manual' : 'not stated in chat'
       }
 
-  const channels = snapshot.perChannel.map((c) => ({
+  const perChannel = Array.isArray(snapshot.perChannel) ? snapshot.perChannel : []
+  const channels = perChannel.map((c) => ({
     channelId: c.channelId,
     channelName: c.channelName,
     newCount: c.newMessageCount ?? 0,
@@ -327,16 +380,16 @@ export function buildCardView(snapshot: DashboardProjectSnapshot, index = 0): Ca
   )
 
   // Progress for visuals
-  const progressPercent = insight ? insight.progress : snapshot.completion
+  const progressPercent = Number.isFinite(insight?.progress) ? insight.progress : (Number.isFinite(snapshot.completion) ? snapshot.completion : 0)
 
   // Time elapsed visual
   const timeElapsed = computeTimeElapsed(dates.startDate, dates.endDate, progressPercent)
 
   // 7-day bars
-  const sevenDayBars = computeSevenDayBars(snapshot.perChannel)
+  const sevenDayBars = computeSevenDayBars(perChannel)
 
   // Activity counts
-  const { messages24h, messages7d } = computeActivityCounts(snapshot.perChannel)
+  const { messages24h, messages7d } = computeActivityCounts(perChannel)
 
   const aiBadge = snapshot.insightUpdatedAt
     ? `${snapshot.insightSource === 'heuristic' ? 'heuristic' : 'AI'} · ${fmtAge(snapshot.insightUpdatedAt)}${
@@ -350,13 +403,13 @@ export function buildCardView(snapshot: DashboardProjectSnapshot, index = 0): Ca
       startDate: dates.startDate,
       endDate: dates.endDate,
       dateBadge: dates.badge,
-      milestones: insight?.milestones.map((m) => ({
+      milestones: insight?.milestones.map((m: any) => ({
         label: m.label,
         dateIso: m.dateIso,
         done: m.done
       })) ?? []
     },
-    requirements: insight?.requirements.map((r) => ({
+    requirements: insight?.requirements.map((r: any) => ({
       text: r.text,
       sourceFile: r.sourceFile,
       who: r.who,
@@ -365,14 +418,14 @@ export function buildCardView(snapshot: DashboardProjectSnapshot, index = 0): Ca
     scopeDeliverables: {
       inScope: insight?.scope.in ?? [],
       outOfScope: insight?.scope.out ?? [],
-      deliverables: insight?.deliverables.map((d) => ({
+      deliverables: insight?.deliverables.map((d: any) => ({
         name: d.name,
         status: d.status
       })) ?? []
     },
     decisions: insight?.decisions ?? [],
     commitments: insight?.commitments ?? [],
-    files: insight?.files.map((f) => ({
+    files: insight?.files.map((f: any) => ({
       name: f.name,
       type: f.type,
       who: f.who,
@@ -380,7 +433,7 @@ export function buildCardView(snapshot: DashboardProjectSnapshot, index = 0): Ca
       url: f.url
     })) ?? [],
     peopleChannels: {
-      people: insight?.people.map((p) => ({
+      people: insight?.people.map((p: any) => ({
         name: p.name,
         role: p.role,
         side: p.side
