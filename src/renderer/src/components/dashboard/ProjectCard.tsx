@@ -76,7 +76,7 @@ function ProjectCardInner({
 
   return (
     <article
-      style={{ background: 'var(--bg-card)', border: '1px solid var(--border-card)', borderRadius: '16px', padding: '18px 20px', '--left-w': '290px', '--right-w': '290px' } as React.CSSProperties}
+      style={{ background: 'var(--bg-card)', border: '1px solid var(--border-card)', borderRadius: '16px', padding: '18px 20px', '--left-w': '290px', '--right-w': '290px', width: '100%' } as React.CSSProperties}
       id={`dash-card-anchor-${project.id}`}
       data-testid={`dash-card-${index}`}
     >
@@ -125,7 +125,7 @@ function ProjectCardInner({
       {/* BODY: 3 columns, never wraps */}
       <div style={{ display: 'grid', gridTemplateColumns: 'var(--left-w, 290px) minmax(0, 1fr) var(--right-w, 290px)', gap: '16px', alignItems: 'stretch', minHeight: '500px', width: '100%' }}>
         <LeftSidebar data={leftSidebar} projectId={project.id} />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', minWidth: 0 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', minWidth: 0, overflow: 'hidden' }}>
           <CentreVisuals visuals={centre.visuals} />
           <CentreContent centre={centre} />
         </div>
