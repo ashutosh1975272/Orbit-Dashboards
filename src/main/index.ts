@@ -19,6 +19,7 @@ import { DashboardDeltaStore } from './dashboard/delta-store'
 import { MonitorStore } from './dashboard/monitor-store'
 import { DashboardInsightSyncEngine } from './dashboard/sync-engine'
 import { DashboardScheduler } from './dashboard/scheduler'
+import { DashboardSidebarStateStore } from './dashboard/sidebar-state'
 import { migrateWorkspaceCards } from './dashboard/workspace-migration'
 import { buildRecentFeed } from './dashboard/recent-feed'
 import { DashboardDigestStore, refreshDigest } from './dashboard/digest'
@@ -231,6 +232,7 @@ if (!gotSingleInstanceLock) {
       encryptionAvailable: (await import('electron')).safeStorage.isEncryptionAvailable()
     })
     const dashboardDeltaStore = new DashboardDeltaStore({ rootDir: dashboardRoot })
+    const dashboardSidebarStateStore = new DashboardSidebarStateStore(userData)
     // v2.2 — NVIDIA NIM rolling insights (universal key/model from .env)
     const nimKey = process.env.NVIDIA_NIM_API_KEY ?? ''
     const nimPrimary =
@@ -402,7 +404,8 @@ if (!gotSingleInstanceLock) {
       oauthTokenProvider: { tryGet: (profileId, teamId) => tokenStore.tryGet(profileId, teamId) },
       historyStore: dashboardHistoryStore,
       buildRecent,
-      getDigest
+      getDigest,
+      sidebarStateStore: dashboardSidebarStateStore
     })
     void runWorkspaceMigration()
     dashboardScheduler.start()
