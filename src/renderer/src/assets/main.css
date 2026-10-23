@@ -2421,3 +2421,5 @@ body.is-resizing-sidebar webview {
 .duration-250 { transition-duration: 250ms; }
 .transition-\[max-height\] { transition-property: max-height; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 150ms; }
 .right-\[-3px\] { right: -3px; }
+
+.hover\:shadow-lg:hover { box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1); }

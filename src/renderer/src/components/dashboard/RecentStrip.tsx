@@ -114,7 +114,7 @@ export default function RecentStrip({
             key={`${item.projectId}-${item.ts}`}
             type="button"
             role="listitem"
-            className="dash-recent-card flex-none flex flex-col gap-2 w-[236px] h-[110px] p-3 bg-surface-dark border border-border-dark rounded-xl cursor-pointer text-left text-text-dark transition-all hover:border-accent hover:bg-accent/10"
+            className="dash-recent-card flex-none flex flex-col gap-2 w-[320px] h-[160px] p-4 bg-surface-dark border border-border-dark rounded-xl cursor-pointer text-left text-text-dark transition-all hover:border-accent hover:bg-accent/10 hover:shadow-lg"
             data-testid={`dash-recent-${item.projectId}`}
             onClick={() => onSelect?.(item.projectId)}
             title={item.oneLine}

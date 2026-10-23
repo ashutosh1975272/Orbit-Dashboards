@@ -175,7 +175,7 @@ export default function ProjectCard({
         </div>
       </header>
 
-      <div className="dash-card-body-v24 grid grid-cols-[290px_minmax(0,1fr)_290px] gap-0 min-h-[500px]">
+      <div className="dash-card-body-v24 grid grid-cols-[minmax(240px,320px)_minmax(0,1fr)_minmax(240px,320px)] gap-0 min-h-[600px]">
         {/* ================= LEFT SIDEBAR: Project Guide ================= */}
         <LeftSidebar
           data={leftSidebar}
