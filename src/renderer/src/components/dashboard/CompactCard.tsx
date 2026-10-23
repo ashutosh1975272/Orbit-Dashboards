@@ -131,7 +131,7 @@ export default function CompactCard({
               <span style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)' }}>{progress}%</span>
               <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{daysUsed != null && daysTotal != null ? `${daysUsed} of ${daysTotal} days` : '—'}</span>
             </div>
-            <div style={{ height: '10px', width: '100%', background: 'var(--track)', borderRadius: '5px', overflow: 'hidden' }}>
+            <div style={{ height: '10px', width: '100%', background: 'var(--bg-track)', borderRadius: '5px', overflow: 'hidden' }}>
               <div style={{ height: '100%', width: `${Math.min(100, progress)}%`, background: 'var(--accent)', borderRadius: '5px' }} />
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
@@ -152,7 +152,7 @@ export default function CompactCard({
                   style={{ display: 'flex', flexDirection: 'column-reverse', alignItems: 'center', gap: '2px', flex: 1 }}
                   title={`${bar.date}: ${bar.count} messages`}
                 >
-                  <div style={{ width: '100%', borderRadius: '2px 2px 0 0', height: `${Math.round((bar.count / Math.max(maxBar, 1)) * 34) + 3}px`, background: bar.isToday ? 'var(--success)' : '#5b4f86' }} />
+                  <div style={{ width: '100%', borderRadius: '2px 2px 0 0', height: `${Math.round((bar.count / Math.max(maxBar, 1)) * 34) + 3}px`, background: bar.isToday ? 'var(--success)' : 'var(--accent)' }} />
                   <span style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{bar.isToday ? 'T' : new Date(bar.date).toLocaleDateString(undefined, { weekday: 'narrow' })}</span>
                 </div>
               ))}
@@ -167,11 +167,11 @@ export default function CompactCard({
 
       {/* ROW 2: count chips */}
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-        {counts.questions > 0 && chip(`${counts.questions} open question${counts.questions === 1 ? '' : 's'}`, () => { onToggle(); onExpandSection?.(1) })}
-        {counts.blockers > 0 && chip(`${counts.blockers} blocker${counts.blockers === 1 ? '' : 's'}`, () => { onToggle(); onExpandSection?.(2) })}
-        {counts.risks > 0 && chip(`${counts.risks} risk${counts.risks === 1 ? '' : 's'}`, () => { onToggle(); onExpandSection?.(3) })}
+        {counts.questions > 0 && chip(`${counts.questions} open question${counts.questions === 1 ? '' : 's'}`, () => { onToggle(); onExpandSection?.(101) })}
+        {counts.blockers > 0 && chip(`${counts.blockers} blocker${counts.blockers === 1 ? '' : 's'}`, () => { onToggle(); onExpandSection?.(102) })}
+        {counts.risks > 0 && chip(`${counts.risks} risk${counts.risks === 1 ? '' : 's'}`, () => { onToggle(); onExpandSection?.(103) })}
         {counts.files > 0 && chip(`${counts.files} file${counts.files === 1 ? '' : 's'}`, () => { onToggle(); onExpandSection?.(6) })}
-        {counts.requirements > 0 && chip(`${counts.requirements} requirement${counts.requirements === 1 ? '' : 's'}`, () => { onToggle(); onExpandSection?.(5) })}
+        {counts.requirements > 0 && chip(`${counts.requirements} requirement${counts.requirements === 1 ? '' : 's'}`, () => { onToggle(); onExpandSection?.(2) })}
       </div>
 
       {/* Minimise / Expand toggle */}
