@@ -19,7 +19,6 @@ import { DashboardDeltaStore } from './dashboard/delta-store'
 import { MonitorStore } from './dashboard/monitor-store'
 import { DashboardInsightSyncEngine } from './dashboard/sync-engine'
 import { DashboardScheduler } from './dashboard/scheduler'
-import { DashboardSidebarStateStore } from './dashboard/sidebar-state'
 import { migrateWorkspaceCards } from './dashboard/workspace-migration'
 import { buildRecentFeed } from './dashboard/recent-feed'
 import { DashboardDigestStore, refreshDigest } from './dashboard/digest'
@@ -51,6 +50,7 @@ if (loadedEnvPath) {
 app.disableHardwareAcceleration()
 app.commandLine.appendSwitch('disable-gpu')
 app.commandLine.appendSwitch('no-sandbox')
+nativeTheme.themeSource = 'dark'
 const gotSingleInstanceLock = app.requestSingleInstanceLock()
 if (!gotSingleInstanceLock) {
   app.quit()
@@ -157,25 +157,6 @@ if (!gotSingleInstanceLock) {
       mainWindow.show()
     })
 
-    mainWindow.webContents.on('did-finish-load', () => {
-      log.info('renderer did-finish-load', { url: mainWindow?.webContents.getURL() })
-    })
-    mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
-      log.error('renderer did-fail-load', { errorCode, errorDescription, validatedURL })
-    })
-    mainWindow.webContents.on('render-process-gone', (_event, details) => {
-      log.error('renderer render-process-gone', { reason: details.reason, exitCode: details.exitCode })
-    })
-    mainWindow.webContents.on('unresponsive', () => {
-      log.error('renderer unresponsive')
-    })
-    mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
-      log.info('renderer console', { level, message, line, sourceId })
-    })
-    mainWindow.webContents.on('preload-error', (_event, preloadPath, error) => {
-      log.error('preload-error', { preloadPath, error: String(error) })
-    })
-
     mainWindow.webContents.on('before-input-event', (event, input) => {
       if (!(input.control || input.meta) || input.type !== 'keyDown') return
       const key = input.key.toLowerCase()
@@ -217,20 +198,7 @@ if (!gotSingleInstanceLock) {
     } else {
       void mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
     }
-
-    if (is.dev) {
-      mainWindow.webContents.openDevTools({ mode: 'detach' })
-    }
   }
-
-  process.on('uncaughtException', (err) => {
-    log.error('uncaughtException', { err: String(err), stack: err.stack })
-  })
-  process.on('unhandledRejection', (reason) => {
-    log.error('unhandledRejection', { reason: String(reason) })
-  })
-
-  nativeTheme.themeSource = 'dark'
 
   app.whenReady().then(async () => {
     electronApp.setAppUserModelId(APP_BUNDLE_ID)
@@ -285,7 +253,6 @@ if (!gotSingleInstanceLock) {
         })
       : null
     const dashboardHistoryStore = new HistoryStore({ rootDir: dashboardRoot })
-    const sidebarStateStore = new DashboardSidebarStateStore(userData)
     // The engine always exists: with a key it enriches with NVIDIA NIM,
     // without one it still keeps every card meaningful via local heuristics.
     const insightEngine = new InsightEngine({
@@ -435,8 +402,7 @@ if (!gotSingleInstanceLock) {
       oauthTokenProvider: { tryGet: (profileId, teamId) => tokenStore.tryGet(profileId, teamId) },
       historyStore: dashboardHistoryStore,
       buildRecent,
-      getDigest,
-      sidebarStateStore
+      getDigest
     })
     void runWorkspaceMigration()
     dashboardScheduler.start()
