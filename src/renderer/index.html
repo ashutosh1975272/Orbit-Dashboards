@@ -23,17 +23,23 @@
       // Sync button state on load and handle toggle clicks
       function syncViewToggle() {
         var mode = document.documentElement.dataset.view;
+        // Legacy .view-toggle
         document.querySelectorAll('.view-toggle button').forEach(function(btn) {
           var pressed = btn.dataset.mode === mode;
           btn.setAttribute('aria-pressed', String(pressed));
           btn.classList.toggle('active', pressed);
         });
+        // New .segmented
+        document.querySelectorAll('.segmented button').forEach(function(btn) {
+          var pressed = btn.dataset.mode === mode;
+          btn.setAttribute('aria-pressed', String(pressed));
+        });
       }
       // Initial sync
       syncViewToggle();
-      // Delegated click handler for view toggles
+      // Delegated click handler for view toggles (.view-toggle and .segmented)
       document.addEventListener('click', function(e) {
-        var btn = e.target.closest('.view-toggle button');
+        var btn = e.target.closest('.view-toggle button, .segmented button');
         if (!btn) return;
         var mode = btn.dataset.mode;
         if (!mode) return;
