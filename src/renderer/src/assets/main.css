@@ -23,6 +23,7 @@ h1, h2, h3, h4, strong, b {
   --bg: #0F0D1A;
   --surface: #181527;
   --surface-2: #211D35;
+  --hover: #2A2545;
   --border: #3A3358;
   --overlay: rgba(8, 6, 16, 0.65);
 
@@ -86,6 +87,7 @@ h1, h2, h3, h4, strong, b {
   --bg: #F5F3FA;
   --surface: #EDE9F5;
   --surface-2: #E0DBEB;
+  --hover: #DCD6E8;
   --border: #C9C2D8;
   --overlay: rgba(8, 6, 16, 0.15);
 
@@ -369,25 +371,139 @@ body.is-resizing-sidebar webview {
   cursor: not-allowed;
 }
 
+/* Primary: deep violet fill, white text */
 .btn.primary {
-  background: var(--accent);
-  color: var(--accent-on);
+  background: var(--accent-btn);
+  color: #fff;
+  font-weight: 600;
+  border: 1px solid var(--accent-btn);
+  border-radius: 8px;
+  padding: 8px 16px;
+  transition: background .15s, transform .05s;
 }
 
 .btn.primary:hover:not(:disabled) {
-  background: var(--accent-dim);
-  color: var(--accent-on);
+  background: var(--accent-btn-hover);
 }
 
+.btn.primary:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* Secondary: outlined style */
 .btn.secondary {
-  background: var(--surface-2);
+  background: transparent;
   color: var(--text);
-  border: 1px solid var(--border);
+  font-weight: 600;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 8px 16px;
+}
+
+.btn.secondary:hover:not(:disabled) {
+  background: var(--hover);
 }
 
 .btn.block {
   width: 100%;
   display: block;
+}
+
+/* Focus-visible for all buttons/inputs */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+button:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+/* View toggles: Collapse all / Expand all / Compact / Expanded / Mixed */
+.view-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.view-toggle button {
+  background: transparent;
+  color: var(--muted);
+  border: 0;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 13px;
+}
+
+.view-toggle button:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.view-toggle button.active,
+.view-toggle button[aria-pressed="true"] {
+  background: var(--accent-btn);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Header bits */
+.auto-sync {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.count-badge {
+  background: var(--hover);
+  color: var(--link);
+  font-weight: 600;
+  min-width: 22px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  text-align: center;
+}
+
+/* Digest bar */
+.digest {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  padding: 14px 18px;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.digest .label {
+  color: var(--link);
+  letter-spacing: .08em;
+  font-size: 11px;
+  font-weight: 700;
+  margin-right: 12px;
+}
+
+/* Empty state */
+.empty-state {
+  max-width: 720px;
+  margin: 72px auto;
+  padding: 40px 32px;
+  text-align: center;
+  border: 1.5px dashed var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.empty-state strong {
+  color: var(--text);
 }
 
 .btn-apply {
