@@ -1,22 +1,27 @@
 import type React from 'react'
-import { useMemo, useRef, useState } from 'react'
+import { useState } from 'react'
 import type { CardSummary, CardView } from './card-view'
 import CardHead from './CardHead'
 import CentreVisuals from './CentreVisuals'
 import CentreContent from './CentreContent'
-import { GuideDetailBody, DetailBody } from './guide-content'
-import {
-  DETAIL_CARDS,
-  GUIDE_SECTIONS,
-  buildInsightThread,
-  detailMeta,
-  guideComplete,
-  guideHint,
-  type DetailKey,
-  type GuideSectionNumber
-} from './guide-model'
+import { DetailBody, GuideDetailBody } from './guide-content'
+import { DETAIL_CARDS, detailMeta, type DetailKey } from './guide-model'
+import { useSidebarCollapse } from '../../hooks/useSidebarCollapse'
+import SlackChatTab from './SlackChatTab'
+import AiChatTab from './AiChatTab'
+import ProjectSettingsTab from './ProjectSettingsTab'
 
-export type WorkspaceTab = 'chat' | 'guide' | 'summary' | 'files'
+export type WorkspaceTab =
+  | 'summary'
+  | 'slack-chat'
+  | 'ai-chat'
+  | 'requirements'
+  | 'scope'
+  | 'decisions'
+  | 'commitments'
+  | 'files'
+  | 'people'
+  | 'settings'
 
 interface ExpandedWorkspaceProps {
   view: CardView
@@ -27,25 +32,57 @@ interface ExpandedWorkspaceProps {
   onEdit: () => void
   onRemove: () => void
   onToggle: () => void
-  /** Optional: open a specific guide section on mount (from compact chip). */
+  /** Optional: open a data tab on mount (from a compact chip). */
   initialGuideSection?: number
-  /** Optional: open a right-rail detail card on mount. */
+  /** Optional: open a detail card inside Summary on mount. */
   initialDetailKey?: DetailKey
 }
 
-function formatMsgTime(iso?: string): string {
-  if (!iso) return ''
-  try {
-    const d = new Date(iso)
-    return d.toLocaleString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  } catch {
-    return ''
+interface TabDef {
+  id: WorkspaceTab
+  label: string
+  /** Guide section body rendered full-width (data tabs only). */
+  section?: 2 | 3 | 4 | 5 | 6 | 7
+  /** Count badge; zero renders dimmed. */
+  badge?: number
+  /** Settings tab: pinned right with distinct styling. */
+  settings?: boolean
+}
+
+/** Map the old guide-section / compact-chip entry points onto the new tab set. */
+function initialTabFor(initialGuideSection?: number, initialDetailKey?: DetailKey): WorkspaceTab {
+  if (initialDetailKey) return 'summary'
+  switch (initialGuideSection) {
+    case 2:
+      return 'requirements'
+    case 3:
+      return 'scope'
+    case 4:
+      return 'decisions'
+    case 5:
+      return 'commitments'
+    case 6:
+      return 'files'
+    case 7:
+      return 'people'
+    default:
+      return 'summary'
   }
+}
+
+/** Full-width panel shell shared by every non-Summary tab. */
+function tabPanel(title: string, body: React.ReactNode, badge?: number): React.ReactElement {
+  return (
+    <section className="ws-tab-panel">
+      <header className="ws-tab-panel-head">
+        <h4>{title}</h4>
+        {badge !== undefined && (
+          <span className={`ws-tab-badge${badge === 0 ? ' is-zero' : ''}`}>{badge}</span>
+        )}
+      </header>
+      <div className="ws-tab-panel-body">{body}</div>
+    </section>
+  )
 }
 
 export default function ExpandedWorkspace({
@@ -60,53 +97,55 @@ export default function ExpandedWorkspace({
   initialGuideSection,
   initialDetailKey
 }: ExpandedWorkspaceProps): React.ReactElement {
-  const { identity, leftSidebar, centre, rightSidebar, aiBadge } = view
-  const [tab, setTab] = useState<WorkspaceTab>(
-    initialDetailKey || initialGuideSection ? 'guide' : 'chat'
+  const { identity, leftSidebar, centre, rightSidebar } = view
+  const [tab, setTab] = useState<WorkspaceTab>(() =>
+    initialTabFor(initialGuideSection, initialDetailKey)
   )
-  const [guideSection, setGuideSection] = useState<GuideSectionNumber>(
-    (initialGuideSection && initialGuideSection >= 1 && initialGuideSection <= 7
-      ? initialGuideSection
-      : 1) as GuideSectionNumber
+  const [summaryDetail, setSummaryDetail] = useState<DetailKey | null>(initialDetailKey ?? null)
+  const { leftCollapsed, rightCollapsed, toggleLeft, toggleRight } = useSidebarCollapse(
+    summary.projectId
   )
-  const [detailKey, setDetailKey] = useState<DetailKey | null>(initialDetailKey ?? null)
-  const [draft, setDraft] = useState('')
-  const threadEndRef = useRef<HTMLDivElement>(null)
 
-  const thread = useMemo(() => buildInsightThread(centre, identity.name), [centre, identity.name])
+  const tabs: TabDef[] = [
+    { id: 'summary', label: 'Summary' },
+    { id: 'slack-chat', label: 'Slack Chat' },
+    { id: 'ai-chat', label: identity.name },
+    {
+      id: 'requirements',
+      label: 'Project Requirements',
+      section: 2,
+      badge: leftSidebar.requirements.length
+    },
+    { id: 'scope', label: 'Scope & Deliverables', section: 3 },
+    { id: 'decisions', label: 'Decisions', section: 4, badge: leftSidebar.decisions.length },
+    { id: 'commitments', label: 'Commitments', section: 5, badge: leftSidebar.commitments.length },
+    { id: 'files', label: 'Files & Links', section: 6, badge: leftSidebar.files.length },
+    {
+      id: 'people',
+      label: 'People & Channels',
+      section: 7,
+      badge: leftSidebar.peopleChannels.people.length
+    },
+    { id: 'settings', label: 'Settings', settings: true }
+  ]
 
-  const selectGuide = (n: GuideSectionNumber): void => {
-    setGuideSection(n)
-    setDetailKey(null)
-    setTab('guide')
+  const selectTab = (id: WorkspaceTab): void => {
+    setTab(id)
+    if (id !== 'summary') setSummaryDetail(null)
   }
 
-  const selectDetail = (key: DetailKey): void => {
-    setDetailKey(key)
-    setTab('guide')
-  }
-
-  const goPrev = (): void => {
-    if (detailKey) {
-      setDetailKey(null)
-      return
-    }
-    const prev = (guideSection <= 1 ? 7 : guideSection - 1) as GuideSectionNumber
-    selectGuide(prev)
-  }
-
-  const goNext = (): void => {
-    if (detailKey) {
-      setDetailKey(null)
-      return
-    }
-    const next = (guideSection >= 7 ? 1 : guideSection + 1) as GuideSectionNumber
-    selectGuide(next)
-  }
-
-  const centreTitle = detailKey
-    ? (DETAIL_CARDS.find((c) => c.key === detailKey)?.title ?? 'Detail')
-    : `${GUIDE_SECTIONS[guideSection - 1].title} #${guideSection}`
+  const detailTitle = summaryDetail
+    ? (DETAIL_CARDS.find((c) => c.key === summaryDetail)?.title ?? 'Detail')
+    : ''
+  const activeDataTab = tabs.find((t) => t.id === tab && t.section !== undefined)
+  const activeSection = activeDataTab?.section
+  const summaryClasses = [
+    'ws-summary',
+    leftCollapsed ? 'is-left-collapsed' : '',
+    rightCollapsed ? 'is-right-collapsed' : ''
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   return (
     <article
@@ -156,7 +195,7 @@ export default function ExpandedWorkspace({
         status={centre.status}
         needsReply={summary.needsReply}
         inactive={summary.inactive}
-        aiBadge={aiBadge}
+        aiBadge={view.aiBadge}
         syncing={syncing}
         onSync={onSync}
         onSettings={onSettings}
@@ -167,219 +206,142 @@ export default function ExpandedWorkspace({
       />
 
       <div className="ws-tabs" role="tablist" aria-label="Workspace views">
-        {(
-          [
-            ['chat', 'Chat'],
-            ['guide', 'Project Guide'],
-            ['summary', 'Summary'],
-            ['files', 'Files']
-          ] as const
-        ).map(([id, label]) => (
+        {tabs.map((t) => (
           <button
-            key={id}
+            key={t.id}
             type="button"
             role="tab"
-            aria-selected={tab === id}
-            className={`ws-tab ${tab === id ? 'is-active' : ''}`}
-            onClick={() => {
-              setTab(id)
-              if (id !== 'guide') setDetailKey(null)
-            }}
+            aria-selected={tab === t.id}
+            className={`ws-tab${tab === t.id ? ' is-active' : ''}${t.settings ? ' is-settings' : ''}`}
+            onClick={() => selectTab(t.id)}
           >
-            {label}
+            <span>{t.label}</span>
+            {t.badge !== undefined && (
+              <span className={`ws-tab-badge${t.badge === 0 ? ' is-zero' : ''}`}>{t.badge}</span>
+            )}
           </button>
         ))}
       </div>
 
-      <div className="ws-body">
-        {/* LEFT — Project Guide nav */}
-        <aside className="ws-panel ws-guide" aria-label="Project Guide">
-          <header className="ws-panel-head">
-            <h4>Project Guide</h4>
-          </header>
-          <nav className="ws-guide-nav" aria-label="Guide sections">
-            {GUIDE_SECTIONS.map((s) => {
-              const active =
-                !detailKey && tab !== 'files' && tab !== 'summary' && guideSection === s.number
-              const done = guideComplete(leftSidebar, s.number)
-              return (
-                <button
-                  key={s.number}
-                  type="button"
-                  className={`ws-guide-item ${active ? 'is-active' : ''}`}
-                  aria-current={active ? 'true' : undefined}
-                  onClick={() => selectGuide(s.number)}
-                >
-                  <span className={`ws-guide-num ${done ? 'is-done' : ''}`}>
-                    {done ? '✓' : s.number}
-                  </span>
-                  <span className="ws-guide-text">
-                    <span className="ws-guide-title">{s.title}</span>
-                    <span className="ws-guide-hint">{guideHint(leftSidebar, s.number)}</span>
-                  </span>
-                  <span className="ws-guide-chevron" aria-hidden>
-                    ›
-                  </span>
-                </button>
-              )
-            })}
-          </nav>
-        </aside>
-
-        {/* CENTER */}
-        <section className="ws-panel ws-center" aria-label="Workspace content">
-          {tab === 'chat' ? (
-            <>
-              <header className="ws-center-head">
-                <div className="ws-center-nav">
-                  <button
-                    type="button"
-                    className="ws-icon-nav"
-                    onClick={goPrev}
-                    aria-label="Previous section"
-                  >
-                    ‹
-                  </button>
-                  <h4>Chat · {identity.name}</h4>
-                  <button
-                    type="button"
-                    className="ws-icon-nav"
-                    onClick={goNext}
-                    aria-label="Next section"
-                  >
-                    ›
-                  </button>
-                </div>
-              </header>
-              <div className="ws-chat-scroll" role="log" aria-live="polite">
-                {thread.length === 0 ? (
-                  <p className="ws-empty">
-                    No chat evidence yet — sync this project to pull Slack messages into the
-                    insight.
-                  </p>
-                ) : (
-                  thread.map((m) => (
-                    <div
-                      key={m.id}
-                      className={`ws-bubble ${m.side === 'client' ? 'is-client' : 'is-orbit'}`}
-                    >
-                      <div className="ws-bubble-meta">
-                        <strong>{m.who}</strong>
-                        {m.whenIso ? <span>{formatMsgTime(m.whenIso)}</span> : null}
-                      </div>
-                      <p>{m.body}</p>
-                    </div>
-                  ))
-                )}
-                <div ref={threadEndRef} />
-              </div>
-              <form
-                className="ws-composer"
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  // Sending lives in the Slack embed — composer is a visual anchor only.
-                }}
+      {tab === 'summary' ? (
+        <div className={summaryClasses}>
+          {/* LEFT — visuals */}
+          <aside
+            className={`ws-panel ws-summary-left${leftCollapsed ? ' is-collapsed' : ''}`}
+            aria-label="Overview"
+          >
+            <header className="ws-panel-head">
+              {!leftCollapsed && <h4>Overview</h4>}
+              <button
+                type="button"
+                className="ws-rail-toggle"
+                onClick={toggleLeft}
+                aria-label={leftCollapsed ? 'Expand overview sidebar' : 'Collapse overview sidebar'}
+                aria-expanded={!leftCollapsed}
               >
-                <input
-                  type="text"
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  placeholder="Type a message… (reply in Slack)"
-                  aria-label="Message draft"
-                  disabled
-                />
-                <div className="ws-composer-actions">
-                  <span className="ws-composer-hint">
-                    Replies go through the Slack workspace view
-                  </span>
-                  <button type="submit" className="ws-send" disabled title="Open Slack to send">
-                    Send
-                  </button>
-                </div>
-              </form>
-            </>
-          ) : null}
-
-          {tab === 'guide' ? (
-            <>
-              <header className="ws-center-head">
-                <div className="ws-center-nav">
-                  <button
-                    type="button"
-                    className="ws-icon-nav"
-                    onClick={goPrev}
-                    aria-label="Previous section"
-                  >
-                    ‹
-                  </button>
-                  <h4>{centreTitle}</h4>
-                  <button
-                    type="button"
-                    className="ws-icon-nav"
-                    onClick={goNext}
-                    aria-label="Next section"
-                  >
-                    ›
-                  </button>
-                </div>
-              </header>
-              <div className="ws-center-scroll">
-                {detailKey ? (
-                  <DetailBody data={rightSidebar} detailKey={detailKey} />
-                ) : (
-                  <GuideDetailBody data={leftSidebar} section={guideSection} />
-                )}
+                {leftCollapsed ? '›' : '‹'}
+              </button>
+            </header>
+            {!leftCollapsed && (
+              <div className="ws-summary-side-scroll">
+                <CentreVisuals visuals={centre.visuals} />
               </div>
-            </>
-          ) : null}
+            )}
+          </aside>
 
-          {tab === 'summary' ? (
-            <div className="ws-center-scroll ws-summary-stack">
-              <CentreVisuals visuals={centre.visuals} />
-              <CentreContent centre={centre} />
-            </div>
-          ) : null}
-
-          {tab === 'files' ? (
-            <>
-              <header className="ws-center-head">
-                <h4>Files & Links</h4>
-              </header>
-              <div className="ws-center-scroll">
-                <GuideDetailBody data={leftSidebar} section={6} />
-              </div>
-            </>
-          ) : null}
-        </section>
-
-        {/* RIGHT — Project Details */}
-        <aside className="ws-panel ws-details" aria-label="Project Details">
-          <header className="ws-panel-head">
-            <h4>Project Details</h4>
-          </header>
-          <div className="ws-details-scroll">
-            {DETAIL_CARDS.map((card) => {
-              const meta = detailMeta(rightSidebar, card.key)
-              const active = detailKey === card.key
-              return (
-                <button
-                  key={card.key}
-                  type="button"
-                  className={`ws-detail-card tone-${card.tone} ${active ? 'is-active' : ''}`}
-                  onClick={() => selectDetail(card.key)}
-                  aria-pressed={active}
-                >
-                  <div className="ws-detail-card-top">
-                    <span className="ws-detail-card-title">{card.title}</span>
-                    <span className={`ws-detail-badge tone-${card.tone}`}>{meta.count}</span>
+          {/* CENTRE — summary, or one detail card opened from the right rail */}
+          <section className="ws-panel ws-center ws-summary-centre" aria-label="Summary">
+            {summaryDetail ? (
+              <>
+                <header className="ws-center-head">
+                  <div className="ws-center-nav">
+                    <button
+                      type="button"
+                      className="ws-icon-nav"
+                      onClick={() => setSummaryDetail(null)}
+                      aria-label="Back to summary"
+                    >
+                      ‹
+                    </button>
+                    <h4>{detailTitle}</h4>
+                    <span className="ws-nav-spacer" aria-hidden="true" />
                   </div>
-                  <p className="ws-detail-card-summary">{meta.summary}</p>
-                </button>
-              )
-            })}
-          </div>
-        </aside>
-      </div>
+                </header>
+                <div className="ws-center-scroll">
+                  <DetailBody data={rightSidebar} detailKey={summaryDetail} />
+                </div>
+              </>
+            ) : (
+              <div className="ws-center-scroll ws-summary-stack">
+                <CentreContent centre={centre} />
+              </div>
+            )}
+          </section>
+
+          {/* RIGHT — Project Details cards */}
+          <aside
+            className={`ws-panel ws-summary-right${rightCollapsed ? ' is-collapsed' : ''}`}
+            aria-label="Project Details"
+          >
+            <header className="ws-panel-head">
+              {!rightCollapsed && <h4>Project Details</h4>}
+              <button
+                type="button"
+                className="ws-rail-toggle"
+                onClick={toggleRight}
+                aria-label={
+                  rightCollapsed
+                    ? 'Expand project details sidebar'
+                    : 'Collapse project details sidebar'
+                }
+                aria-expanded={!rightCollapsed}
+              >
+                {rightCollapsed ? '‹' : '›'}
+              </button>
+            </header>
+            {!rightCollapsed && (
+              <div className="ws-details-scroll">
+                {DETAIL_CARDS.map((card) => {
+                  const meta = detailMeta(rightSidebar, card.key)
+                  const active = summaryDetail === card.key
+                  return (
+                    <button
+                      key={card.key}
+                      type="button"
+                      className={`ws-detail-card tone-${card.tone} ${active ? 'is-active' : ''}`}
+                      onClick={() => setSummaryDetail(card.key)}
+                      aria-pressed={active}
+                    >
+                      <div className="ws-detail-card-top">
+                        <span className="ws-detail-card-title">{card.title}</span>
+                        <span className={`ws-detail-badge tone-${card.tone}`}>{meta.count}</span>
+                      </div>
+                      <p className="ws-detail-card-summary">{meta.summary}</p>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </aside>
+        </div>
+      ) : null}
+
+      {tab === 'slack-chat'
+        ? tabPanel('Slack Chat', <SlackChatTab projectName={identity.name} />)
+        : null}
+      {tab === 'ai-chat'
+        ? tabPanel(identity.name, <AiChatTab projectName={identity.name} />)
+        : null}
+      {tab === 'settings'
+        ? tabPanel('Settings', <ProjectSettingsTab projectName={identity.name} />)
+        : null}
+      {activeSection
+        ? tabPanel(
+            activeDataTab?.label ?? '',
+            <GuideDetailBody data={leftSidebar} section={activeSection} />,
+            activeDataTab?.badge
+          )
+        : null}
     </article>
   )
 }

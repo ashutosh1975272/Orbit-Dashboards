@@ -2761,11 +2761,11 @@ button:disabled {
 .rounded-lg { border-radius: 0.5rem; }
 .rounded-xl { border-radius: 0.75rem; }
 .self-center { align-self: center; }
-.space-y-1 > * + * { margin-top: 0.25rem; } }
-.space-y-2 > * + * { margin-top: 0.5rem; } }
-.space-y-3 > * + * { margin-top: 0.75rem; } }
-.space-y-4 > * + * { margin-top: 1rem; } }
-.space-y-6 > * + * { margin-top: 1.5rem; } }
+.space-y-1 > * + * { margin-top: 0.25rem; }
+.space-y-2 > * + * { margin-top: 0.5rem; }
+.space-y-3 > * + * { margin-top: 0.75rem; }
+.space-y-4 > * + * { margin-top: 1rem; }
+.space-y-6 > * + * { margin-top: 1.5rem; }
 .text-2xl { font-size: 1.5rem; line-height: 2rem; }
 .text-3xl { font-size: 1.875rem; line-height: 2.25rem; }
 .text-accent { color: var(--accent); }
@@ -3095,10 +3095,16 @@ button:disabled {
 .ws-tabs {
   display: flex;
   gap: 6px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
   padding-bottom: 4px;
   border-bottom: 1px solid var(--border-panel);
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-btn) transparent;
 }
+.ws-tabs::-webkit-scrollbar { height: 6px; }
+.ws-tabs::-webkit-scrollbar-thumb { background: var(--border-btn); border-radius: 3px; }
 .ws-tab {
   height: 36px;
   padding: 0 14px;
@@ -3109,12 +3115,51 @@ button:disabled {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .ws-tab:hover { color: var(--text-soft); background: var(--bg-panel); }
 .ws-tab.is-active {
   background: color-mix(in srgb, var(--accent) 22%, transparent);
   color: var(--accent);
   border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+/* Settings tab: pinned to the right, visually distinct from the data tabs. */
+.ws-tab.is-settings {
+  margin-left: auto;
+  border-style: dashed;
+  border-color: var(--border-btn);
+  color: var(--text-muted);
+}
+.ws-tab.is-settings:hover { color: var(--text-soft); border-color: var(--text-muted); }
+.ws-tab.is-settings.is-active {
+  background: color-mix(in srgb, var(--text-muted) 14%, transparent);
+  color: var(--text-soft);
+  border-color: var(--border-btn);
+}
+
+.ws-tab-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--accent);
+}
+.ws-tab-badge.is-zero {
+  background: var(--bg-chip);
+  color: var(--text-muted);
+  opacity: 0.5;
 }
 
 .ws-body {
@@ -3487,4 +3532,149 @@ button:disabled {
   .ws-guide,
   .ws-details { max-height: 280px; }
   .ws-center { min-height: 420px; }
+}
+
+/* ===== v2.5 — Summary tab: collapsible sidebars + full-width data tabs ===== */
+
+.ws-summary {
+  display: grid;
+  grid-template-columns: minmax(230px, 290px) minmax(0, 1fr) minmax(230px, 290px);
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+.ws-summary.is-left-collapsed {
+  grid-template-columns: 40px minmax(0, 1fr) minmax(230px, 290px);
+}
+.ws-summary.is-right-collapsed {
+  grid-template-columns: minmax(230px, 290px) minmax(0, 1fr) 40px;
+}
+.ws-summary.is-left-collapsed.is-right-collapsed {
+  grid-template-columns: 40px minmax(0, 1fr) 40px;
+}
+
+.ws-summary-side-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 10px;
+}
+
+.ws-rail-toggle {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--border-btn);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.ws-rail-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+.ws-summary-left.is-collapsed .ws-panel-head,
+.ws-summary-right.is-collapsed .ws-panel-head {
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 10px 0;
+  border-bottom: none;
+}
+.ws-summary-left.is-collapsed,
+.ws-summary-right.is-collapsed {
+  align-items: center;
+}
+
+.ws-nav-spacer { width: 36px; flex-shrink: 0; }
+
+.ws-tab-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-panel);
+  border-radius: var(--radius-panel);
+  overflow: hidden;
+}
+.ws-tab-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-panel);
+  flex-shrink: 0;
+}
+.ws-tab-panel-head h4 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-label);
+}
+.ws-tab-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px 18px;
+}
+
+.ws-placeholder {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  padding: 32px;
+}
+.ws-placeholder-icon { font-size: 30px; opacity: 0.7; }
+.ws-placeholder h5 { margin: 0; font-size: 16px; font-weight: 700; color: var(--text); }
+.ws-placeholder p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  max-width: 460px;
+}
+
+@container (max-width: 1100px) {
+  .ws-summary {
+    grid-template-columns: minmax(200px, 240px) minmax(0, 1fr) minmax(200px, 240px);
+  }
+  .ws-summary.is-left-collapsed {
+    grid-template-columns: 40px minmax(0, 1fr) minmax(200px, 240px);
+  }
+  .ws-summary.is-right-collapsed {
+    grid-template-columns: minmax(200px, 240px) minmax(0, 1fr) 40px;
+  }
+  .ws-summary.is-left-collapsed.is-right-collapsed {
+    grid-template-columns: 40px minmax(0, 1fr) 40px;
+  }
+}
+
+@container (max-width: 900px) {
+  .ws-summary,
+  .ws-summary.is-left-collapsed,
+  .ws-summary.is-right-collapsed,
+  .ws-summary.is-left-collapsed.is-right-collapsed {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ws-summary-left { max-height: 38vh; }
+  .ws-summary-right { max-height: 38vh; }
+  .ws-summary-centre { min-height: 420px; }
 }

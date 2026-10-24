@@ -76,7 +76,7 @@ export function GuideDetailBody({
           ))}
         </ul>
       ) : (
-        emptyNote('No client requirements explicitly stated in chat or files')
+        emptyNote('No requirements found in chat')
       )
     case 3:
       return (
