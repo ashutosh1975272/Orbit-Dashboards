@@ -23,8 +23,10 @@ import { DashboardSidebarStateStore } from './dashboard/sidebar-state'
 import { migrateWorkspaceCards } from './dashboard/workspace-migration'
 import { buildRecentFeed } from './dashboard/recent-feed'
 import { DashboardDigestStore, refreshDigest } from './dashboard/digest'
+import { DashboardChatService } from './dashboard/chat-service'
 import { HistoryStore } from './dashboard/history-store'
-import { NimProvider } from './dashboard/ai-provider'
+import { AiSettingsStore } from './dashboard/ai-settings-store'
+import { AiSettingsService } from './dashboard/ai-settings'
 import { InsightEngine } from './dashboard/insight-engine'
 import { SlackPoller } from './dashboard/slack-poller'
 import { loadAppEnv } from './load-app-env'
@@ -234,7 +236,6 @@ if (!gotSingleInstanceLock) {
     const dashboardDeltaStore = new DashboardDeltaStore({ rootDir: dashboardRoot })
     const dashboardSidebarStateStore = new DashboardSidebarStateStore(userData)
     // v2.2 — NVIDIA NIM rolling insights (universal key/model from .env)
-    const nimKey = process.env.NVIDIA_NIM_API_KEY ?? ''
     const nimPrimary =
       process.env.NVIDIA_NIM_MODEL_PRIMARY ?? 'nvidia/nemotron-3.5-super-vl-120b-a12b'
     const nimFallback =
@@ -244,28 +245,36 @@ if (!gotSingleInstanceLock) {
     // reasoning models burn the whole token budget on reasoning and answer
     // nothing, so thinking is off by default (re-enable from .env)
     const nimEnableThinking = process.env.NVIDIA_NIM_ENABLE_THINKING === 'true'
-    const nimProvider = nimKey
-      ? new NimProvider({
-          apiKey: nimKey,
-          modelPrimary: nimPrimary,
-          modelFallback: nimFallback,
-          timeoutMs: Number.isFinite(nimTimeoutMs) ? nimTimeoutMs : 90_000,
-          maxTokens: Number.isFinite(nimMaxTokens) ? nimMaxTokens : 2000,
-          enableThinking: nimEnableThinking
-        })
-      : null
+    // v2.7 — project settings → global settings → env defaults. The key never
+    // leaves this process; the renderer only sees masks.
+    const aiSettingsStore = new AiSettingsStore({
+      rootDir: dashboardRoot,
+      encryptionAvailable: (await import('electron')).safeStorage.isEncryptionAvailable()
+    })
+    const aiSettings = new AiSettingsService({
+      store: aiSettingsStore,
+      env: {
+        apiKey: process.env.NVIDIA_NIM_API_KEY ?? '',
+        model: nimPrimary,
+        fallbackModel: nimFallback
+      },
+      timeoutMs: Number.isFinite(nimTimeoutMs) ? nimTimeoutMs : 90_000,
+      maxTokens: Number.isFinite(nimMaxTokens) ? nimMaxTokens : 2000,
+      enableThinking: nimEnableThinking
+    })
     const dashboardHistoryStore = new HistoryStore({ rootDir: dashboardRoot })
     // The engine always exists: with a key it enriches with NVIDIA NIM,
     // without one it still keeps every card meaningful via local heuristics.
     const insightEngine = new InsightEngine({
-      provider: nimProvider,
+      provider: null,
+      resolveProvider: (projectId: string) => aiSettings.getProvider(projectId),
       historyStore: dashboardHistoryStore,
       deltaStore: dashboardDeltaStore,
       fetchUsers: (token: string) => new SlackPoller().usersList(token),
       log: (msg) => log.info(msg)
     })
-    if (!nimProvider) {
-      log.info('[dashboard] NVIDIA_NIM_API_KEY missing — insights fall back to heuristics')
+    if (!(await aiSettings.resolveSettings()).apiKey) {
+      log.info('[dashboard] no AI key configured — insights fall back to heuristics')
     }
     const digestStore = new DashboardDigestStore({ rootDir: dashboardRoot })
     const refreshDigestNow = async (): Promise<DashboardDigest | null> => {
@@ -280,7 +289,7 @@ if (!gotSingleInstanceLock) {
       return refreshDigest({
         workspaces,
         store: digestStore,
-        provider: nimProvider,
+        provider: await aiSettings.getProvider(),
         log: (msg) => log.info(msg)
       })
     }
@@ -315,6 +324,18 @@ if (!gotSingleInstanceLock) {
         getNewMessageCount: (projectId: string) => dashboardEngine.newMessageCountFor(projectId)
       })
     const getDigest = async (): Promise<DashboardDigest | null> => refreshDigestNow()
+
+    // v2.6 — Slack Chat tab: local history + replies via chat.postMessage
+    const dashboardChatService = new DashboardChatService({
+      monitorStore: dashboardMonitorStore,
+      deltaStore: dashboardDeltaStore,
+      oauthTokenProvider: { tryGet: (profileId, teamId) => tokenStore.tryGet(profileId, teamId) },
+      oauthScopesProvider: async (profileId, teamId) => {
+        const links = await tokenStore.listWorkspaces(profileId)
+        return links.find((link) => link.teamId === teamId)?.scopes ?? null
+      },
+      log: (msg) => log.info(msg)
+    })
 
     // v2.2 — one-time workspace migration: stamp + split legacy mixed cards.
     // Runs in the background: it talks to Slack and must never block startup.
@@ -405,7 +426,9 @@ if (!gotSingleInstanceLock) {
       historyStore: dashboardHistoryStore,
       buildRecent,
       getDigest,
-      sidebarStateStore: dashboardSidebarStateStore
+      sidebarStateStore: dashboardSidebarStateStore,
+      chatService: dashboardChatService,
+      aiSettings
     })
     void runWorkspaceMigration()
     dashboardScheduler.start()

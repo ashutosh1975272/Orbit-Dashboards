@@ -1,6 +1,17 @@
 import type {
+  DashboardAiModelsQueryPayload,
+  DashboardAiModelsResult,
+  DashboardAiSettingsQueryPayload,
+  DashboardAiSettingsSavePayload,
+  DashboardAiSettingsView,
   DashboardListChannelsPayload,
   DashboardAppClientConfig,
+  DashboardChatMessage,
+  DashboardChatPage,
+  DashboardChatQueryPayload,
+  DashboardSendErrorCode,
+  DashboardSendMessagePayload,
+  DashboardSendMessageResult,
   InsightHistoryEntryContract,
   DashboardManualToken,
   DashboardSnapshot,
@@ -113,7 +124,13 @@ export const IpcChannels = {
 
   DashboardSidebarGet: 'dashboard:sidebar-get',
   DashboardSidebarSet: 'dashboard:sidebar-set',
-  DashboardSidebarUpdate: 'dashboard:sidebar-update'
+  DashboardSidebarUpdate: 'dashboard:sidebar-update',
+  DashboardGetMessages: 'dashboard:get-messages',
+  DashboardSendMessage: 'dashboard:send-message',
+
+  DashboardGetAiSettings: 'dashboard:get-ai-settings',
+  DashboardSaveAiSettings: 'dashboard:save-ai-settings',
+  DashboardListAiModels: 'dashboard:list-ai-models'
 } as const
 
 export type IpcChannel = (typeof IpcChannels)[keyof typeof IpcChannels]
@@ -264,18 +281,34 @@ export interface IpcApi {
     getSidebarState: (projectId: string) => Promise<ProjectSidebarState>
     setSidebarState: (projectId: string, state: ProjectSidebarState) => Promise<void>
     updateSidebarState: (projectId: string, sidebar: 'left' | 'right', patch: Partial<SidebarState>) => Promise<SidebarState>
+    getMessages: (payload: DashboardChatQueryPayload) => Promise<DashboardChatPage>
+    sendMessage: (payload: DashboardSendMessagePayload) => Promise<DashboardSendMessageResult>
+    getAiSettings: (payload?: DashboardAiSettingsQueryPayload) => Promise<DashboardAiSettingsView>
+    saveAiSettings: (payload: DashboardAiSettingsSavePayload) => Promise<DashboardAiSettingsView>
+    listAiModels: (payload?: DashboardAiModelsQueryPayload) => Promise<DashboardAiModelsResult>
   }
 }
 
 export type {
   ActivateAppPayload,
+  DashboardAiModelsQueryPayload,
+  DashboardAiModelsResult,
+  DashboardAiSettingsQueryPayload,
+  DashboardAiSettingsSavePayload,
+  DashboardAiSettingsView,
   DashboardListChannelsPayload,
   ActivateProfilePayload,
   AppId,
   ChannelHistoryPayload,
   CreateProfileInput,
   CurrentWorkspaceInfo,
+  DashboardChatMessage,
+  DashboardChatPage,
+  DashboardChatQueryPayload,
   DashboardManualToken,
+  DashboardSendErrorCode,
+  DashboardSendMessagePayload,
+  DashboardSendMessageResult,
   DashboardSnapshot,
   DashboardSyncProgressPayload,
   DashboardViewSetPayload,

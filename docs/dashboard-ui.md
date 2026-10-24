@@ -1,6 +1,6 @@
 # Orbit Dashboard — Complete UI Reference
 
-> **Scope:** Everything the Dashboard page renders at commit `f369e5d` — the page shell, the Recent strip, the full (expanded) card, and the minimised (compact) card — with the exact labels, data sources, and behaviours from the code.
+> **Scope:** Everything the Dashboard page renders — the page shell, the focus line, the dense project row, and the full (expanded) workspace — with the exact labels, data sources, and behaviours from the code.
 >
 > **Code map:** `src/renderer/src/components/dashboard/` (renderer) · `src/main/dashboard/` (main process) · `src/shared/dashboard-contract.ts` (types)
 
@@ -8,11 +8,11 @@
 
 ## 1. What the Dashboard is
 
-The Dashboard is a **local, read-only intelligence view over Slack client projects**. Each project = one workspace + a set of watched channels. The app polls Slack every 300 s (5 min), stores messages locally, and an insight engine (NVIDIA NIM, with a local heuristic fallback) distils them into a project card.
+The Dashboard is a **local intelligence view over Slack client projects**. Each project = one workspace + a set of watched channels. The app polls Slack every 300 s (5 min), stores messages locally, and an insight engine (NVIDIA NIM, with a local heuristic fallback) distils them into a project card.
 
 - **One card = one workspace/project.** Two workspaces are never merged on a card; the workspace name is always visible.
 - **Everything is local.** Messages live in JSON under `<userData>/dashboard/`; the only network calls are Slack polling and the optional AI insight call.
-- **Read-only chat.** The dashboard never sends messages — replies go through the embedded Slack view.
+- **One writable surface: Slack Chat.** The dashboard itself is read-only except for the **Slack Chat** tab, which posts replies with `chat.postMessage` (needs the `chat:write` scope) to a watched channel. No other tab or card action writes to Slack.
 
 ### How you open it
 
@@ -32,120 +32,83 @@ The sidebar state survives re-renders because expansion lives in the store, not 
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│ Client projects — Slack      ● auto-sync every 300s  ⟳ Sync all  + Set up new project │
+│ Client projects                 [Compact|Expanded|Mixed] [⋯] [New project] │
+│ 1 project · Synced 4m ago · Every 5 min                      │
 ├──────────────────────────────────────────────────────────────┤
-│ DIGEST  Reply to AgentWork client confirming start …         │
+│ Across workspaces  Reply to AgentWork client confirming …    │
 ├──────────────────────────────────────────────────────────────┤
-│ RECENT — MOST IMPORTANT FIRST        All 1 · Urgent 1 · Inactive 24h+ 1 │
-│ [ recent mini-card ] [ recent mini-card ] …                  │
-├──────────────────────────────────────────────────────────────┤
-│ Workspaces ①              Collapse all  Expand all  [Compact|Expanded|Mixed] │
-│ ┌ full-width project card (compact or expanded) ───────────┐ │
-│ └──────────────────────────────────────────────────────────┘ │
-│ … more cards …                                               │
+│ project row (compact) — expands in place into the workspace  │
+│ … more rows …                                                │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-### 2.1 Header (`page-head`)
+### 2.1 Header (`dash-head`)
+
+One header owns the page: title, a quiet status sub-line, view mode, the actions menu and the primary action.
 
 | Control | Label | Behaviour |
 |---|---|---|
-| Title | `Client projects — Slack` | Static |
-| Sync status | `● auto-sync every 300s` | Green dot; interval comes from `snapshot.syncIntervalSeconds` (default 300). While syncing it appends ` · syncing 2/5` (current/total projects) |
-| Sync all | `⟳ Sync all` | `syncNow()` with no project id → syncs every project |
-| New project | `+ Set up new project` | Opens the 5-step DashboardWizard |
+| Title | `Client projects` | Static |
+| Status sub-line | `1 project · Synced 4m ago · Every 5 min` | Project count, freshness of the newest sync (`just now` / `Xm ago` / `Xh ago` / `Xd ago`), poll interval from `snapshot.syncIntervalSeconds`. While syncing the middle item reads `Syncing 2/5` |
+| View mode | `Compact / Expanded / Mixed` | Sets `viewMode`; persisted to `localStorage['orbit.view']`. `Compact` clears `expandedIds`, `Expanded` fills it |
+| ⋯ menu | **AI settings**, **Sync all now**, **Collapse all**, **Expand all** | AI settings opens the dashboard-level fallback panel; Sync all calls `syncNow()` with no id; Collapse/Expand all rewrite `expandedIds` |
+| Primary | `New project` | Opens the 5-step DashboardWizard |
 
-### 2.2 Digest bar (`digest`)
+### 2.2 Focus line (`dash-focus`)
 
 - Rendered only when `snapshot.digest` exists.
-- Label `DIGEST` + `digest.topPriority` — the single most urgent thing **across all workspaces** (≤20 words). This is the only place workspaces are combined.
+- Label `Across workspaces` + `digest.topPriority` — the single most urgent thing **across all workspaces** (≤20 words). This is the only place workspaces are combined.
 - Built by the digest engine (`src/main/dashboard/digest.ts`), source `ai` or `local`.
 
-### 2.3 Workspaces toolbar (`section-head`)
+### 2.3 Project list (`dash-list`)
 
-| Control | Behaviour |
-|---|---|
-| `Workspaces` + count badge | Count = number of project snapshots |
-| `Collapse all` | Clears `expandedIds` → every card renders compact |
-| `Expand all` | Adds every project id to `expandedIds` |
-| Segmented `Compact / Expanded / Mixed` | Sets `viewMode`; persisted to `localStorage['orbit.view']` |
+- One `ProjectCard` per snapshot, each wrapped in its own `ErrorBoundary` (a broken card cannot take down the page).
+- Rows stack vertically at full width with a 6 px gap and a hairline between rows; every row expands **in place** into the full workspace (no modal, no second page).
+- **Empty state** (`empty-state`): shown when there are zero projects — a `+` mark, the 5-step setup in one sentence (create Slack app → token → channels → card → live sync) and a `New project` button.
 
 **View-mode semantics**
 
 | Mode | What renders |
 |---|---|
-| **Compact** | Every card is the compact card; `expandedIds` cleared |
+| **Compact** | Every card is the dense project row; `expandedIds` cleared |
 | **Expanded** | Every card is the full workspace card |
 | **Mixed** (default) | Per-card state: a card is expanded if its id is in `expandedIds` |
 
-### 2.4 Card grid
-
-- One `ProjectCard` per snapshot, each wrapped in its own `ErrorBoundary` (a broken card cannot take down the page).
-- Cards stack vertically, full width, 24 px gap (`space-y-6`).
-- **Empty state** (`No project cards yet`): shown when there are zero projects — icon `+`, explanation of the 5-step setup (create Slack app → get token → channels → card → live sync) and a `+ Set up new project` button.
-
-### 2.5 Page-level states
+### 2.4 Page-level states
 
 | State | What you see |
 |---|---|
 | Loading (no snapshot yet) | Centred spinner + `Loading dashboard…` |
 | Load error | `Failed to load dashboard` + message + `Retry` |
 | Render error (boundary) | `Dashboard Error` + message + `Retry` (clears error and reloads) |
-| Auto-refresh | `loadSnapshot()` + `loadRecent()` every 60 s while the page is open |
+| Auto-refresh | `loadSnapshot()` every 60 s while the page is open |
 
-### 2.6 Wizard overlay
+### 2.5 Wizard overlay
 
-When `wizardOpenFor` is set, `<DashboardWizard />` renders over the page. It is the same wizard used by `+ Set up new project` and by each card's gear button (edit mode, prefilled).
+When `wizardOpenFor` is set, `<DashboardWizard />` renders over the page. It is the same wizard used by `New project` and by each project's Settings tab (edit mode, prefilled).
 
 ---
 
-## 3. The Recent strip
+## 3. Recent feed (backend only)
 
-**Purpose:** the newest *important* changes across all workspaces, one item per project, ranked by importance — not by time.
+**v2.8:** the horizontal Recent strip was removed from the page — the focus line already surfaces the single most urgent item, and the project rows carry per-project state. The ranked feed is still built in the main process and served over `dashboard:get-recent`, so a future surface can consume it without rework.
 
-- Hidden entirely when there are no items (`return null`).
-- Horizontal scroll row of fixed-width (236 px) mini-cards; max 6 visible after filtering.
+**Purpose of the feed:** the newest *important* changes across all workspaces, one item per project, ranked by importance — not by time.
 
-### 3.1 Header
+### 3.1 Feed item shape
 
-| Element | Detail |
-|---|---|
-| Title | `Recent — most important first` |
-| Filter tabs | `All N` · `Urgent N` · `Inactive 24h+ N` |
-
-| Filter | Includes |
-|---|---|
-| **All** (default) | Every recent item |
-| **Urgent** | `needsReply` OR status `blocked` OR status `at-risk` |
-| **Inactive 24h+** | Last activity ≥ 24 h ago |
-
-Counts are computed live from the feed; an empty filter shows `Nothing matches this filter.`
-
-### 3.2 Mini-card anatomy
-
-```
-┌──────────────────────────────────┐
-│ [Workspace name]      [status]   │  ← workspace pill (truncated 120px) + status chip
-│ Agentwork                        │  ← project name, bold
-│ Client said "good" in response…  │  ← oneLine, 2-line clamp
-│ ⚠ reply  ↑ at-risk→on-track  14d #new-channel │
-└──────────────────────────────────┘
-```
-
-| Row | Source | Notes |
+| Field | Source | Notes |
 |---|---|---|
-| Workspace pill | `item.teamName` | Always present — hard rule: workspace never hidden |
-| Status chip | `item.status` | Colour by status: on-track green, at-risk yellow, blocked red, waiting-on-client purple |
-| Project name | `item.projectName` | Bold, truncated |
-| One-line summary | `item.oneLine` | From the insight's `recentLine`, else the newest non-noise message (≤110 chars) |
-| `⚠ reply` | `item.needsReply` | Yellow, only when a reply is owed |
-| `↑ delta` | `item.delta` | Status change, e.g. `at-risk → on-track` |
-| Age | `fmtAge(item.ts)` | `now` / `14m` / `3h` / `14d` |
-| `#channel` | `item.channelName` | The channel the newest message came from |
+| `teamName` | workspace | Always present — hard rule: workspace never hidden |
+| `status` | insight / heuristic | `on-track` · `at-risk` · `blocked` · `waiting-on-client` |
+| `projectName` | project record | Bold in any future UI |
+| `oneLine` | insight `recentLine`, else newest non-noise message | ≤110 chars |
+| `needsReply` | insight | True when a reply is owed |
+| `delta` | status history | Status change, e.g. `at-risk → on-track` |
+| `ts` | newest message | Rendered as `now` / `14m` / `3h` / `14d` |
+| `channelName` | newest message | The channel it came from |
 
-Clicking a mini-card calls `onSelect(projectId)` → smooth-scrolls to that project's card and flashes it (`is-flash`, 1.4 s). It does **not** expand the card.
-
-### 3.3 How items are built & ranked
+### 3.2 How items are built & ranked
 
 `src/main/dashboard/recent-feed.ts` — pure local data, no LLM/Slack call per item:
 
@@ -174,90 +137,100 @@ So a workspace **waiting on the client outranks a busy but healthy one**, and a 
 Rendered when the card is expanded (mode `expanded`, or `mixed` + id in `expandedIds`). Root element: `article.ws-shell`, `data-expanded="true"`.
 
 ```
-Workspaces › Agentwork                              ← breadcrumb
-[Active] [Waiting on client] [Needs my reply] [Inactive 24h+]   ← status filter row
-#1  Agentwork  [AgentWork]  Client · Agentwork-Application  [waiting-on-client] [Needs my reply]   AI · 3h ago · model   [⟳ Sync] [⚙] [✎] [🗑] [Minimise ⌄]   ← CardHead
-[ Chat ] [ Project Guide ] [ Summary ] [ Files ]    ← tabs
-┌────────────────┬──────────────────────────────┬──────────────────┐
-│ Project Guide  │  centre content              │ Project Details  │
-│ 1 Start & Timeline │ (depends on tab/section) │ Needs Reply  2   │
-│ 2 Client Requirements │                       │ Blockers     0   │
-│ 3 Scope & Deliverables │                      │ Risks        0   │
-│ 4 Decisions    │                              │ Next Steps   1   │
-│ 5 Commitments  │                              │ Client Mood      │
-│ 6 Files & Links│                              │ Activity         │
-│ 7 People & Channels │                         │ History          │
-└────────────────┴──────────────────────────────┴──────────────────┘
+Agentwork  [Waiting on client] [Needs my reply]   AgentWork  Agentwork-Application
+AI 7h ago  private/nvidia/nemotron-3.5-super-120b-a12b            [Sync] [Collapse] [⋯]   ← CardHead
+[ Summary ] [ Slack Chat ] [ Agentwork ] [ Project Requirements 1 ] [ Scope & Deliverables ]
+[ Decisions 0 ] [ Commitments 0 ] [ Files & Links 0 ] [ People & Channels 2 ]      [ Settings ]
+┌──────────────────┬──────────────────────────────┬──────────────────┐
+│ Overview         │  centre content              │ Project Details  │
+│ progress, time,  │  situation · just changed ·  │ Needs Reply  2   │
+│ 7-day activity   │  next step · highlights      │ Blockers     0   │
+└──────────────────┴──────────────────────────────┴──────────────────┘
 ```
 
-### 4.1 Breadcrumb
+### 4.1 No breadcrumb
 
-`Workspaces › <project name>` — static context line above the card.
+The card expands in place in the project list, so the row itself supplies context; the old `Workspaces › <project>` line was removed.
 
-### 4.2 Status filter row
+### 4.2 Status flags in the header
 
-Four pills, always visible, acting as **state indicators** (not clickable filters):
+Only the states that are actually true render, as compact chips beside the project name:
 
-| Pill | Lit (`is-on`) when |
-|---|---|
-| `Active` | status is `on-track` |
-| `Waiting on client` | status is `waiting-on-client` (yellow) |
-| `Needs my reply` | `summary.needsReply` (red) |
-| `Inactive 24h+` | `summary.inactive` (grey) |
+| Chip | Rendered when | Tone |
+|---|---|---|
+| `On track` / `At risk` / `Blocked` / `Waiting on client` | current `summary.status` | green / amber / red / amber |
+| `Needs my reply` | `summary.needsReply` | red |
+| `Inactive 24h+` | `summary.inactive` | grey |
 
-### 4.3 CardHead (shared header row)
+There is no row of always-visible, dimmed pills: a state that does not apply is absent, not greyed out.
 
-Used by both card variants (`CardHead.tsx`). Two halves:
+### 4.3 CardHead — identity and actions
+
+Expanded cards use `CardHead.tsx`. Two halves:
 
 **Left — identity & state**
 
 | Element | Content |
 |---|---|
-| `#N` | 1-based card index |
-| Project name | Bold 20 px, ellipsis + tooltip |
-| Workspace chip | `teamName`, accent outline |
-| Client | `Client · <clientName or "Not set">` |
-| Status pill | `on-track` green · `at-risk` red-pink · `blocked` amber · `waiting-on-client` purple |
-| `Needs my reply` | Red pill when a reply is owed |
-| `Inactive 24h+` | Grey pill when no client message for 24 h+ |
+| Project name | 17 px, weight 650, break-word + tooltip |
+| Status flags | The chips above, immediately after the name |
+| Workspace | `teamName`, faint 12 px text |
+| Client | `clientName`, only when it differs from the workspace |
+| AI badge | e.g. `AI 7h ago  private/nvidia/nemotron-3.5-super-120b-a12b`, or `no insight yet`; wraps below the identity line on narrow cards |
 
 **Right — actions**
 
-| Button | Icon/label | Action |
+| Button | Label | Action |
 |---|---|---|
-| Sync | `⟳ Sync` (or `Syncing…`, disabled) | `syncNow(projectId)` |
-| Settings | ⚙ | Reopens the wizard in edit mode for this project (workspace/channels) |
-| Edit details | ✎ (expanded only) | Opens the **Edit project** modal |
-| Remove | 🗑 (expanded only, red) | Deletes the project (`deleteProject`) |
-| Toggle | `Expand ⌄` / `Minimise ⌄` | Collapses/expands the card, scrolls it to top, flashes it |
-| AI badge | e.g. `AI · 3h ago · nvidia/nemotron-3.5-super-120b-a12b` | Insight age + model, or `no insight yet` |
+| Sync | `Sync` (or `Syncing…`, disabled) | `syncNow(projectId)` |
+| Collapse | `Collapse` | Collapses in place, scrolls the row to the top, flashes it |
+| Menu | `⋯` | **Project settings** (opens the Settings tab) · **Delete project** (red) |
 
-### 4.4 Tabs
+### 4.4 Tabs (10 tabs)
+
+The tab bar **wraps** onto a second line when the card is narrow — no horizontal scrollbar. Settings is pushed to the right edge of the last row.
 
 | Tab | What it shows |
 |---|---|
-| **Chat** (default) | A synthetic thread built from real insight fields only — never invented messages. Bubbles: last client message (client side), up to 5 highlights, situation line, "Next step: …". Composer is a disabled visual anchor: "Replies go through the Slack workspace view". |
-| **Project Guide** | The 7-section guide (left nav) + selected section body in the centre. Opening a detail card from the right rail also renders here. |
-| **Summary** | Visual overview (`CentreVisuals`) + textual summary (`CentreContent`). |
-| **Files** | Reuses guide section 6 (Files & Links) in the centre panel. |
+| **Summary** (default) | Three panes: left visuals (progress donut, time bars, 7-day activity), centre a flat stack (situation, just changed, next step / highlights / last client message) with hairline dividers instead of nested cards, right 7 Project Details cards. Detail cards open in the centre; the back button returns to the summary. Sidebars collapse to a 40 px rail and persist per project. |
+| **Slack Chat** | Locally stored messages from the project's watched channels (delta store): sender, time, text, `#channel` chip. Channel filter, auto-scroll to newest, older pages load on scroll-up. The composer posts replies through `dashboard:send-message` → `chat.postMessage`; sends update optimistically and errors show inline. **This is the only writable surface.** |
+| **&lt;Project name&gt;** | Project-scoped AI chat (placeholder for now). Label = project name. |
+| **Project Requirements** | Full-width guide section 2: requirement text, source-file chip, `by <who>`, timestamp. Empty: "No requirements found in chat". |
+| **Scope & Deliverables** | Full-width guide section 3 (in scope / out of scope / deliverables). |
+| **Decisions** | Full-width guide section 4. |
+| **Commitments** | Full-width guide section 5. |
+| **Files & Links** | Full-width guide section 6 (type chip, shared by, date, Open link). |
+| **People & Channels** | Full-width guide section 7 (people with Client/Us, channels with message count). |
+| **Settings** | Per-project configuration, pinned right: AI key/model (or **Use global settings**), workspace & channels (the wizard rendered inline), and manual schedule/completion. See §4.4.1. |
 
-Tab state: switching to any tab other than `guide` clears the selected detail card.
+Data tabs carry a count badge that dims at zero. The numbered Project Guide left nav and the standalone Chat/Project Guide/Files tabs from the pre-v2.6 layout are gone; the section bodies described below are the data-tab bodies.
 
-### 4.5 Left panel — Project Guide (7 sections)
+#### 4.4.1 Settings tab (v2.7)
 
-Each row = number/check + title + one-line hint + chevron. The number becomes `✓` when the section is "complete" (has data).
+The card-header **⋯ → Project settings** (or the compact row's `⋯`) opens this tab instead of a modal. It has three sections:
 
-| # | Section | Hint when empty | Complete when |
-|---|---|---|---|
-| 1 | Start & Timeline | `Dates not stated in chat` | start/end date or any milestone exists |
-| 2 | Client Requirements | `No requirements found in chat` | ≥1 requirement |
-| 3 | Scope & Deliverables | `Scope not discussed in chat` | in-scope + out-of-scope + deliverables > 0 |
-| 4 | Decisions | `No decisions recorded in chat` | ≥1 decision |
-| 5 | Commitments | `No commitments found in chat` | ≥1 commitment |
-| 6 | Files & Links | `No files shared in this workspace` | ≥1 file |
-| 7 | People & Channels | `No people or channels found` | ≥1 person or channel |
+| Section | Controls | Behaviour |
+|---|---|---|
+| **AI settings** | Provider (`NVIDIA NIM`), Model dropdown (loaded from `dashboard:list-ai-models`), API key (password field with **Show/Hide**), **Use global settings** | Stored per project. With the toggle on, the project key/model are ignored and the dashboard settings apply. The **EFFECTIVE NOW** box shows e.g. `Using global: nvidia/nemotron-3.5-super-120b-a12b · global key ••••abcd`. Only the mask ever reaches the renderer; keys are encrypted with `safeStorage` in the main process. |
+| **Workspace & channels** | Summary line + **Edit workspace & channels** | Mounts the 5-step `DashboardWizard` inline (starts at channel selection, preserves OAuth connectors). Saving triggers a sync. |
+| **Schedule & completion** | Start date, End date, Completion % (0–100) | Writes through `upsertProject`; manual values win over dates/percentages extracted from chat. |
 
-**Section bodies (centre panel):**
+The dashboard-level panel (header **⋯ → AI settings**) edits the same form without a project scope: its key/model are the fallback for every project. Resolution order per field is **project override (unless `useGlobal`) → dashboard global → environment defaults**; the insight engine and project chat both obtain providers through `AiSettingsService.resolveSettings(projectId)`. With no key anywhere, AI features stay off and the card keeps its heuristic insight.
+
+### 4.5 Left panel — Overview (Summary tab)
+
+The left pane of Summary is the project's visual state, not a navigation list:
+
+| Block | Contents | Source |
+|---|---|---|
+| Progress | Donut `0–100%` with the percentage in the middle | `summary.progress` |
+| Time elapsed | Start → due with a pace verdict (behind / on pace / ahead); `Dates not stated in chat` + **Add dates** when missing | `effectiveDates`, `paceLabel` |
+| Work done / time used | Flat bars comparing completion against elapsed time | `progress`, `daysUsed/daysTotal` |
+| Last 7 days | One bar per day, today in accent, tooltip with the count | `week[]` |
+
+The pane collapses to a 40 px rail with `‹`, persists per project, and the centre `›` toggles the right pane the same way. The guide sections are **tabs**, not a left nav.
+
+**Guide section bodies (the data tabs):**
 
 | # | Body contents |
 |---|---|
@@ -269,7 +242,7 @@ Each row = number/check + title + one-line hint + chevron. The number becomes `�
 | 6 | File cards: name, type chip (PDF/DOCX/LINK/IMAGE/OTHER), `shared by`, date, **Open** link |
 | 7 | **People** (name · role · Client/Us chip) and **Channels** (#name · message count · `new` chip) |
 
-Navigation: `‹` / `›` in the centre header cycle sections 1→7→1; from a detail card, either arrow returns to the guide. Clicking any section sets the centre title to `<Section title> #N`.
+Each data tab renders its section body full width in the centre; the tab itself carries the count badge. From a Project Details card, the back control returns to the Summary.
 
 ### 4.6 Right panel — Project Details (7 detail cards)
 
@@ -285,75 +258,66 @@ Each is a clickable summary card with a count badge, a tone colour, and a one-li
 | **Activity** (info) | 1 if any message in 24 h | `24h N · 7d N · client <age>` | 2×2 stats (24h, 7d, Client age, Me age) + last client message + my last reply |
 | **History** (muted) | #history entries | `from → to` of latest | Each entry: `from → to`, timestamp, `+N msgs`; empty → `No status changes recorded yet` |
 
-### 4.7 Edit project modal
+### 4.7 Schedule & completion (Settings tab)
 
-Opened by ✎ in the CardHead (expanded only). Centred dialog over a dark scrim; click outside or **Cancel** closes it.
+Moved out of the old ✎ modal. Open the card-header **⋯ → Project settings** → **Settings** tab → **Schedule & completion**.
 
 | Field | Meaning |
 |---|---|
 | Start date | Blank = use dates found in chat |
 | End date / deadline | Project deadline |
-| Manually set completion % | 0–100, overrides the activity estimate (blank = auto) |
+| Completion % | 0–100, overrides the activity estimate (blank = auto) |
 
-**Save** calls `upsertProject` with the merged project and closes the modal.
+**Save schedule** calls `upsertProject` with the merged project. The card updates immediately (the snapshot re-derives `effectiveDates` and `completion` from the fresh project record).
 
 ---
 
-## 5. The minimised (compact) card
+## 5. The minimised (compact) row
 
-Rendered when the card is collapsed (`compact` mode, or `mixed` + id not in `expandedIds`). It is still full width — "minimised" means one dense summary row-set instead of the three-panel workspace.
+Rendered when the card is collapsed (`compact` mode, or `mixed` + id not in `expandedIds`). It is one dense row rather than a card, so many projects scan in a few seconds.
 
 ```
-#1  Agentwork  [AgentWork]  Client · Agentwork-Application  [waiting-on-client] [Needs my reply]        [⟳ Sync] [⚙] [Expand ⌄]
-┌───────────────────────────────┬──────────────────────┬────────────────────┐
-│ Situation (2-line clamp)      │  42%   12 of 30 days │  LAST 7 DAYS       │
-│ Just changed: …               │  ▓▓▓▓▓░░░░░░░░░░     │  ▁ ▃ ▅ ▂ ▇ ▄ T     │
-│ [NEXT STEP  Reply to …]       │  Sep 1 → Oct 1  ahead│  Client 3h ago     │
-│                               │                      │  Me —              │
-└───────────────────────────────┴──────────────────────┴────────────────────┘
-[2 open questions] [1 blocker] [1 risk] [2 files] [1 requirement]   ← count chips (only non-zero)
-[Expand ⌄]                                                          ← bottom toggle
+▎ Agentwork  AgentWork  Agentwork-Application  Waiting on client          Needs reply  ▁▁▁▁ 0%  15d  ⋯  ›
+▎ Client initiated contact and asked to start; no work has begun yet.
+▎ [1 question]
 ```
 
-### 5.1 CardHead (compact variant)
+A 3 px left bar carries the status colour (`is-on-track` green · `is-at-risk` amber · `is-blocked` red · `is-waiting-on-client` amber).
 
-Same identity block as the expanded card (index, name, workspace chip, client, status, `Needs my reply`, `Inactive 24h+`) plus Sync + ⚙. No ✎/🗑 (edit/delete are expanded-only). Toggle says `Expand`.
+### 5.1 Row anatomy
 
-### 5.2 Three zones
-
-| Zone | Contents | Source |
+| Area | Contents | Source |
 |---|---|---|
-| **A — situation** (flex 3, min 420 px) | Situation line (16 px semibold, clamped to 2 lines; `No summary yet` fallback) · `Just changed: <recentLine>` in accent · a filled **NEXT STEP** block | insight `situationLine`, `recentLine`, `nextStep` |
-| **B — progress & pace** (flex 2, min 300 px) | Big `<progress>%` · `N of M days` · 10 px progress bar · `start → end` ages (or `Dates not stated`) · pace verdict coloured: behind = danger, ahead = accent, on-pace = success | `progress`, `daysUsed/daysTotal`, `dates`, `paceLabel` |
-| **C — last 7 days** (flex 1.2, min 200 px) | `LAST 7 DAYS` label · 7 mini bars (today = green `T`, else accent + weekday initial; tooltip `date: N messages`) · `Client <age>` · `Me <age>` | `week[]`, `lastClientAt`, `myLastReplyAt` |
+| Head | Project name (650), workspace, client (only when different), status label | `name`, `workspaceName`, `clientName`, `status` |
+| Situation | One line, ellipsis; `No summary yet` fallback | `situationLine` |
+| Chips | `N question(s)` · `N blocker(s)` · `N risk(s)` — only when non-zero | `counts` |
+| Side | `Needs reply` flag when owed · progress meter + `%` · client-message age | `needsReply`, `progress`, `paceLabel`, `lastClientAt` |
+| Actions | `⋯` menu: **Sync now**, **Project settings**, **Delete project** | — |
+| Chevron | Opens the full workspace in place | — |
 
-### 5.3 Count chips (row 2)
+The whole row body is one button (aria-label `Open <name>`); the chips, menu and chevron sit outside it so each keeps its own hit target.
 
-Only rendered when non-zero. Each chip is clickable and **expands the card directly to the matching detail**:
+### 5.2 Chips open the matching detail
 
 | Chip | Opens |
 |---|---|
-| `N open question(s)` | Needs Reply detail (101) |
+| `N question(s)` | Needs Reply detail (101) |
 | `N blocker(s)` | Blockers detail (102) |
 | `N risk(s)` | Risks detail (103) |
-| `N file(s)` | Guide section 6 — Files & Links |
-| `N requirement(s)` | Guide section 2 — Client Requirements |
 
-### 5.4 Toggle
+Each chip expands the row and lands on that detail card; there is no second toggle at the bottom of the row.
 
-A second `Expand ⌄` button sits at the bottom of the compact card, in addition to the one in CardHead. Both call the same `onToggle` (scroll-to-card + flash). (Note: this duplicates the header toggle — a candidate for cleanup.)
+### 5.3 Compact vs expanded — quick diff
 
-### 5.5 Compact vs expanded — quick diff
-
-| Aspect | Compact | Expanded |
+| Aspect | Compact row | Expanded |
 |---|---|---|
-| Header | CardHead (Sync, ⚙, Expand) | CardHead (Sync, ⚙, ✎, 🗑, Minimise) + AI badge |
-| Status row | pills inside header only | dedicated filter row above header |
-| Body | 3 zones + count chips | tabs + 3 panels (Guide nav · centre · Details) |
-| Chat | none | synthetic thread + disabled composer |
-| Project guide | none (chips jump into it) | 7 sections with completion ticks |
-| Details | none | 7 detail cards with counts |
-| Edit/Delete | not available | ✎ modal / 🗑 delete |
+| Header | inline identity + status label, no actions until `⋯` | CardHead (Sync, Collapse, `⋯`) + status chips + AI badge |
+| Status | text label beside the identity, coloured left bar | chips beside the project name |
+| Body | one situation line + state chips | 10 tabs + 3-panel Summary |
+| Chat | none | Slack Chat (writable) · project AI chat |
+| Project guide | none (chips jump into a detail) | full tabs for sections 2–7 |
+| Details | progress meter, pace tooltip, client age | 7 detail cards with counts |
+| Edit/Delete | `⋯` → Project settings / Delete | Settings tab / `⋯` → Delete |
 | Purpose | scan many projects fast | work one project in depth |
 
 ---
@@ -376,8 +340,8 @@ A second `Expand ⌄` button sits at the bottom of the compact card, in addition
 | **Needs reply** | `insight.clientAsk.needsReply` |
 | **Urgency** | `insight.clientAsk.urgency` (low / normal / high) |
 | **Inactive 24h+** | No last client message AND last sync older than 24 h |
-| **Count chips** | `openQuestions`, `blockers`, `risks`, `files`, `requirements` lengths |
-| **AI badge** | `AI · <age> · <model>` (or `heuristic · …`, or `no insight yet`) |
+| **Row chips** | `openQuestions`, `blockers`, `risks` lengths (files/requirements live in the tabs) |
+| **AI badge** | `AI <age> <model>` (or `heuristic …`, or `no insight yet`); the badge's dot-separated parts render as separate spans, never as a middle-dot string |
 | **Synced label** | `synced <age>` from `lastUpdatedAt` |
 | **Score** | Same importance formula as the Recent feed (used for ordering/debug) |
 
@@ -389,22 +353,26 @@ A second `Expand ⌄` button sits at the bottom of the compact card, in addition
 
 | File | Responsibility |
 |---|---|
-| `DashboardView.tsx` | Page shell: header, digest, Recent, toolbar, card grid, empty/loading/error states, wizard host |
+| `DashboardView.tsx` | Page shell: one header (title, sub-line, view mode, actions menu, New project), focus line, project list, empty/loading/error states, wizard host, dashboard AI settings panel |
 | `DashboardRail.tsx` | Sidebar entry (Dashboard → Slack) |
-| `RecentStrip.tsx` | Recent mini-cards + All/Urgent/Inactive filters |
-| `ProjectCard.tsx` | Per-project switch between compact/expanded, edit modal, memoised |
-| `CardHead.tsx` | Shared header: identity, status pills, Sync/⚙/✎/🗑/toggle, AI badge |
-| `CompactCard.tsx` | Minimised card: 3 zones + count chips |
-| `ExpandedWorkspace.tsx` | Full card: breadcrumb, status row, tabs, 3-panel body |
+| `ProjectCard.tsx` | Per-project switch between compact/expanded, settings-tab focus, memoised |
+| `CardHead.tsx` | Expanded header: identity, true-state chips, Sync/Collapse/`⋯`, AI badge |
+| `CompactCard.tsx` | Dense project row: identity, situation, state chips, meter, age, `⋯` |
+| `ExpandedWorkspace.tsx` | Full workspace: header, wrapping tab bar, 3-panel Summary |
+| `ProjectSettingsTab.tsx` | Settings tab: AI form, inline workspace wizard, schedule/completion |
+| `AiSettingsForm.tsx` | Shared AI settings form (project scope and global scope) |
+| `AiSettingsPanel.tsx` | Dashboard-level AI settings modal |
 | `guide-model.ts` | Guide sections, detail cards, hints, completion, chat-thread builder, date formatters |
 | `guide-content.tsx` | Bodies for the 7 guide sections and 7 detail cards |
-| `CentreContent.tsx` | Summary tab text panels (Summary, Highlights, Last Client Message) |
+| `CentreContent.tsx` | Summary centre: one flat stack (Summary, Highlights, Last client message) separated by hairline dividers |
 | `CentreVisuals.tsx` | Summary tab visuals (progress donut, time bars, 7-day activity) |
 | `card-view.ts` | Pure view-model: `buildCardView`, `buildCardSummary`, all derived values |
-| `DashboardWizard.tsx` | 5-step add/edit project overlay |
+| `DashboardWizard.tsx` | 5-step add-project overlay, or inline channel editor in Settings |
 | `ErrorBoundary.tsx` | Per-card and page-level crash isolation |
 | `src/main/dashboard/recent-feed.ts` | Builds + ranks the Recent feed |
 | `src/main/dashboard/digest.ts` | Cross-workspace digest line |
+| `src/main/dashboard/ai-settings-store.ts` | Encrypted per-project/global AI settings persistence (`ai-settings.json`) |
+| `src/main/dashboard/ai-settings.ts` | `AiSettingsService`: `resolveSettings`, provider cache, masked public views, model list |
 | `src/shared/dashboard-contract.ts` | Types for everything above |
 
 ---
@@ -413,18 +381,17 @@ A second `Expand ⌄` button sits at the bottom of the compact card, in addition
 
 | Surface | What it shows |
 |---|---|
-| Header | `Client projects — Slack`, auto-sync 300 s, Sync all, + Set up new project |
-| Digest | `Reply to AgentWork client confirming start and requesting project details` |
-| Recent (All 1) | Agentwork · waiting-on-client · “Client said "good" in response to a test message” · 14d · #new-channel |
-| Workspaces (1) | Agentwork, **Expanded** selected |
-| CardHead | `#1 Agentwork` · AgentWork · Client · Agentwork-Application · waiting-on-client · Needs my reply · `AI · 3h ago · nvidia/nemotron-3.5-super-120b-a12b` |
-| Status row | Waiting on client lit; Needs my reply lit |
-| Guide left | 1 Start & Timeline → `Dates not stated in chat`; 2 Requirements → `1 requirement` ✓; 3 Scope → `Scope not discussed in chat` |
-| Chat centre | Utkarsh Barnwal “good” (Oct 10, 10:10 AM); Ashutosh “Client asked if we can start here” (Oct 9, 5:16 PM); Ashutosh requirement note (Oct 9, 5:19 PM) |
-| Details right | Needs Reply & Open Questions 2 (`can we start here ?`), Blockers 0 (None), Risks 0 |
+| Header | `Client projects`, sub-line `1 project · Synced 4m ago · Every 5 min`, `Compact / Expanded / Mixed`, `⋯`, `New project` |
+| Focus line | `Across workspaces` — `Reply to AgentWork client confirming start and request project details` |
+| Project row | Agentwork · AgentWork · Agentwork-Application · Waiting on client · situation line · `1 question` · `Needs reply` · 0% · 15d |
+| Expanded header | `Agentwork` + `Waiting on client` + `Needs my reply` chips · AgentWork · Agentwork-Application · `AI 7h ago  private/nvidia/nemotron-3.5-super-120b-a12b` · Sync · Collapse · `⋯` |
+| Tabs | Summary · Slack Chat · Agentwork · Requirements 1 · Scope · Decisions · Commitments · Files · People 2 · Settings (gear, right-aligned) |
+| Overview left | `0%` progress donut, `Time elapsed — Dates not stated in chat`, time and 7-day activity bars |
+| Summary centre | One flat stack with hairline dividers: Situation, Just changed, Next step (`Reply to the client confirming we can start and ask for project details`), Highlights, Last client message |
+| Details right | Needs Reply & Open Questions 2 (`can we start here ?`), Blockers 0, Risks 0, Next Steps 1, Client Mood, Activity, History |
 
-This matches the code paths above: one project → one Recent item, guide ticks driven by `guideComplete()`, detail counts from `detailMeta()`, chat bubbles from `buildInsightThread()`.
+This matches the code paths above: one project → one row, tab badges from `view.leftSidebar`/`view.rightSidebar` counts, guide ticks driven by `guideComplete()`, detail counts from `detailMeta()`, situation/next-step text from the insight with the heuristic fallback.
 
 ---
 
-*Generated from the source at `f369e5d`. If the card design changes, update this file in the same commit.*
+*Originally generated from the source at `f369e5d`. Updated for v2.6 (10-tab workspace, writable Slack Chat), v2.8 (single dashboard header, dense project rows, in-place expansion, true-state chips instead of the status/filter strip, Recent strip removed, focus line renamed `Across workspaces`) and v2.9 (flat Summary centre with hairline dividers, short tab labels, icon-only Settings tab). If the card design changes, update this file in the same commit.*

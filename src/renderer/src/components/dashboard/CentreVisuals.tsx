@@ -60,14 +60,14 @@ export default function CentreVisuals({ visuals }: CentreVisualsProps): React.Re
             </svg>
             <div className="dash-donut-center absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
               <span className="dash-donut-percent text-3xl font-bold text-text-dark leading-none">{progressPercent}%</span>
-              <span className="dash-donut-label text-xs uppercase tracking-wider text-muted-dark mt-1">Progress</span>
+              <span className="dash-donut-label text-xs text-muted-dark mt-1">Progress</span>
             </div>
           </div>
         </div>
 
         {/* Time Elapsed Bars */}
         <div className="dash-panel dash-visuals-panel dash-time-panel">
-          <div className="dash-visuals-panel-title text-xs font-semibold uppercase tracking-wider text-muted-dark mb-3">Time Elapsed</div>
+          <div className="dash-visuals-panel-title text-xs font-semibold text-muted-dark mb-3">Time elapsed</div>
           {timeElapsed.hasDates ? (
             <>
               <div className="dash-time-bars space-y-3">
@@ -77,11 +77,11 @@ export default function CentreVisuals({ visuals }: CentreVisualsProps): React.Re
                       className="dash-time-bar-fill dash-time-bar-work h-full rounded-full"
                       style={{ 
                         width: `${Math.min(100, timeElapsed.progressPercent ?? 0)}%`,
-                        background: 'linear-gradient(90deg, var(--accent), var(--accent-dim))'
+                        background: 'var(--accent)'
                       }}
                     />
                   </div>
-                  <span className="dash-time-bar-label w-20 text-xs font-semibold text-muted-dark uppercase tracking-wider text-right">Work Done</span>
+                  <span className="dash-time-bar-label w-20 text-xs text-muted-dark text-right">Work done</span>
                 </div>
                 <div className="dash-time-bar-row flex items-center gap-3">
                   <div className="dash-time-bar-track flex-1 h-3.5 bg-border-dark rounded-full overflow-hidden relative">
@@ -91,11 +91,11 @@ export default function CentreVisuals({ visuals }: CentreVisualsProps): React.Re
                         width: `${timeElapsed.totalDays && timeElapsed.daysUsed
                           ? Math.min(100, (timeElapsed.daysUsed / timeElapsed.totalDays) * 100)
                           : 0}%`,
-                        background: 'linear-gradient(90deg, var(--muted), var(--border))'
+                        background: 'var(--text-faint)'
                       }}
                     />
                   </div>
-                  <span className="dash-time-bar-label w-20 text-xs font-semibold text-muted-dark uppercase tracking-wider text-right">Time Used</span>
+                  <span className="dash-time-bar-label w-20 text-xs text-muted-dark text-right">Time used</span>
                 </div>
               </div>
               <div className="dash-time-meta flex justify-between mt-2 text-xs text-muted-dark">
@@ -103,14 +103,14 @@ export default function CentreVisuals({ visuals }: CentreVisualsProps): React.Re
                 <span className="dash-time-date">{formatDateShort(timeElapsed.endDate!)}</span>
               </div>
               <div className="dash-time-summary mt-2 text-sm font-medium text-text-dark">
-                {timeElapsed.daysUsed} of {timeElapsed.totalDays} days used · {timeElapsed.daysLeft} days left
+                {timeElapsed.daysUsed} of {timeElapsed.totalDays} days used, {timeElapsed.daysLeft} days left
               </div>
-              <div className={`dash-pace-verdict mt-2 px-3 py-2 rounded-lg text-xs font-semibold uppercase tracking-wider text-center ${
+              <div className={`dash-pace-verdict mt-2 px-3 py-2 rounded-lg text-xs font-semibold text-center ${
                 timeElapsed.pace === 'behind'
                   ? 'bg-red-500/15 text-red-400 border border-red-500/30'
                   : timeElapsed.pace === 'ahead'
-                    ? 'bg-purple-500/15 text-purple-400 border border-purple-500/30'
-                    : 'bg-green-500/15 text-green-400 border border-green-500/30'
+                    ? 'bg-green-500/15 text-green-400 border border-green-500/30'
+                    : 'bg-gray-500/15 text-gray-400 border border-gray-500/30'
               }`}>
                 {timeElapsed.paceLabel}
               </div>
@@ -129,14 +129,11 @@ export default function CentreVisuals({ visuals }: CentreVisualsProps): React.Re
       {/* Row 2: Last 7 Days Activity Bars */}
       <div className="dash-visuals-row dash-visuals-row-bottom">
         <div className="dash-panel dash-visuals-panel dash-activity-panel">
-          <div className="dash-visuals-panel-title text-xs font-semibold uppercase tracking-wider text-muted-dark mb-3">Last 7 Days Activity</div>
+          <div className="dash-visuals-panel-title text-xs font-semibold text-muted-dark mb-3">Last 7 days</div>
           <div className="dash-activity-bars flex items-end gap-2 px-1" style={{ height: "70px" }} role="img" aria-label="Messages per day for the last 7 days">
             {sevenDayBars.map((bar, i) => {
               const barHeight = `${Math.round((bar.count / Math.max(maxBarCount, 1)) * 34) + 3}px`
-              const barColor = bar.isToday ? 'var(--success)' : 'var(--accent)'
-              const gradient = bar.isToday
-                ? 'linear-gradient(180deg, var(--success), var(--success))'
-                : 'linear-gradient(180deg, var(--accent), var(--accent-dim))'
+              const barColor = bar.isToday ? 'var(--accent)' : 'var(--text-muted)'
               return (
                 <div
                   key={i}
@@ -144,8 +141,8 @@ export default function CentreVisuals({ visuals }: CentreVisualsProps): React.Re
                   style={{ '--bar-height': barHeight } as React.CSSProperties}
                   title={`${formatDateShort(bar.date)}: ${bar.count} messages`}
                 >
-                  <div className="dash-activity-bar-fill w-full rounded-t" style={{ height: barHeight, background: gradient } as React.CSSProperties} />
-                  <span className="dash-activity-bar-date text-xs text-muted-dark uppercase tracking-wider">
+                  <div className="dash-activity-bar-fill w-full rounded-t" style={{ height: barHeight, background: bar.isToday ? 'var(--accent)' : 'var(--text-faint)' } as React.CSSProperties} />
+                  <span className="dash-activity-bar-date text-xs text-muted-dark">
                     {bar.isToday ? 'T' : new Date(bar.date).toLocaleDateString(undefined, { weekday: 'narrow' })}
                   </span>
                   {bar.count > 0 && <span className="dash-activity-bar-count text-xs font-semibold" style={{ color: barColor } as React.CSSProperties}>{bar.count}</span>}

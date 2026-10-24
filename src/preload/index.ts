@@ -13,6 +13,10 @@ import type {
   WorkspaceThemePayload
 } from '../shared/types'
 import type {
+  DashboardAiModelsResult,
+  DashboardAiSettingsView,
+  DashboardChatPage,
+  DashboardSendMessageResult,
   DashboardSnapshot,
   DashboardSyncProgressPayload,
   InsightHistoryEntryContract,
@@ -195,7 +199,17 @@ const api: IpcApi = {
     setSidebarState: (projectId: string, state: ProjectSidebarState) =>
       ipcRenderer.invoke(IpcChannels.DashboardSidebarSet, { projectId, state }),
     updateSidebarState: (projectId: string, sidebar: 'left' | 'right', patch: Partial<SidebarState>) =>
-      ipcRenderer.invoke(IpcChannels.DashboardSidebarUpdate, { projectId, sidebar, patch }) as Promise<SidebarState>
+      ipcRenderer.invoke(IpcChannels.DashboardSidebarUpdate, { projectId, sidebar, patch }) as Promise<SidebarState>,
+    getMessages: (payload) =>
+      ipcRenderer.invoke(IpcChannels.DashboardGetMessages, payload) as Promise<DashboardChatPage>,
+    sendMessage: (payload) =>
+      ipcRenderer.invoke(IpcChannels.DashboardSendMessage, payload) as Promise<DashboardSendMessageResult>,
+    getAiSettings: (payload) =>
+      ipcRenderer.invoke(IpcChannels.DashboardGetAiSettings, payload) as Promise<DashboardAiSettingsView>,
+    saveAiSettings: (payload) =>
+      ipcRenderer.invoke(IpcChannels.DashboardSaveAiSettings, payload) as Promise<DashboardAiSettingsView>,
+    listAiModels: (payload) =>
+      ipcRenderer.invoke(IpcChannels.DashboardListAiModels, payload) as Promise<DashboardAiModelsResult>
   }
 }
 

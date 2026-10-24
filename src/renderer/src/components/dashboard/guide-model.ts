@@ -174,7 +174,7 @@ export function detailMeta(
     case 'activity':
       return {
         count: data.activity.messages24h > 0 ? 1 : 0,
-        summary: `24h ${data.activity.messages24h} · 7d ${data.activity.messages7d} · client ${formatTimeAgo(data.activity.lastClientMessage?.whenIso)}`
+        summary: `24h ${data.activity.messages24h}, 7d ${data.activity.messages7d}, client ${formatTimeAgo(data.activity.lastClientMessage?.whenIso)}`
       }
     case 'history':
       return {

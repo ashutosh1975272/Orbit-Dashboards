@@ -2,6 +2,7 @@
   "name": "slack-dashboard",
   "version": "1.0.0",
   "description": "Multi-profile Slack dashboard (Electron)",
+  "desktopName": "Orbit",
   "main": "./out/main/index.js",
   "author": "slack-dashboard",
   "homepage": "https://electron-vite.org",

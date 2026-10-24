@@ -48,6 +48,9 @@ mac:
   notarize: false
 linux:
   icon: icon.png
+  # Keep the .desktop entry name, WM_CLASS and package.json desktopName in sync
+  # so desktops associate the running window with the launcher.
+  syncDesktopName: true
   target:
     - AppImage
     - snap

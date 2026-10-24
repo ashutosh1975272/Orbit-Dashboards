@@ -1,9 +1,9 @@
 import type { AppId, WorkspaceThemePayload } from '../../../shared/types'
 
-const DARK_SIDEBAR = '#16131c'
-const LIGHT_SIDEBAR = '#efe8f7'
-const DEFAULT_ACCENT = '#a78bc9'
-const DEFAULT_ACCENT_DIM = '#8a73a8'
+const DARK_SIDEBAR = '#121419'
+const LIGHT_SIDEBAR = '#f0f2f5'
+const DEFAULT_ACCENT = '#a99bff'
+const DEFAULT_ACCENT_DIM = '#5b3ad6'
 
 type BrandTheme = {
   accent: string
@@ -62,7 +62,7 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
 
 function rgba(hex: string, alpha: number): string {
   const rgb = hexToRgb(hex)
-  if (!rgb) return `rgba(167, 139, 201, ${alpha})`
+  if (!rgb) return `rgba(169, 155, 255, ${alpha})`
   return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`
 }
 
@@ -157,14 +157,9 @@ function paintChrome(options: {
   const safeSidebar = isNearWhite(sidebar) ? neutral : sidebar
   const tint = mixToward(safeSidebar, neutral, dark ? 0.55 : 0.7)
   root.style.setProperty('--sidebar-tint', isNearWhite(tint) ? neutral : tint)
-  root.style.setProperty(
-    '--border',
-    rgba(isNearWhite(accent) ? DEFAULT_ACCENT_DIM : accent, dark ? 0.2 : 0.18)
-  )
-  root.style.setProperty(
-    '--border-soft',
-    rgba(isNearWhite(accent) ? DEFAULT_ACCENT_DIM : accent, dark ? 0.1 : 0.1)
-  )
+  // Borders stay neutral: accent marks action, selection and state only.
+  root.style.removeProperty('--border')
+  root.style.removeProperty('--border-soft')
 
   const safeAccent = isNearWhite(accent)
     ? appId === 'slack'
@@ -247,7 +242,7 @@ export function resetWorkspaceTheme(): void {
   root.style.setProperty('--accent-dim', DEFAULT_ACCENT_DIM)
   root.style.setProperty(
     '--accent-soft',
-    dark ? 'rgba(167, 139, 201, 0.18)' : 'rgba(107, 82, 137, 0.14)'
+    dark ? 'rgba(169, 155, 255, 0.18)' : 'rgba(95, 68, 216, 0.14)'
   )
   root.style.setProperty('--accent-on', '#ffffff')
   root.style.setProperty('--sidebar-tint', dark ? DARK_SIDEBAR : LIGHT_SIDEBAR)

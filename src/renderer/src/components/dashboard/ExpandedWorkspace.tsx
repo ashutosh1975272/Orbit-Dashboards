@@ -1,7 +1,8 @@
 import type React from 'react'
 import { useState } from 'react'
+import type { DashboardProject } from '../../../../shared/dashboard-contract'
 import type { CardSummary, CardView } from './card-view'
-import CardHead from './CardHead'
+import CardHead, { type CardHeadFlag } from './CardHead'
 import CentreVisuals from './CentreVisuals'
 import CentreContent from './CentreContent'
 import { DetailBody, GuideDetailBody } from './guide-content'
@@ -26,12 +27,14 @@ export type WorkspaceTab =
 interface ExpandedWorkspaceProps {
   view: CardView
   summary: CardSummary
+  project: DashboardProject
   syncing: boolean
   onSync: () => void
   onSettings: () => void
-  onEdit: () => void
   onRemove: () => void
   onToggle: () => void
+  /** Force a starting tab (the card-header gear opens Settings). */
+  initialTab?: WorkspaceTab
   /** Optional: open a data tab on mount (from a compact chip). */
   initialGuideSection?: number
   /** Optional: open a detail card inside Summary on mount. */
@@ -40,13 +43,42 @@ interface ExpandedWorkspaceProps {
 
 interface TabDef {
   id: WorkspaceTab
+  /** Short label used in the tab strip. */
   label: string
+  /** Full title used for the panel heading, when longer than the tab label. */
+  panel?: string
   /** Guide section body rendered full-width (data tabs only). */
   section?: 2 | 3 | 4 | 5 | 6 | 7
-  /** Count badge; zero renders dimmed. */
+  /** Count badge; zero is not rendered. */
   badge?: number
-  /** Settings tab: pinned right with distinct styling. */
+  /** Settings tab: icon button pinned to the right. */
   settings?: boolean
+}
+
+function GearGlyph(): React.JSX.Element {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1.11 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H9a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z" />
+    </svg>
+  )
+}
+
+const STATUS_FLAGS: Record<string, CardHeadFlag> = {
+  'on-track': { label: 'On track', tone: 'success' },
+  'at-risk': { label: 'At risk', tone: 'warn' },
+  blocked: { label: 'Blocked', tone: 'danger' },
+  'waiting-on-client': { label: 'Waiting on client', tone: 'warn' }
 }
 
 /** Map the old guide-section / compact-chip entry points onto the new tab set. */
@@ -71,7 +103,12 @@ function initialTabFor(initialGuideSection?: number, initialDetailKey?: DetailKe
 }
 
 /** Full-width panel shell shared by every non-Summary tab. */
-function tabPanel(title: string, body: React.ReactNode, badge?: number): React.ReactElement {
+function tabPanel(
+  title: string,
+  body: React.ReactNode,
+  badge?: number,
+  bodyClassName?: string
+): React.ReactElement {
   return (
     <section className="ws-tab-panel">
       <header className="ws-tab-panel-head">
@@ -80,7 +117,7 @@ function tabPanel(title: string, body: React.ReactNode, badge?: number): React.R
           <span className={`ws-tab-badge${badge === 0 ? ' is-zero' : ''}`}>{badge}</span>
         )}
       </header>
-      <div className="ws-tab-panel-body">{body}</div>
+      <div className={`ws-tab-panel-body${bodyClassName ? ` ${bodyClassName}` : ''}`}>{body}</div>
     </section>
   )
 }
@@ -88,18 +125,19 @@ function tabPanel(title: string, body: React.ReactNode, badge?: number): React.R
 export default function ExpandedWorkspace({
   view,
   summary,
+  project,
   syncing,
   onSync,
   onSettings,
-  onEdit,
   onRemove,
   onToggle,
+  initialTab,
   initialGuideSection,
   initialDetailKey
 }: ExpandedWorkspaceProps): React.ReactElement {
   const { identity, leftSidebar, centre, rightSidebar } = view
-  const [tab, setTab] = useState<WorkspaceTab>(() =>
-    initialTabFor(initialGuideSection, initialDetailKey)
+  const [tab, setTab] = useState<WorkspaceTab>(
+    () => initialTab ?? initialTabFor(initialGuideSection, initialDetailKey)
   )
   const [summaryDetail, setSummaryDetail] = useState<DetailKey | null>(initialDetailKey ?? null)
   const { leftCollapsed, rightCollapsed, toggleLeft, toggleRight } = useSidebarCollapse(
@@ -112,17 +150,19 @@ export default function ExpandedWorkspace({
     { id: 'ai-chat', label: identity.name },
     {
       id: 'requirements',
-      label: 'Project Requirements',
+      label: 'Requirements',
+      panel: 'Project Requirements',
       section: 2,
       badge: leftSidebar.requirements.length
     },
-    { id: 'scope', label: 'Scope & Deliverables', section: 3 },
+    { id: 'scope', label: 'Scope', panel: 'Scope & Deliverables', section: 3 },
     { id: 'decisions', label: 'Decisions', section: 4, badge: leftSidebar.decisions.length },
     { id: 'commitments', label: 'Commitments', section: 5, badge: leftSidebar.commitments.length },
-    { id: 'files', label: 'Files & Links', section: 6, badge: leftSidebar.files.length },
+    { id: 'files', label: 'Files', panel: 'Files & Links', section: 6, badge: leftSidebar.files.length },
     {
       id: 'people',
-      label: 'People & Channels',
+      label: 'People',
+      panel: 'People & Channels',
       section: 7,
       badge: leftSidebar.peopleChannels.people.length
     },
@@ -133,6 +173,16 @@ export default function ExpandedWorkspace({
     setTab(id)
     if (id !== 'summary') setSummaryDetail(null)
   }
+
+  const statusFlag: CardHeadFlag | null = summary.status
+    ? (STATUS_FLAGS[summary.status] ?? { label: summary.status, tone: 'muted' })
+    : null
+
+  const headFlags: CardHeadFlag[] = [
+    ...(statusFlag ? [statusFlag] : []),
+    ...(summary.needsReply ? [{ label: 'Needs my reply', tone: 'danger' as const }] : []),
+    ...(summary.inactive ? [{ label: 'Inactive 24h+', tone: 'muted' as const }] : [])
+  ]
 
   const detailTitle = summaryDetail
     ? (DETAIL_CARDS.find((c) => c.key === summaryDetail)?.title ?? 'Detail')
@@ -154,55 +204,17 @@ export default function ExpandedWorkspace({
       data-testid={`dash-card-${summary.index}`}
       data-expanded="true"
     >
-      <div className="ws-crumb">
-        <span>Workspaces</span>
-        <span className="ws-crumb-sep">›</span>
-        <span className="ws-crumb-current">{identity.name}</span>
-      </div>
-
-      <div className="ws-status-row" role="list" aria-label="Project status filters">
-        <span
-          className={`ws-status-pill ${summary.status === 'on-track' ? 'is-on' : ''}`}
-          role="listitem"
-        >
-          Active
-        </span>
-        <span
-          className={`ws-status-pill is-wait ${summary.status === 'waiting-on-client' ? 'is-on' : ''}`}
-          role="listitem"
-        >
-          Waiting on client
-        </span>
-        <span
-          className={`ws-status-pill is-reply ${summary.needsReply ? 'is-on' : ''}`}
-          role="listitem"
-        >
-          Needs my reply
-        </span>
-        <span
-          className={`ws-status-pill is-idle ${summary.inactive ? 'is-on' : ''}`}
-          role="listitem"
-        >
-          Inactive 24h+
-        </span>
-      </div>
-
       <CardHead
-        index={summary.index}
         name={identity.name}
         workspaceName={identity.teamName}
         clientName={identity.clientName}
-        status={centre.status}
-        needsReply={summary.needsReply}
-        inactive={summary.inactive}
         aiBadge={view.aiBadge}
+        flags={headFlags}
         syncing={syncing}
         onSync={onSync}
         onSettings={onSettings}
-        onEdit={onEdit}
         onRemove={onRemove}
         onToggle={onToggle}
-        expanded
       />
 
       <div className="ws-tabs" role="tablist" aria-label="Workspace views">
@@ -212,12 +224,14 @@ export default function ExpandedWorkspace({
             type="button"
             role="tab"
             aria-selected={tab === t.id}
+            aria-label={t.settings ? 'Settings' : undefined}
+            title={t.settings ? 'Settings' : undefined}
             className={`ws-tab${tab === t.id ? ' is-active' : ''}${t.settings ? ' is-settings' : ''}`}
             onClick={() => selectTab(t.id)}
           >
-            <span>{t.label}</span>
-            {t.badge !== undefined && (
-              <span className={`ws-tab-badge${t.badge === 0 ? ' is-zero' : ''}`}>{t.badge}</span>
+            {t.settings ? <GearGlyph /> : <span>{t.label}</span>}
+            {t.badge !== undefined && t.badge > 0 && (
+              <span className="ws-tab-badge">{t.badge}</span>
             )}
           </button>
         ))}
@@ -314,7 +328,11 @@ export default function ExpandedWorkspace({
                     >
                       <div className="ws-detail-card-top">
                         <span className="ws-detail-card-title">{card.title}</span>
-                        <span className={`ws-detail-badge tone-${card.tone}`}>{meta.count}</span>
+                        <span
+                          className={`ws-detail-badge tone-${card.tone}${meta.count === 0 ? ' is-zero' : ''}`}
+                        >
+                          {meta.count}
+                        </span>
                       </div>
                       <p className="ws-detail-card-summary">{meta.summary}</p>
                     </button>
@@ -327,17 +345,26 @@ export default function ExpandedWorkspace({
       ) : null}
 
       {tab === 'slack-chat'
-        ? tabPanel('Slack Chat', <SlackChatTab projectName={identity.name} />)
+        ? tabPanel(
+            'Slack Chat',
+            <SlackChatTab
+              projectId={summary.projectId}
+              channels={identity.channels.map((channel) => ({
+                channelId: channel.channelId,
+                channelName: channel.channelName
+              }))}
+            />,
+            undefined,
+            'is-chat'
+          )
         : null}
       {tab === 'ai-chat'
         ? tabPanel(identity.name, <AiChatTab projectName={identity.name} />)
         : null}
-      {tab === 'settings'
-        ? tabPanel('Settings', <ProjectSettingsTab projectName={identity.name} />)
-        : null}
+      {tab === 'settings' ? tabPanel('Settings', <ProjectSettingsTab project={project} />) : null}
       {activeSection
         ? tabPanel(
-            activeDataTab?.label ?? '',
+            activeDataTab?.panel ?? activeDataTab?.label ?? '',
             <GuideDetailBody data={leftSidebar} section={activeSection} />,
             activeDataTab?.badge
           )

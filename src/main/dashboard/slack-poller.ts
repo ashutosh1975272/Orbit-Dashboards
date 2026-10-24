@@ -40,6 +40,13 @@ interface UsersListResponse {
   }>
 }
 
+interface PostMessageResponse {
+  ok: boolean
+  error?: string
+  ts?: string
+  channel?: string
+}
+
 async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
@@ -117,6 +124,23 @@ export class SlackPoller {
       messages,
       hasMore: Boolean(res.response_metadata?.next_cursor)
     }
+  }
+
+  /** Post a reply as the token owner (needs the chat:write scope). */
+  async postMessage(input: {
+    token: string
+    channelId: string
+    text: string
+  }): Promise<{ ts: string; channelId: string }> {
+    if (this.baseUrl.startsWith('http://_FAKE')) {
+      return { ts: `${Date.now()}.000000`, channelId: input.channelId }
+    }
+    const res = await callApi<PostMessageResponse>('chat.postMessage', input.token, {
+      channel: input.channelId,
+      text: input.text
+    })
+    if (!res.ts) throw new Error('slack chat.postMessage: missing ts')
+    return { ts: res.ts, channelId: res.channel ?? input.channelId }
   }
 
   async authTest(token: string): Promise<{

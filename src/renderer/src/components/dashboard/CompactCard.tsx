@@ -1,205 +1,212 @@
 import type React from 'react'
-import CardHead from './CardHead'
+import { useEffect, useRef, useState } from 'react'
 import type { CardSummary } from './card-view'
 
 interface CompactCardProps {
   summary: CardSummary
-  expanded: boolean
   onToggle: () => void
   onExpandSection?: (section: number) => void
   onSync: (id: string) => void
-  onEdit: () => void
   onSettings: () => void
+  onRemove: () => void
   syncing: boolean
 }
 
-const PACE_COLOR: Record<string, string> = {
-  behind: 'var(--danger)',
-  ahead: 'var(--accent)',
-  'on-pace': 'var(--success)'
+const STATUS_LABEL: Record<string, string> = {
+  'on-track': 'On track',
+  'at-risk': 'At risk',
+  blocked: 'Blocked',
+  'waiting-on-client': 'Waiting on client'
 }
 
-function chip(label: string, onClick: () => void): React.ReactElement {
+function fmtAge(iso: string | null): string {
+  if (!iso) return '—'
+  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60_000))
+  if (mins < 1) return 'now'
+  if (mins < 60) return `${mins}m`
+  const hours = Math.round(mins / 60)
+  if (hours < 24) return `${hours}h`
+  return `${Math.round(hours / 24)}d`
+}
+
+function MoreGlyph(): React.JSX.Element {
   return (
-    <button
-      type="button"
-      style={{
-        height: '36px',
-        padding: '0 12px',
-        borderRadius: '999px',
-        border: '1px solid var(--border-btn)',
-        background: 'var(--bg-panel)',
-        color: 'var(--text-soft)',
-        fontSize: '12px',
-        fontWeight: 600,
-        cursor: 'pointer',
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '6px'
-      }}
-      onClick={(e) => { e.stopPropagation(); onClick() }}
-    >
-      {label}
-    </button>
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <circle cx="5" cy="12" r="1.7" />
+      <circle cx="12" cy="12" r="1.7" />
+      <circle cx="19" cy="12" r="1.7" />
+    </svg>
   )
 }
 
+/** One dense project row. Everything that needs a decision is on the line;
+ *  the full workspace opens in place when the row is activated. */
 export default function CompactCard({
   summary,
-  expanded,
   onToggle,
   onExpandSection,
   onSync,
-  onEdit,
   onSettings,
+  onRemove,
   syncing
 }: CompactCardProps): React.ReactElement {
   const {
-    projectId, index, name, workspaceName, clientName, status, needsReply, inactive,
-    situationLine, justChanged, nextStep, progress, dates, daysUsed, daysTotal, pace, paceLabel,
-    week, lastClientAt, myLastReplyAt, counts
+    projectId, index, name, workspaceName, clientName, status, needsReply,
+    situationLine, progress, paceLabel, lastClientAt, counts
   } = summary
 
-  const maxBar = Math.max(...week.map((b) => b.count), 1)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
 
-  const fmtAge = (iso: string | null): string => {
-    if (!iso) return '—'
-    const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60_000))
-    if (mins < 1) return 'just now'
-    if (mins < 60) return `${mins}m ago`
-    const hours = Math.round(mins / 60)
-    if (hours < 24) return `${hours}h ago`
-    return `${Math.round(hours / 24)}d ago`
+  useEffect(() => {
+    if (!menuOpen) return
+    const close = (event: MouseEvent): void => {
+      if (menuRef.current?.contains(event.target as Node)) return
+      setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [menuOpen])
+
+  const openSection = (section: number): void => {
+    if (onExpandSection) onExpandSection(section)
+    else onToggle()
   }
+
+  const statusLabel = status ? STATUS_LABEL[status] ?? status : null
+  const age = lastClientAt ? fmtAge(lastClientAt) : null
+  const ageLabel = age ? (age === 'now' ? 'now' : `${age} ago`) : '—'
+  const activityTitle = age
+    ? `Last client message ${age} ago`
+    : 'No client messages yet'
 
   return (
     <article
-      style={{
-        background: 'var(--bg-card)',
-        border: '1px solid var(--border-card)',
-        borderRadius: '16px',
-        padding: '16px 20px',
-        width: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '14px',
-        overflow: 'hidden'
-      }}
+      className={`proj-row${status ? ` is-${status}` : ''}`}
       id={`dash-card-anchor-${projectId}`}
       data-testid={`dash-card-${index}`}
     >
-      <CardHead
-        index={index}
-        name={name}
-        workspaceName={workspaceName}
-        clientName={clientName}
-        status={status}
-        needsReply={needsReply}
-        inactive={inactive}
-        syncing={syncing}
-        onSync={() => void onSync(projectId)}
-        onEdit={onEdit}
-        onSettings={onSettings}
-        onToggle={onToggle}
-        expanded={expanded}
-      />
+      <span className="proj-row-bar" aria-hidden />
 
-      {/* ROW 1: three zones */}
-      <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', width: '100%' }}>
-        {/* Zone A: situation + just changed + next step */}
-        <div style={{ flex: 3, minWidth: '420px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <p style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text)', lineHeight: 1.5, margin: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} data-testid="dash-situation">
-            {situationLine || 'No summary yet'}
-          </p>
-          {justChanged && (
-            <p style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent)', margin: 0, whiteSpace: 'nowrap' }} data-testid="dash-just-changed">
-              Just changed: {justChanged}
-            </p>
-          )}
-          {nextStep && (
-            <div style={{ padding: '10px 14px', borderRadius: '10px', background: 'var(--accent)', color: 'var(--on-accent)', fontSize: '15px', fontWeight: 600, lineHeight: 1.4, display: 'inline-flex', alignItems: 'center', gap: '8px' }} data-testid="dash-next-step">
-              <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', opacity: 0.8 }}>NEXT STEP</span>
-              {nextStep}
-            </div>
-          )}
-        </div>
+      <div className="proj-row-body">
+        <button
+          type="button"
+          className="proj-row-main"
+          onClick={onToggle}
+          aria-expanded={false}
+          aria-label={`Open ${name}`}
+        >
+          <span className="proj-row-head">
+            <span className="proj-row-name">{name}</span>
+            <span className="proj-row-ws">{workspaceName}</span>
+            {clientName && clientName !== workspaceName ? (
+              <span className="proj-row-client">{clientName}</span>
+            ) : null}
+            {statusLabel ? (
+              <span className="proj-row-status">{statusLabel}</span>
+            ) : null}
+          </span>
+          <span className="proj-row-line">{situationLine || 'No summary yet'}</span>
+        </button>
 
-        {/* Zone B: progress + time + pace */}
-        <div style={{ flex: 2, minWidth: '300px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-panel)', borderRadius: '10px', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8px' }}>
-              <span style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)' }}>{progress}%</span>
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{daysUsed != null && daysTotal != null ? `${daysUsed} of ${daysTotal} days` : '—'}</span>
-            </div>
-            <div style={{ height: '10px', width: '100%', background: 'var(--bg-track)', borderRadius: '5px', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${Math.min(100, progress)}%`, background: 'var(--accent)', borderRadius: '5px' }} />
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{dates.startDate && dates.endDate ? `${fmtAge(dates.startDate)} → ${fmtAge(dates.endDate)}` : 'Dates not stated'}</span>
-              <span style={{ fontSize: '12px', fontWeight: 600, color: PACE_COLOR[pace] ?? 'var(--text-muted)' }}>{paceLabel}</span>
-            </div>
+        {counts.questions + counts.blockers + counts.risks > 0 ? (
+          <div className="proj-row-chips">
+            {counts.questions > 0 ? (
+              <button type="button" className="proj-chip" onClick={() => openSection(101)}>
+                {counts.questions} {counts.questions === 1 ? 'question' : 'questions'}
+              </button>
+            ) : null}
+            {counts.blockers > 0 ? (
+              <button type="button" className="proj-chip is-danger" onClick={() => openSection(102)}>
+                {counts.blockers} {counts.blockers === 1 ? 'blocker' : 'blockers'}
+              </button>
+            ) : null}
+            {counts.risks > 0 ? (
+              <button type="button" className="proj-chip is-warn" onClick={() => openSection(103)}>
+                {counts.risks} {counts.risks === 1 ? 'risk' : 'risks'}
+              </button>
+            ) : null}
           </div>
-        </div>
-
-        {/* Zone C: last 7 days + last messages */}
-        <div style={{ flex: 1.2, minWidth: '200px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-panel)', borderRadius: '10px', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-label)' }}>LAST 7 DAYS</span>
-            <div style={{ display: 'flex', alignItems: 'end', gap: '5px', height: '36px' }}>
-              {week.map((bar) => (
-                <div
-                  key={bar.date}
-                  style={{ display: 'flex', flexDirection: 'column-reverse', alignItems: 'center', gap: '2px', flex: 1 }}
-                  title={`${bar.date}: ${bar.count} messages`}
-                >
-                  <div style={{ width: '100%', borderRadius: '2px 2px 0 0', height: `${Math.round((bar.count / Math.max(maxBar, 1)) * 34) + 3}px`, background: bar.isToday ? 'var(--success)' : 'var(--accent)' }} />
-                  <span style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{bar.isToday ? 'T' : new Date(bar.date).toLocaleDateString(undefined, { weekday: 'narrow' })}</span>
-                </div>
-              ))}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Client {fmtAge(lastClientAt)}</span>
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Me {fmtAge(myLastReplyAt)}</span>
-            </div>
-          </div>
-        </div>
+        ) : null}
       </div>
 
-      {/* ROW 2: count chips */}
-      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-        {counts.questions > 0 && chip(`${counts.questions} open question${counts.questions === 1 ? '' : 's'}`, () => { onToggle(); onExpandSection?.(101) })}
-        {counts.blockers > 0 && chip(`${counts.blockers} blocker${counts.blockers === 1 ? '' : 's'}`, () => { onToggle(); onExpandSection?.(102) })}
-        {counts.risks > 0 && chip(`${counts.risks} risk${counts.risks === 1 ? '' : 's'}`, () => { onToggle(); onExpandSection?.(103) })}
-        {counts.files > 0 && chip(`${counts.files} file${counts.files === 1 ? '' : 's'}`, () => { onToggle(); onExpandSection?.(6) })}
-        {counts.requirements > 0 && chip(`${counts.requirements} requirement${counts.requirements === 1 ? '' : 's'}`, () => { onToggle(); onExpandSection?.(2) })}
+      <div className="proj-row-side">
+        {needsReply ? <span className="proj-flag">Needs reply</span> : null}
+        <span className="proj-meter" title={`${progress}% complete. ${paceLabel}`}>
+          <span className="proj-meter-bar">
+            <span style={{ width: `${Math.min(100, Math.max(0, progress))}%` }} />
+          </span>
+          <span className="proj-meter-num">{progress}%</span>
+        </span>
+        <span className="proj-age" title={activityTitle}>
+          {ageLabel}
+        </span>
       </div>
 
-      {/* Minimise / Expand toggle */}
-      <button
-        type="button"
-        style={{
-          padding: '8px 14px',
-          borderRadius: '10px',
-          background: 'transparent',
-          border: '1px solid var(--accent)',
-          color: 'var(--accent)',
-          fontSize: '13px',
-          fontWeight: 600,
-          minHeight: '44px',
-          cursor: 'pointer',
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '6px'
-        }}
-        onClick={onToggle}
-        aria-expanded={expanded}
-        aria-label={`${expanded ? 'Minimise' : 'Expand'} ${name}`}
-      >
-        {expanded ? 'Minimise' : 'Expand'}
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
-          <path d="M6 9l6 6 6-6" />
-        </svg>
-      </button>
+      <div className="proj-actions">
+        <div className="dash-menu-wrap" ref={menuRef}>
+          <button
+            type="button"
+            className="proj-more"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            aria-label={`Actions for ${name}`}
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            <MoreGlyph />
+          </button>
+          {menuOpen ? (
+            <div
+              className="dash-menu"
+              role="menu"
+              aria-label={`Actions for ${name}`}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') setMenuOpen(false)
+              }}
+            >
+              <button
+                type="button"
+                role="menuitem"
+                disabled={syncing}
+                onClick={() => {
+                  onSync(projectId)
+                  setMenuOpen(false)
+                }}
+              >
+                {syncing ? 'Syncing…' : 'Sync now'}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  onSettings()
+                  setMenuOpen(false)
+                }}
+              >
+                Project settings
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="is-danger"
+                onClick={() => {
+                  onRemove()
+                  setMenuOpen(false)
+                }}
+              >
+                Delete project
+              </button>
+            </div>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          className="proj-chevron"
+          onClick={onToggle}
+          aria-label={`Open ${name}`}
+          tabIndex={-1}
+        />
+      </div>
     </article>
   )
 }

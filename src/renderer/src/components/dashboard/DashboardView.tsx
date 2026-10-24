@@ -1,15 +1,34 @@
 import type React from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useDashboardStore } from '../../hooks/useDashboard'
 import ProjectCard from './ProjectCard'
 import DashboardWizard from './DashboardWizard'
-import RecentStrip from './RecentStrip'
+import AiSettingsPanel from './AiSettingsPanel'
 import ErrorBoundary from './ErrorBoundary'
 
+function fmtAge(iso: string | null): string {
+  if (!iso) return 'never'
+  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60_000))
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.round(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.round(hours / 24)}d ago`
+}
+
+function MoreGlyph(): React.JSX.Element {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <circle cx="5" cy="12" r="1.6" />
+      <circle cx="12" cy="12" r="1.6" />
+      <circle cx="19" cy="12" r="1.6" />
+    </svg>
+  )
+}
+
 /**
- * Dashboard page (v2.4): header → top digest → "Recent" strip (mini cards,
- * most important first) → stacked FULL-WIDTH project cards (one workspace
- * per card) with three-column detail view.
+ * Dashboard page (v2.8): one header, one focus line, then a dense list of
+ * project rows. A row expands in place into the full workspace.
  */
 export default function DashboardView(): React.ReactElement | null {
   const snapshot = useDashboardStore((s) => s.snapshot)
@@ -21,8 +40,6 @@ export default function DashboardView(): React.ReactElement | null {
   const progress = useDashboardStore((s) => s.progress)
   const wizardOpenFor = useDashboardStore((s) => s.wizardOpenFor)
   const openWizard = useDashboardStore((s) => s.openWizard)
-  const recent = useDashboardStore((s) => s.recent)
-  const loadRecent = useDashboardStore((s) => s.loadRecent)
   const [renderError, setRenderError] = useState<Error | null>(null)
   const [viewMode, setViewMode] = useState<'compact' | 'expanded' | 'mixed'>('mixed')
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
@@ -30,25 +47,39 @@ export default function DashboardView(): React.ReactElement | null {
   const [focusDetailKey, setFocusDetailKey] = useState<
     Record<string, 'needs-reply' | 'blockers' | 'risks'>
   >({})
+  const [settingsTarget, setSettingsTarget] = useState<{
+    projectId: string
+    nonce: number
+  } | null>(null)
+  const [aiSettingsOpen, setAiSettingsOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const [accordionMode] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     void loadSnapshot()
-    void loadRecent()
     const timer = window.setInterval(() => {
       void loadSnapshot().catch(() => {})
-      void loadRecent().catch(() => {})
     }, 60_000)
     return () => window.clearInterval(timer)
-  }, [loadSnapshot, loadRecent])
+  }, [loadSnapshot])
 
   useEffect(() => {
-    // Sync view mode with localStorage on load
     try {
       const saved = localStorage.getItem('orbit.view') as 'compact' | 'expanded' | 'mixed' | null
       if (saved) setViewMode(saved)
     } catch {}
   }, [])
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const close = (event: MouseEvent): void => {
+      if (menuRef.current?.contains(event.target as Node)) return
+      setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [menuOpen])
 
   const focusProject = (projectId: string): void => {
     const el = document.getElementById(`dash-card-anchor-${projectId}`)
@@ -56,6 +87,30 @@ export default function DashboardView(): React.ReactElement | null {
     el.scrollIntoView({ behavior: 'smooth', block: 'center' })
     el.classList.add('is-flash')
     window.setTimeout(() => el.classList.remove('is-flash'), 1400)
+  }
+
+  /** Drop any chip-driven tab focus so the gear can win. */
+  const clearCardFocus = (projectId: string): void => {
+    setFocusGuideSection((prev) => {
+      if (!(projectId in prev)) return prev
+      const next = { ...prev }
+      delete next[projectId]
+      return next
+    })
+    setFocusDetailKey((prev) => {
+      if (!(projectId in prev)) return prev
+      const next = { ...prev }
+      delete next[projectId]
+      return next
+    })
+  }
+
+  /** Card-header gear → expand the card and land on its Settings tab. */
+  const openProjectSettings = (projectId: string): void => {
+    clearCardFocus(projectId)
+    setExpandedIds((prev) => new Set(prev).add(projectId))
+    setSettingsTarget((prev) => ({ projectId, nonce: (prev?.nonce ?? 0) + 1 }))
+    window.setTimeout(() => focusProject(projectId), 140)
   }
 
   // Render error boundary fallback
@@ -119,6 +174,11 @@ export default function DashboardView(): React.ReactElement | null {
   }
 
   const digest = snapshot?.digest ?? null
+  const projects = snapshot?.projects ?? []
+  const lastSync = projects.reduce<string | null>(
+    (acc, p) => (p.lastUpdatedAt && (!acc || p.lastUpdatedAt > acc) ? p.lastUpdatedAt : acc),
+    null
+  )
 
   const handleViewChange = (mode: 'compact' | 'expanded' | 'mixed') => {
     setViewMode(mode)
@@ -128,179 +188,220 @@ export default function DashboardView(): React.ReactElement | null {
       setExpandedIds(new Set((snapshot?.projects ?? []).map((p) => p.project.id)))
   }
 
+  const collapseAll = (): void => {
+    setExpandedIds(new Set())
+    setMenuOpen(false)
+  }
+
+  const expandAll = (): void => {
+    setExpandedIds(new Set(projects.map((p) => p.project.id)))
+    setMenuOpen(false)
+  }
+
   return (
     <ErrorBoundary label="dashboard-view">
-      <section
-        className="dash-view flex flex-col h-full w-full bg-background-dark text-text-dark p-6 overflow-y-auto"
-        data-testid="dashboard-view"
-      >
-          <header className="page-head">
-            <h1>Client projects — Slack</h1>
-            <div className="actions">
-              <span className="auto-sync">
-                <i className="dot" aria-hidden="true"></i>
-                auto-sync every {snapshot?.syncIntervalSeconds ?? 300}s
-                {progress?.syncing ? ` · syncing ${progress.current}/${progress.total}` : ''}
+      <section className="dash-view" data-testid="dashboard-view">
+        <header className="dash-head">
+          <div className="dash-head-copy">
+            <h1>Client projects</h1>
+            <p className="dash-head-sub">
+              <span>{projects.length === 1 ? '1 project' : `${projects.length} projects`}</span>
+              <span>
+                {progress?.syncing
+                  ? `Syncing ${progress.current}/${progress.total}`
+                  : `Synced ${fmtAge(lastSync)}`}
               </span>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => void syncNow()}
-              >
-                ⟳ Sync all
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => openWizard()}
-              >
-                + Set up new project
-              </button>
+              <span>Every {Math.round((snapshot?.syncIntervalSeconds ?? 300) / 60)} min</span>
+            </p>
+          </div>
+
+          <div className="dash-head-actions">
+            <div className="segmented" role="group" aria-label="View mode">
+              {(['compact', 'expanded', 'mixed'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  data-mode={mode}
+                  aria-pressed={viewMode === mode}
+                  onClick={() => handleViewChange(mode)}
+                >
+                  {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                </button>
+              ))}
             </div>
-          </header>
 
-          {digest ? (
-            <section className="digest" data-testid="dash-digest">
-              <span className="label">DIGEST</span>
-              <span>{digest.topPriority}</span>
-            </section>
-          ) : null}
-
-          <RecentStrip items={recent} onSelect={focusProject} />
-
-          {/* WORKSPACES heading row */}
-          <div className="section-head">
-            <h2>
-              Workspaces
-              <span className="count">{snapshot?.projects?.length ?? 0}</span>
-            </h2>
-            <div className="toolbar">
-              <div className="btn-row">
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => setExpandedIds(new Set())}
+            <div className="dash-menu-wrap" ref={menuRef}>
+              <button
+                type="button"
+                className="btn btn-icon"
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+                aria-label="Dashboard actions"
+                onClick={() => setMenuOpen((open) => !open)}
+              >
+                <MoreGlyph />
+              </button>
+              {menuOpen ? (
+                <div
+                  className="dash-menu"
+                  role="menu"
+                  aria-label="Dashboard actions"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') setMenuOpen(false)
+                  }}
                 >
-                  Collapse all
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() =>
-                    setExpandedIds(new Set((snapshot?.projects ?? []).map((p) => p.project.id)))
-                  }
-                >
-                  Expand all
-                </button>
-              </div>
-              <div className="segmented" role="group" aria-label="View mode">
-                {(['compact', 'expanded', 'mixed'] as const).map((mode) => (
                   <button
-                    key={mode}
                     type="button"
-                    data-mode={mode}
-                    aria-pressed={viewMode === mode}
-                    onClick={() => handleViewChange(mode)}
+                    role="menuitem"
+                    onClick={() => {
+                      setAiSettingsOpen(true)
+                      setMenuOpen(false)
+                    }}
                   >
-                    {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                    AI settings
                   </button>
-                ))}
-              </div>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      void syncNow()
+                      setMenuOpen(false)
+                    }}
+                  >
+                    Sync all now
+                  </button>
+                  <span className="dash-menu-sep" aria-hidden />
+                  <button type="button" role="menuitem" onClick={collapseAll}>
+                    Collapse all
+                  </button>
+                  <button type="button" role="menuitem" onClick={expandAll}>
+                    Expand all
+                  </button>
+                </div>
+              ) : null}
             </div>
-          </div>
 
-          <div className="dash-grid dash-grid-workspace w-full space-y-6" data-testid="dash-grid">
-            {(snapshot?.projects ?? []).map((projectSnapshot, index) => {
-              const isExpanded =
-                viewMode === 'expanded' ||
-                (viewMode === 'mixed' && expandedIds.has(projectSnapshot.project.id))
-              return (
-                <ErrorBoundary key={projectSnapshot.project.id} label={`card-${index}`}>
-                  <ProjectCard
-                    snapshot={projectSnapshot}
-                    index={index}
-                    expanded={isExpanded}
-                    initialGuideSection={focusGuideSection[projectSnapshot.project.id]}
-                    initialDetailKey={focusDetailKey[projectSnapshot.project.id]}
-                    onToggle={() => {
-                      setExpandedIds((prev) => {
-                        const next = new Set(prev)
-                        if (next.has(projectSnapshot.project.id))
-                          next.delete(projectSnapshot.project.id)
-                        else {
-                          if (accordionMode) next.clear()
-                          next.add(projectSnapshot.project.id)
-                        }
-                        return next
-                      })
-                      const el = document.getElementById(
-                        `dash-card-anchor-${projectSnapshot.project.id}`
-                      )
-                      if (el) {
-                        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                        el.classList.add('is-flash')
-                        setTimeout(() => el.classList.remove('is-flash'), 1400)
-                      }
-                    }}
-                    onDelete={(id) => void deleteProject(id)}
-                    onExpandSection={(section) => {
-                      const id = projectSnapshot.project.id
-                      if (section === 101) {
-                        setFocusDetailKey((prev) => ({ ...prev, [id]: 'needs-reply' }))
-                        setFocusGuideSection((prev) => {
-                          const next = { ...prev }
-                          delete next[id]
-                          return next
-                        })
-                      } else if (section === 102) {
-                        setFocusDetailKey((prev) => ({ ...prev, [id]: 'blockers' }))
-                        setFocusGuideSection((prev) => {
-                          const next = { ...prev }
-                          delete next[id]
-                          return next
-                        })
-                      } else if (section === 103) {
-                        setFocusDetailKey((prev) => ({ ...prev, [id]: 'risks' }))
-                        setFocusGuideSection((prev) => {
-                          const next = { ...prev }
-                          delete next[id]
-                          return next
-                        })
-                      } else {
-                        setFocusGuideSection((prev) => ({ ...prev, [id]: section }))
-                        setFocusDetailKey((prev) => {
-                          const next = { ...prev }
-                          delete next[id]
-                          return next
-                        })
-                      }
-                      setExpandedIds((prev) => {
-                        const next = new Set(prev)
+            <button type="button" className="btn btn-primary" onClick={() => openWizard()}>
+              New project
+            </button>
+          </div>
+        </header>
+
+        {digest ? (
+          <p className="dash-focus" data-testid="dash-digest">
+            <span className="dash-focus-label">Across workspaces</span>
+            <span>{digest.topPriority}</span>
+          </p>
+        ) : null}
+
+        <div className="dash-list" data-testid="dash-grid">
+          {projects.map((projectSnapshot, index) => {
+            const isExpanded =
+              viewMode === 'expanded' ||
+              (viewMode === 'mixed' && expandedIds.has(projectSnapshot.project.id))
+            return (
+              <ErrorBoundary key={projectSnapshot.project.id} label={`card-${index}`}>
+                <ProjectCard
+                  snapshot={projectSnapshot}
+                  index={index}
+                  expanded={isExpanded}
+                  initialTab={
+                    settingsTarget?.projectId === projectSnapshot.project.id
+                      ? 'settings'
+                      : undefined
+                  }
+                  tabNonce={
+                    settingsTarget?.projectId === projectSnapshot.project.id
+                      ? settingsTarget.nonce
+                      : 0
+                  }
+                  initialGuideSection={focusGuideSection[projectSnapshot.project.id]}
+                  initialDetailKey={focusDetailKey[projectSnapshot.project.id]}
+                  onOpenSettings={openProjectSettings}
+                  onToggle={() => {
+                    const id = projectSnapshot.project.id
+                    const willCollapse = expandedIds.has(id)
+                    setExpandedIds((prev) => {
+                      const next = new Set(prev)
+                      if (next.has(id)) next.delete(id)
+                      else {
+                        if (accordionMode) next.clear()
                         next.add(id)
+                      }
+                      return next
+                    })
+                    if (willCollapse) {
+                      setSettingsTarget((prev) => (prev?.projectId === id ? null : prev))
+                    }
+                    const el = document.getElementById(`dash-card-anchor-${id}`)
+                    if (el) {
+                      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                      el.classList.add('is-flash')
+                      setTimeout(() => el.classList.remove('is-flash'), 1400)
+                    }
+                  }}
+                  onDelete={(id) => void deleteProject(id)}
+                  onExpandSection={(section) => {
+                    const id = projectSnapshot.project.id
+                    setSettingsTarget((prev) => (prev?.projectId === id ? null : prev))
+                    if (section === 101) {
+                      setFocusDetailKey((prev) => ({ ...prev, [id]: 'needs-reply' }))
+                      setFocusGuideSection((prev) => {
+                        const next = { ...prev }
+                        delete next[id]
                         return next
                       })
-                    }}
-                  />
-                </ErrorBoundary>
-              )
-            })}
-            {(snapshot?.projects ?? []).length === 0 && (
-              <div className="empty-state" data-testid="empty-state">
-                <div className="icon" aria-hidden="true">+</div>
-                <h3>No project cards yet</h3>
-                <p>
-                  Click <strong>Set up new project</strong>. A 5-step guide walks you through it:
-                  create the Slack app → get the token → channels → card → live sync.
-                </p>
-                <button type="button" className="btn btn-primary" onClick={() => openWizard()}>
-                  + Set up new project
-                </button>
-              </div>
-            )}
-          </div>
+                    } else if (section === 102) {
+                      setFocusDetailKey((prev) => ({ ...prev, [id]: 'blockers' }))
+                      setFocusGuideSection((prev) => {
+                        const next = { ...prev }
+                        delete next[id]
+                        return next
+                      })
+                    } else if (section === 103) {
+                      setFocusDetailKey((prev) => ({ ...prev, [id]: 'risks' }))
+                      setFocusGuideSection((prev) => {
+                        const next = { ...prev }
+                        delete next[id]
+                        return next
+                      })
+                    } else {
+                      setFocusGuideSection((prev) => ({ ...prev, [id]: section }))
+                      setFocusDetailKey((prev) => {
+                        const next = { ...prev }
+                        delete next[id]
+                        return next
+                      })
+                    }
+                    setExpandedIds((prev) => {
+                      const next = new Set(prev)
+                      next.add(id)
+                      return next
+                    })
+                  }}
+                />
+              </ErrorBoundary>
+            )
+          })}
 
-          {wizardOpenFor ? <DashboardWizard /> : null}
-        </section>
-      </ErrorBoundary>
-    )
-  }
+          {projects.length === 0 && (
+            <div className="empty-state" data-testid="empty-state">
+              <div className="icon" aria-hidden="true">+</div>
+              <h3>No project cards yet</h3>
+              <p>
+                Click <strong>New project</strong>. A guided setup walks you through it: create the
+                Slack app, get the token, pick channels, then sync.
+              </p>
+              <button type="button" className="btn btn-primary" onClick={() => openWizard()}>
+                New project
+              </button>
+            </div>
+          )}
+        </div>
+
+        {wizardOpenFor ? <DashboardWizard /> : null}
+        <AiSettingsPanel open={aiSettingsOpen} onClose={() => setAiSettingsOpen(false)} />
+      </section>
+    </ErrorBoundary>
+  )
+}

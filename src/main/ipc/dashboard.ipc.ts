@@ -1,7 +1,16 @@
 import { BrowserWindow } from 'electron'
 import { IpcChannels } from '../../shared/ipc-contract'
 import type {
+  DashboardAiModelsQueryPayload,
+  DashboardAiModelsResult,
+  DashboardAiSettingsQueryPayload,
+  DashboardAiSettingsSavePayload,
+  DashboardAiSettingsView,
   DashboardManualToken,
+  DashboardChatPage,
+  DashboardChatQueryPayload,
+  DashboardSendMessagePayload,
+  DashboardSendMessageResult,
   DashboardSnapshot,
   DashboardSyncProgressPayload,
   ManualTokenPayload,
@@ -12,9 +21,11 @@ import type {
   ProjectSidebarState,
   SidebarState
 } from '../../shared/dashboard-contract'
+import type { AiSettingsService } from '../dashboard/ai-settings'
 import type { DashboardSyncEngine } from '../dashboard/sync-engine'
 import type { DashboardScheduler } from '../dashboard/scheduler'
 import type { MonitorStore } from '../dashboard/monitor-store'
+import type { DashboardChatService } from '../dashboard/chat-service'
 import { SlackPoller } from '../dashboard/slack-poller'
 import { listChannels } from '../slack/slack-api-client'
 import type { SlackChannelSummary } from '../../shared/types'
@@ -36,6 +47,10 @@ export interface DashboardIpcDeps {
   getDigest?: () => Promise<DashboardSnapshot['digest']>
   /** v2.4 — sidebar state per project */
   sidebarStateStore?: DashboardSidebarStateStore
+  /** v2.6 — Slack Chat tab (local history + replies) */
+  chatService?: DashboardChatService
+  /** v2.7 — global + per-project AI provider settings */
+  aiSettings?: AiSettingsService
 }
 
 export interface DashboardIpcRegistration {
@@ -113,6 +128,7 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
 
   handleInvoke(IpcChannels.DashboardDeleteProject, async (payload: ProjectDeletePayload) => {
     await deps.monitorStore.deleteProject(payload.projectId)
+    await deps.aiSettings?.clearProject(payload.projectId)
     return broadcastSnapshot()
   })
 
@@ -226,6 +242,39 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
           return deps.sidebarStateStore!.updateRight(payload.projectId, payload.patch)
         }
       }
+    )
+  }
+
+  // v2.6 — Slack Chat tab: local message history + replies (chat.postMessage)
+  if (deps.chatService) {
+    handleInvoke(
+      IpcChannels.DashboardGetMessages,
+      async (payload: DashboardChatQueryPayload): Promise<DashboardChatPage> =>
+        deps.chatService!.loadMessages(payload)
+    )
+    handleInvoke(
+      IpcChannels.DashboardSendMessage,
+      async (payload: DashboardSendMessagePayload): Promise<DashboardSendMessageResult> =>
+        deps.chatService!.sendMessage(payload)
+    )
+  }
+
+  // v2.7 — AI provider settings (keys stay in main; public views are masked)
+  if (deps.aiSettings) {
+    handleInvoke(
+      IpcChannels.DashboardGetAiSettings,
+      async (payload?: DashboardAiSettingsQueryPayload): Promise<DashboardAiSettingsView> =>
+        deps.aiSettings!.publicView(payload?.projectId)
+    )
+    handleInvoke(
+      IpcChannels.DashboardSaveAiSettings,
+      async (payload: DashboardAiSettingsSavePayload): Promise<DashboardAiSettingsView> =>
+        deps.aiSettings!.save(payload)
+    )
+    handleInvoke(
+      IpcChannels.DashboardListAiModels,
+      async (payload?: DashboardAiModelsQueryPayload): Promise<DashboardAiModelsResult> =>
+        deps.aiSettings!.listModels(payload?.projectId)
     )
   }
 

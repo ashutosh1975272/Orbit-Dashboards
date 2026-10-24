@@ -362,3 +362,129 @@ export interface InsightHistoryEntryContract {
   /* v2.4 — sidebar state snapshot at this insight */
   sidebarState?: { left: SidebarState; right: SidebarState }
 }
+
+/* ===== v2.6 — Slack Chat tab (local history + replies) ===== */
+
+/** One message in the Slack Chat tab (local delta store, names resolved best-effort). */
+export interface DashboardChatMessage {
+  /** Slack ts — unique within a channel. Optimistic messages use `temp-…`. */
+  ts: string
+  channelId: string
+  channelName: string
+  /** Slack user id (empty when the message has no author, e.g. some bot posts). */
+  userId: string
+  /** Display name when resolvable; falls back to the user id (ADR-0007). */
+  userName: string
+  text: string
+  /** ISO timestamp derived from ts. */
+  atIso: string
+  /** true when the token owner wrote the message. */
+  isMine: boolean
+  /** optimistic message, not confirmed by Slack yet. */
+  pending?: boolean
+  /** optimistic message whose send failed. */
+  failed?: boolean
+}
+
+export interface DashboardChatPage {
+  messages: DashboardChatMessage[]
+  /** Pass as `beforeTs` to load the next (older) page; null when exhausted. */
+  nextBeforeTs: string | null
+  hasMore: boolean
+}
+
+export interface DashboardChatQueryPayload {
+  projectId: string
+  /** undefined = all watched channels. */
+  channelId?: string
+  /** Return messages strictly older than this Slack ts. */
+  beforeTs?: string
+  /** Page size (default 50, max 200). */
+  limit?: number
+}
+
+export interface DashboardSendMessagePayload {
+  projectId: string
+  channelId: string
+  text: string
+}
+
+export type DashboardSendErrorCode =
+  | 'missing_scope'
+  | 'not_connected'
+  | 'channel_not_found'
+  | 'invalid_text'
+  | 'slack_error'
+  | 'unknown'
+
+export interface DashboardSendMessageResult {
+  ok: boolean
+  message?: DashboardChatMessage
+  error?: string
+  code?: DashboardSendErrorCode
+  /** Scope Slack requires when code = 'missing_scope'. */
+  missingScope?: string
+}
+
+/* ===== v2.7 — AI provider settings (global + per project) ===== */
+
+export type AiProviderId = 'nvidia-nim'
+
+/** Never contains the raw key — only a mask such as "••••abcd". */
+export interface AiSettingsPublic {
+  provider: AiProviderId
+  /** Configured model, null when this scope does not override one. */
+  model: string | null
+  /** Masked stored key ("••••abcd"); null when none is stored here. */
+  apiKeyMask: string | null
+  hasKey: boolean
+}
+
+export interface ProjectAiSettingsPublic extends AiSettingsPublic {
+  /** true = ignore this project's overrides and use the dashboard settings. */
+  useGlobal: boolean
+}
+
+export type AiSettingsSource = 'project' | 'global' | 'env' | 'none'
+
+/** What the insight engine / project chat will actually use. */
+export interface EffectiveAiSettings {
+  provider: AiProviderId
+  model: string
+  modelSource: 'project' | 'global' | 'env'
+  keySource: AiSettingsSource
+  /** Masked key for the effective key, never the key itself. */
+  apiKeyMask: string | null
+}
+
+export interface DashboardAiSettingsView {
+  global: AiSettingsPublic
+  /** null when the view was requested without a project. */
+  project: ProjectAiSettingsPublic | null
+  effective: EffectiveAiSettings
+}
+
+export interface DashboardAiSettingsQueryPayload {
+  projectId?: string
+}
+
+export interface DashboardAiSettingsSavePayload {
+  /** Omitted = dashboard-level global settings. */
+  projectId?: string
+  useGlobal?: boolean
+  provider?: AiProviderId
+  /** null clears the override; undefined keeps the stored value. */
+  model?: string | null
+  /** null clears the key; undefined keeps it; a string replaces it. */
+  apiKey?: string | null
+}
+
+export interface DashboardAiModelsQueryPayload {
+  projectId?: string
+}
+
+export interface DashboardAiModelsResult {
+  models: string[]
+  source: AiSettingsSource
+  error?: string
+}

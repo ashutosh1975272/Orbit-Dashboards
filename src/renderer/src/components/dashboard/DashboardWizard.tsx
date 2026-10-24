@@ -21,7 +21,8 @@ const USER_SCOPES = [
   'im:history',
   'mpim:read',
   'mpim:history',
-  'emoji:read'
+  'emoji:read',
+  'chat:write'
 ]
 
 const OPTIONAL_SCOPES = new Set([
@@ -31,7 +32,8 @@ const OPTIONAL_SCOPES = new Set([
   'im:history',
   'mpim:read',
   'mpim:history',
-  'emoji:read'
+  'emoji:read',
+  'chat:write'
 ])
 
 const APPS_HOME = 'https://api.slack.com/apps'
@@ -41,14 +43,14 @@ function buildManifest(_clientId: string, redirectUri: string): string {
     {
       display_information: {
         name: 'Orbit Dashboard Connector',
-        description: 'Read-only feed for a client project dashboard',
+        description: 'Project feed and chat replies for the Orbit dashboard',
         background_color: '#1B1F3B'
       },
       oauth_config: {
         redirect_urls: redirectUri ? [redirectUri] : [],
         scopes: { user: USER_SCOPES }
       },
-    settings: {
+      settings: {
         org_deploy_enabled: false,
         socket_mode_enabled: false,
         is_hosted: false,
@@ -99,16 +101,33 @@ const STEPS = [
   'Finish'
 ] as const
 
-/** Channel list for a saved vault connector (module scope = stable for effects). */
-async function fetchChannels(key: string): Promise<Array<{ id: string; name: string }>> {
-  const found = await window.api.dashboard.listChannels({
-    tokenSource: 'manual',
-    manualTokenKey: key
-  })
+interface ChannelQuery {
+  tokenSource: 'oauth' | 'manual'
+  profileId?: string
+  teamId?: string
+  manualTokenKey?: string
+}
+
+/** Channel list for a connector (module scope = stable for effects). */
+async function fetchChannels(query: ChannelQuery): Promise<Array<{ id: string; name: string }>> {
+  const found = await window.api.dashboard.listChannels(query)
   return found.map((c) => ({ id: c.id, name: c.name }))
 }
 
-export default function DashboardWizard(): React.ReactElement {
+interface DashboardWizardProps {
+  /** Render inside the Settings tab instead of a modal overlay. */
+  inline?: boolean
+  /** Project to edit when rendered inline. */
+  projectId?: string
+  /** Called when an inline edit finishes. */
+  onDone?: () => void
+}
+
+export default function DashboardWizard({
+  inline = false,
+  projectId,
+  onDone
+}: DashboardWizardProps): React.ReactElement {
   const snapshot = useDashboardStore((s) => s.snapshot)
   const wizardOpenFor = useDashboardStore((s) => s.wizardOpenFor)
   const closeWizard = useDashboardStore((s) => s.closeWizard)
@@ -116,10 +135,16 @@ export default function DashboardWizard(): React.ReactElement {
   const upsertProject = useDashboardStore((s) => s.upsertProject)
   const syncNow = useDashboardStore((s) => s.syncNow)
 
+  const targetId = projectId ?? wizardOpenFor?.projectId ?? null
   const target = useMemo(() => {
-    if (!wizardOpenFor?.projectId || !snapshot) return null
-    return snapshot.projects.find((p) => p.project.id === wizardOpenFor.projectId) ?? null
-  }, [wizardOpenFor, snapshot])
+    if (!targetId || !snapshot) return null
+    return snapshot.projects.find((p) => p.project.id === targetId) ?? null
+  }, [targetId, snapshot])
+
+  const close = (): void => {
+    if (inline && onDone) onDone()
+    else closeWizard()
+  }
 
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(target ? 3 : 1)
 
@@ -180,15 +205,28 @@ export default function DashboardWizard(): React.ReactElement {
     return USER_SCOPES.filter((s) => OPTIONAL_SCOPES.has(s) && !granted.has(s))
   }, [result])
 
+  // Manual tokens are listed by vault key; OAuth projects use their profile + team.
+  const channelQuery = useMemo<ChannelQuery | null>(() => {
+    if (savedKey) return { tokenSource: 'manual', manualTokenKey: savedKey }
+    if (target?.project.tokenSource === 'oauth') {
+      return {
+        tokenSource: 'oauth',
+        profileId: target.project.profileId,
+        teamId: target.project.teamId
+      }
+    }
+    return null
+  }, [savedKey, target])
+
   async function loadChannelList(): Promise<void> {
     setLoadingChannels(true)
     setChannelError(null)
     try {
-      if (!savedKey) {
+      if (!channelQuery) {
         setChannels([])
         return
       }
-      setChannels(await fetchChannels(savedKey))
+      setChannels(await fetchChannels(channelQuery))
     } catch (err) {
       setChannels([])
       setChannelError(err instanceof Error ? err.message : 'channel fetch failed')
@@ -200,11 +238,11 @@ export default function DashboardWizard(): React.ReactElement {
   // Auto-load the channel list when the channels step opens (async only —
   // no synchronous state writes inside the effect body).
   useEffect(() => {
-    if (step !== 3 || !savedKey || channels.length > 0) return
+    if (step !== 3 || !channelQuery || channels.length > 0) return
     let alive = true
     void (async () => {
       try {
-        const found = await fetchChannels(savedKey)
+        const found = await fetchChannels(channelQuery)
         if (!alive) return
         setChannels(found)
         setChannelError(null)
@@ -217,7 +255,7 @@ export default function DashboardWizard(): React.ReactElement {
     return () => {
       alive = false
     }
-  }, [step, savedKey, channels.length])
+  }, [step, channelQuery, channels.length])
 
   async function connectToken(): Promise<void> {
     if (!vaultKey.trim() || !tokenValue.trim()) {
@@ -260,7 +298,9 @@ export default function DashboardWizard(): React.ReactElement {
   async function createCard(): Promise<void> {
     if (!projectName.trim() || selected.size === 0) return
     // v2.3 — hard rule: a card must be bound to exactly one workspace
-    if (!result?.teamId) {
+    const teamId = result?.teamId ?? target?.project.teamId
+    const teamName = result?.teamName ?? target?.project.teamName
+    if (!teamId) {
       setCreateError(
         'Workspace unknown — reconnect the connector so the card can be bound to one workspace.'
       )
@@ -280,13 +320,14 @@ export default function DashboardWizard(): React.ReactElement {
         id,
         name: projectName.trim(),
         clientName: clientName.trim() || projectName.trim(),
-        profileId: `manual:${savedKey}`,
-        teamId: result.teamId,
-        teamName: result.teamName,
-        selfUserId: result?.userId,
+        // editing an OAuth card must not silently convert it to a manual token
+        profileId: target?.project.profileId ?? `manual:${savedKey}`,
+        teamId,
+        teamName,
+        selfUserId: result?.userId ?? target?.project.selfUserId,
         appId: 'slack',
-        tokenSource: 'manual',
-        manualTokenKey: savedKey,
+        tokenSource: target?.project.tokenSource ?? 'manual',
+        manualTokenKey: savedKey || target?.project.manualTokenKey,
         monitors: monitors.length
           ? monitors
           : (target?.project.monitors ?? []).map((m) => ({
@@ -313,291 +354,307 @@ export default function DashboardWizard(): React.ReactElement {
     }
   }
 
-  return (
-    <div className="settings-backdrop wizard-backdash" onClick={closeWizard}>
-      <section
-        className="wizard-panel"
-        role="dialog"
-        aria-label="Set up new project"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <header className="wizard-header">
-          <div className="wizard-steps" aria-label="wizard progress">
-            {STEPS.map((label, i) => {
-              const n = (i + 1) as 1 | 2 | 3 | 4 | 5
-              return (
-                <span
-                  key={label}
-                  className={`wizard-dot${step === n ? ' is-active' : ''}${step > n ? ' is-done' : ''}`}
-                >
-                  {step > n ? '✓' : n}
-                </span>
-              )
-            })}
-            <span className="wizard-step-label">{STEPS[step - 1]}</span>
-          </div>
-          <button type="button" className="dash-icon-btn" onClick={closeWizard} title="Close">
+  const panel = (
+    <section
+      className={`wizard-panel${inline ? ' is-inline' : ''}`}
+      role={inline ? 'region' : 'dialog'}
+      aria-label={target ? 'Edit workspace and channels' : 'Set up new project'}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <header className="wizard-header">
+        <div className="wizard-steps" aria-label="wizard progress">
+          {STEPS.map((label, i) => {
+            const n = (i + 1) as 1 | 2 | 3 | 4 | 5
+            return (
+              <span
+                key={label}
+                className={`wizard-dot${step === n ? ' is-active' : ''}${step > n ? ' is-done' : ''}`}
+              >
+                {step > n ? '✓' : n}
+              </span>
+            )
+          })}
+          <span className="wizard-step-label">{STEPS[step - 1]}</span>
+        </div>
+        {!inline && (
+          <button type="button" className="dash-icon-btn" onClick={close} title="Close">
             ✕
           </button>
-        </header>
+        )}
+      </header>
 
-        {/* ===== STEP 1 — guided connect ===== */}
-        {step === 1 ? (
-          <div className="wizard-body">
-            <h3>Connect a workspace</h3>
-            <ol className="wizard-guide">
-              <li>
-                <p>
-                  <b>1. Create the Slack app</b> (one-time, ~1 min) — it is read-only and you own
-                  it. Open{' '}
-                  <a href={APPS_HOME} target="_blank" rel="noreferrer">
-                    api.slack.com/apps
-                  </a>{' '}
-                  and click <b>Create New App → From an app manifest</b>.
-                </p>
-              </li>
-              <li>
-                <p>
-                  <b>2. Paste this manifest JSON</b> in the manifest box (it already carries the 12
-                  read scopes and a correct redirect URL):
-                </p>
-                <pre className="wizard-code">{manifest}</pre>
-                <button type="button" className="dash-subtle" onClick={() => void copyManifest()}>
-                  {copied === 'manifest' ? '✓ Copied' : '⧉ Copy JSON'}
-                </button>
-              </li>
-              <li>
-                <p>
-                  <b>3. Install it to the workspace</b> — while in your app page open{' '}
-                  <b>Settings → Install App → Install to workspace</b> and press <b>Allow</b>.
-                </p>
-              </li>
-              <li>
-                <p>
-                  <b>4. Find &amp; copy the token</b> — still on the app page, open{' '}
-                  <b>Settings → OAuth &amp; Permissions</b>; under <b>User OAuth Tokens</b> you will
-                  see <code>xoxp-…</code>. Click copy (if no token exists yet, press{' '}
-                  <b>Install to workspace</b> first).
-                </p>
-              </li>
-            </ol>
-            <p className="settings-hint">
-              Tip: repeat step 3 once <b>per workspace</b> you want to read — each install gives a
-              token that only reads that workspace.
-            </p>
-            <div className="settings-actions">
-              <button type="button" className="dash-primary" onClick={() => setStep(2)}>
-                I have the token →
-              </button>
-            </div>
-          </div>
-        ) : null}
-
-        {step === 2 ? (
-          <div className="wizard-body">
-            <h3>Paste the token</h3>
-            {savedTokenMask && !replaceMode ? (
-              <>
-                <p className="wizard-saved-token">
-                  saved connector: <code>{savedKey}</code> · <code>{savedTokenMask}</code>
-                </p>
-                <div className="settings-actions">
-                  <button type="button" className="dash-subtle" onClick={() => setStep(3)}>
-                    Continue with it →
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  className="wizard-linklike"
-                  onClick={() => setReplaceMode(true)}
-                >
-                  Replace this token…
-                </button>
-              </>
-            ) : (
-              <>
-                <label className="settings-row">
-                  <p className="settings-hint">
-                    Project name — the key becomes <code>{vaultKey || 'DASH_TOKEN_<PROJECT>'}</code>{' '}
-                    automatically
-                  </p>
-                  <input
-                    value={projectName}
-                    onChange={(e) => setProjectName(e.target.value)}
-                    placeholder="e.g. Acme Website Redesign"
-                    autoFocus
-                  />
-                </label>
-                <label className="settings-row">
-                  <p className="settings-hint">
-                    The <code>xoxp-…</code> you copied from OAuth &amp; Permissions
-                  </p>
-                  <input
-                    type="password"
-                    value={tokenValue}
-                    onChange={(e) => setTokenValue(e.target.value)}
-                    placeholder="xoxp-…"
-                  />
-                </label>
-                {connectError ? <p className="wizard-error">{connectError}</p> : null}
-                {result?.valid && !savedTokenMask ? (
-                  <p className="settings-hint">
-                    ✅ verified: <b>{result.teamName}</b> as {result.userName ?? 'workspace user'}
-                    {missingScopes.length > 0
-                      ? ` · partial scopes (missing ${missingScopes.join(', ')})`
-                      : ''}
-                  </p>
-                ) : null}
-                <div className="settings-actions">
-                  <button type="button" className="dash-subtle" onClick={() => setStep(1)}>
-                    ← Setup guide
-                  </button>
-                  <button
-                    type="button"
-                    className="dash-primary"
-                    disabled={connecting || !vaultKey}
-                    onClick={() => void connectToken()}
-                  >
-                    {connecting ? 'Validating…' : 'Validate & Add'}
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        ) : null}
-
-        {/* ===== STEP 2 — channels ===== */}
-        {step === 3 ? (
-          <div className="wizard-body">
-            <h3>Choose channels</h3>
-            <p className="wizard-sub">
-              {loadingChannels
-                ? 'Loading channels via token…'
-                : `${channels.length} readable with ${savedKey} — tick what this card watches.`}
-            </p>
-            {result?.teamName ? (
-              <p className="settings-hint">
-                Workspace: <b>{result.teamName}</b> — one card watches exactly one workspace.
+      {/* ===== STEP 1 — guided connect ===== */}
+      {step === 1 ? (
+        <div className="wizard-body">
+          <h3>Connect a workspace</h3>
+          <ol className="wizard-guide">
+            <li>
+              <p>
+                <b>1. Create the Slack app</b> (one-time, ~1 min) — you own it, and it reads your
+                channels plus posts replies from the Slack Chat tab. Open{' '}
+                <a href={APPS_HOME} target="_blank" rel="noreferrer">
+                  api.slack.com/apps
+                </a>{' '}
+                and click <b>Create New App → From an app manifest</b>.
               </p>
-            ) : null}
-            {channelError ? (
-              <>
-                <p className="wizard-error">{channelError}</p>
+            </li>
+            <li>
+              <p>
+                <b>2. Paste this manifest JSON</b> in the manifest box (it already carries all{' '}
+                {USER_SCOPES.length} scopes, including chat:write for replies, and a correct
+                redirect URL):
+              </p>
+              <pre className="wizard-code">{manifest}</pre>
+              <button type="button" className="dash-subtle" onClick={() => void copyManifest()}>
+                {copied === 'manifest' ? '✓ Copied' : '⧉ Copy JSON'}
+              </button>
+            </li>
+            <li>
+              <p>
+                <b>3. Install it to the workspace</b> — while in your app page open{' '}
+                <b>Settings → Install App → Install to workspace</b> and press <b>Allow</b>.
+              </p>
+            </li>
+            <li>
+              <p>
+                <b>4. Find &amp; copy the token</b> — still on the app page, open{' '}
+                <b>Settings → OAuth &amp; Permissions</b>; under <b>User OAuth Tokens</b> you will
+                see <code>xoxp-…</code>. Click copy (if no token exists yet, press{' '}
+                <b>Install to workspace</b> first).
+              </p>
+            </li>
+          </ol>
+          <p className="settings-hint">
+            Tip: repeat step 3 once <b>per workspace</b> you want to read — each install gives a
+            token that only reads that workspace.
+          </p>
+          <div className="settings-actions">
+            <button type="button" className="dash-primary" onClick={() => setStep(2)}>
+              I have the token →
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {step === 2 ? (
+        <div className="wizard-body">
+          <h3>Paste the token</h3>
+          {savedTokenMask && !replaceMode ? (
+            <>
+              <p className="wizard-saved-token">
+                saved connector: <code>{savedKey}</code> · <code>{savedTokenMask}</code>
+              </p>
+              <div className="settings-actions">
+                <button type="button" className="dash-subtle" onClick={() => setStep(3)}>
+                  Continue with it →
+                </button>
+              </div>
+              <button
+                type="button"
+                className="wizard-linklike"
+                onClick={() => setReplaceMode(true)}
+              >
+                Replace this token…
+              </button>
+            </>
+          ) : (
+            <>
+              <label className="settings-row">
+                <p className="settings-hint">
+                  Project name — the key becomes <code>{vaultKey || 'DASH_TOKEN_<PROJECT>'}</code>{' '}
+                  automatically
+                </p>
+                <input
+                  value={projectName}
+                  onChange={(e) => setProjectName(e.target.value)}
+                  placeholder="e.g. Acme Website Redesign"
+                  autoFocus
+                />
+              </label>
+              <label className="settings-row">
+                <p className="settings-hint">
+                  The <code>xoxp-…</code> you copied from OAuth &amp; Permissions
+                </p>
+                <input
+                  type="password"
+                  value={tokenValue}
+                  onChange={(e) => setTokenValue(e.target.value)}
+                  placeholder="xoxp-…"
+                />
+              </label>
+              {connectError ? <p className="wizard-error">{connectError}</p> : null}
+              {result?.valid && !savedTokenMask ? (
+                <p className="settings-hint">
+                  ✅ verified: <b>{result.teamName}</b> as {result.userName ?? 'workspace user'}
+                  {missingScopes.length > 0
+                    ? ` · partial scopes (missing ${missingScopes.join(', ')})`
+                    : ''}
+                </p>
+              ) : null}
+              <div className="settings-actions">
+                <button type="button" className="dash-subtle" onClick={() => setStep(1)}>
+                  ← Setup guide
+                </button>
                 <button
                   type="button"
-                  className="dash-subtle"
-                  onClick={() => void loadChannelList()}
+                  className="dash-primary"
+                  disabled={connecting || !vaultKey}
+                  onClick={() => void connectToken()}
                 >
-                  ⟳ Retry channel fetch
+                  {connecting ? 'Validating…' : 'Validate & Add'}
                 </button>
-              </>
-            ) : null}
-            <div className="wizard-channels">
-              {channels.map((c) => (
-                <label key={c.id} className="dash-channel-option">
-                  <input
-                    type="checkbox"
-                    checked={selected.has(c.id)}
-                    onChange={(e) =>
-                      setSelected((prev) => {
-                        const next = new Set(prev)
-                        if (e.target.checked) next.add(c.id)
-                        else next.delete(c.id)
-                        return next
-                      })
-                    }
-                  />
-                  <span>#{c.name}</span>
-                </label>
-              ))}
-              {!loadingChannels && channels.length === 0
-                ? 'No channels visible for this connector yet.'
-                : null}
-            </div>
-            {selected.size > 0 ? <p className="settings-hint">{selected.size} selected</p> : null}
-            <div className="settings-actions">
+              </div>
+            </>
+          )}
+        </div>
+      ) : null}
+
+      {/* ===== STEP 2 — channels ===== */}
+      {step === 3 ? (
+        <div className="wizard-body">
+          <h3>Choose channels</h3>
+          <p className="wizard-sub">
+            {loadingChannels
+              ? 'Loading channels via token…'
+              : `${channels.length} readable with ${savedKey} — tick what this card watches.`}
+          </p>
+          {result?.teamName ? (
+            <p className="settings-hint">
+              Workspace: <b>{result.teamName}</b> — one card watches exactly one workspace.
+            </p>
+          ) : null}
+          {channelError ? (
+            <>
+              <p className="wizard-error">{channelError}</p>
+              <button type="button" className="dash-subtle" onClick={() => void loadChannelList()}>
+                ⟳ Retry channel fetch
+              </button>
+            </>
+          ) : null}
+          <div className="wizard-channels">
+            {channels.map((c) => (
+              <label key={c.id} className="dash-channel-option">
+                <input
+                  type="checkbox"
+                  checked={selected.has(c.id)}
+                  onChange={(e) =>
+                    setSelected((prev) => {
+                      const next = new Set(prev)
+                      if (e.target.checked) next.add(c.id)
+                      else next.delete(c.id)
+                      return next
+                    })
+                  }
+                />
+                <span>#{c.name}</span>
+              </label>
+            ))}
+            {!loadingChannels && channels.length === 0
+              ? 'No channels visible for this connector yet.'
+              : null}
+          </div>
+          {selected.size > 0 ? <p className="settings-hint">{selected.size} selected</p> : null}
+          <div className="settings-actions">
+            {!inline ? (
               <button type="button" className="dash-subtle" onClick={() => setStep(2)}>
                 ← Back
               </button>
-              <button
-                type="button"
-                className="dash-primary"
-                disabled={selected.size === 0}
-                onClick={pickChannels}
-              >
-                Continue →
-              </button>
-            </div>
-          </div>
-        ) : null}
-
-        {/* ===== STEP 3 — confirm ===== */}
-        {step === 4 ? (
-          <div className="wizard-body">
-            <h3>Confirm card</h3>
-            <p className="wizard-sub">Names are pre-filled from the workspace — edit freely.</p>
-            {result?.teamName ? (
-              <p className="settings-hint">
-                Workspace: <b>{result.teamName}</b> (<code>{result.teamId}</code>) — this card will
-                only ever read this workspace.
-              </p>
             ) : null}
-            <label className="settings-row">
-              <p className="settings-hint">Project (card title)</p>
-              <input value={projectName} onChange={(e) => setProjectName(e.target.value)} />
-            </label>
-            <label className="settings-row">
-              <p className="settings-hint">Client — who you work for (used for AI attribution)</p>
-              <input
-                value={clientName}
-                onChange={(e) => setClientName(e.target.value)}
-                placeholder="e.g. Acme"
-              />
-            </label>
-            <p className="settings-hint">
-              {selected.size} channel{selected.size === 1 ? '' : 's'} ·{' '}
-              {Array.from(selected)
-                .map((chId) => channels.find((c) => c.id === chId)?.name ?? chId)
-                .join(', ')}
-            </p>
-            {createError ? <p className="wizard-error">{createError}</p> : null}
-            <p className="settings-hint">
-              Adding triggers an automatic first sync — the card opens with fresh data.
-            </p>
-            <div className="settings-actions">
-              <button type="button" className="dash-subtle" onClick={() => setStep(3)}>
-                ← Back
-              </button>
-              <button
-                type="button"
-                className="dash-primary"
-                disabled={creating || !projectName.trim()}
-                onClick={() => void createCard()}
-              >
-                {creating ? 'Syncing…' : 'Add project'}
-              </button>
-            </div>
+            <button
+              type="button"
+              className="dash-primary"
+              disabled={selected.size === 0}
+              onClick={pickChannels}
+            >
+              Continue →
+            </button>
           </div>
-        ) : null}
+        </div>
+      ) : null}
 
-        {/* ===== STEP 5 — finish ===== */}
-        {step === 5 ? (
-          <div className="wizard-body wizard-finish">
-            <p className="wizard-finish-check">✅</p>
-            <h3>{projectName.trim() ? projectName.trim() : 'Project'} added to the dashboard</h3>
-            <p className="wizard-sub">
-              The card is live and its <b>first sync is running</b> — fresh messages, % completion,
-              client mood and dates will fill in within seconds. After that it refreshes
-              automatically every {snapshot?.syncIntervalSeconds ?? 300}s (new messages only).
+      {/* ===== STEP 3 — confirm ===== */}
+      {step === 4 ? (
+        <div className="wizard-body">
+          <h3>Confirm card</h3>
+          <p className="wizard-sub">Names are pre-filled from the workspace — edit freely.</p>
+          {(result?.teamName ?? target?.project.teamName) ? (
+            <p className="settings-hint">
+              Workspace: <b>{result?.teamName ?? target?.project.teamName}</b> (
+              <code>{result?.teamId ?? target?.project.teamId}</code>) — this card will only ever
+              read this workspace.
             </p>
-            <div className="settings-actions">
-              <button type="button" className="dash-primary" onClick={closeWizard}>
-                Done — show me the dashboard
-              </button>
-            </div>
+          ) : null}
+          <label className="settings-row">
+            <p className="settings-hint">Project (card title)</p>
+            <input value={projectName} onChange={(e) => setProjectName(e.target.value)} />
+          </label>
+          <label className="settings-row">
+            <p className="settings-hint">Client — who you work for (used for AI attribution)</p>
+            <input
+              value={clientName}
+              onChange={(e) => setClientName(e.target.value)}
+              placeholder="e.g. Acme"
+            />
+          </label>
+          <p className="settings-hint">
+            {selected.size} channel{selected.size === 1 ? '' : 's'} ·{' '}
+            {Array.from(selected)
+              .map((chId) => channels.find((c) => c.id === chId)?.name ?? chId)
+              .join(', ')}
+          </p>
+          {createError ? <p className="wizard-error">{createError}</p> : null}
+          <p className="settings-hint">
+            {target
+              ? 'Saving triggers a sync so the card reflects the new channel set.'
+              : 'Adding triggers an automatic first sync — the card opens with fresh data.'}
+          </p>
+          <div className="settings-actions">
+            <button type="button" className="dash-subtle" onClick={() => setStep(3)}>
+              ← Back
+            </button>
+            <button
+              type="button"
+              className="dash-primary"
+              disabled={creating || !projectName.trim()}
+              onClick={() => void createCard()}
+            >
+              {creating ? 'Syncing…' : target ? 'Save changes' : 'Add project'}
+            </button>
           </div>
-        ) : null}
-      </section>
+        </div>
+      ) : null}
+
+      {/* ===== STEP 5 — finish ===== */}
+      {step === 5 ? (
+        <div className="wizard-body wizard-finish">
+          <p className="wizard-finish-check">✅</p>
+          <h3>
+            {target
+              ? 'Changes saved'
+              : `${projectName.trim() ? projectName.trim() : 'Project'} added to the dashboard`}
+          </h3>
+          <p className="wizard-sub">
+            {target
+              ? 'The connector and channel set are up to date. A sync is running now so the card reflects the new channels.'
+              : 'The card is live and its first sync is running — fresh messages, % completion, client mood and dates will fill in within seconds.'}{' '}
+            It refreshes automatically every {snapshot?.syncIntervalSeconds ?? 300}s (new messages
+            only).
+          </p>
+          <div className="settings-actions">
+            <button type="button" className="dash-primary" onClick={close}>
+              {target ? 'Done' : 'Done — show me the dashboard'}
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </section>
+  )
+
+  if (inline) return <div className="wizard-inline">{panel}</div>
+
+  return (
+    <div className="settings-backdrop wizard-backdash" onClick={close}>
+      {panel}
     </div>
   )
 }

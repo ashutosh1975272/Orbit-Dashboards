@@ -280,8 +280,19 @@ export class DashboardSyncEngine {
       const cached = this.lastResults.get(project.id)
       if (cached) {
         // the cached snapshot may predate the latest insight (the enrich
-        // step runs after the cache is written) — always refresh it
-        out.push(await this.attachLastInsight(project, cached))
+        // step runs after the cache is written) — always refresh it. The
+        // project record can also change (dates, completion, channels), so
+        // re-derive the fields that depend on it.
+        const refreshed: DashboardProjectSnapshot = {
+          ...cached,
+          project,
+          effectiveDates: {
+            startDate: project.startDate ?? cached.extractedDates?.startDate,
+            endDate: project.endDate ?? cached.extractedDates?.endDate
+          },
+          completion: project.manualCompletion ?? cached.completion
+        }
+        out.push(await this.attachLastInsight(project, refreshed))
         continue
       }
       const perChannel = await this.storedDeltas(project)
