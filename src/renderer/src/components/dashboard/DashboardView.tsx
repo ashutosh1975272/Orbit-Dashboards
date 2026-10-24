@@ -42,6 +42,14 @@ export default function DashboardView(): React.ReactElement | null {
     return () => window.clearInterval(timer)
   }, [loadSnapshot, loadRecent])
 
+  useEffect(() => {
+    // Sync view mode with localStorage on load
+    try {
+      const saved = localStorage.getItem('orbit.view') as 'compact' | 'expanded' | 'mixed' | null
+      if (saved) setViewMode(saved)
+    } catch {}
+  }, [])
+
   const focusProject = (projectId: string): void => {
     const el = document.getElementById(`dash-card-anchor-${projectId}`)
     if (!el) return
@@ -112,14 +120,6 @@ export default function DashboardView(): React.ReactElement | null {
 
   const digest = snapshot?.digest ?? null
 
-  useEffect(() => {
-    // Sync view mode with localStorage on load
-    try {
-      const saved = localStorage.getItem('orbit.view') as 'compact' | 'expanded' | 'mixed' | null
-      if (saved) setViewMode(saved)
-    } catch {}
-  }, [])
-
   const handleViewChange = (mode: 'compact' | 'expanded' | 'mixed') => {
     setViewMode(mode)
     try { localStorage.setItem('orbit.view', mode) } catch {}
@@ -128,13 +128,12 @@ export default function DashboardView(): React.ReactElement | null {
       setExpandedIds(new Set((snapshot?.projects ?? []).map((p) => p.project.id)))
   }
 
-  try {
-    return (
-      <ErrorBoundary label="dashboard-view">
-        <section
-          className="dash-view flex flex-col h-full w-full bg-background-dark text-text-dark p-6 overflow-y-auto"
-          data-testid="dashboard-view"
-        >
+  return (
+    <ErrorBoundary label="dashboard-view">
+      <section
+        className="dash-view flex flex-col h-full w-full bg-background-dark text-text-dark p-6 overflow-y-auto"
+        data-testid="dashboard-view"
+      >
           <header className="page-head">
             <h1>Client projects — Slack</h1>
             <div className="actions">
@@ -304,8 +303,4 @@ export default function DashboardView(): React.ReactElement | null {
         </section>
       </ErrorBoundary>
     )
-  } catch (err) {
-    setRenderError(err instanceof Error ? err : new Error(String(err)))
-    return null
   }
-}
