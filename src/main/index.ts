@@ -30,6 +30,7 @@ import { buildRecentFeed } from './dashboard/recent-feed'
 import { DashboardDigestStore, refreshDigest } from './dashboard/digest'
 import { DashboardChatService } from './dashboard/chat-service'
 import { HistoryStore } from './dashboard/history-store'
+import { DashboardViewedStore } from './dashboard/viewed-store'
 import { AiSettingsStore } from './dashboard/ai-settings-store'
 import { AiSettingsService } from './dashboard/ai-settings'
 import { InsightEngine } from './dashboard/insight-engine'
@@ -313,6 +314,7 @@ if (!gotSingleInstanceLock) {
       enableThinking: nimEnableThinking
     })
     const dashboardHistoryStore = new HistoryStore({ rootDir: dashboardRoot })
+    const dashboardViewedStore = new DashboardViewedStore({ rootDir: dashboardRoot })
     // The engine always exists: with a key it enriches with NVIDIA NIM,
     // without one it still keeps every card meaningful via local heuristics.
     const insightEngine = new InsightEngine({
@@ -358,6 +360,8 @@ if (!gotSingleInstanceLock) {
         getLastEntry: async (projectId: string) =>
           (await dashboardHistoryStore.read(projectId))[0] ?? null
       },
+      historyReader: (projectId: string) => dashboardHistoryStore.read(projectId),
+      viewedStore: dashboardViewedStore,
       onSynced: () => {
         void refreshDigestNow().catch((err) =>
           log.warn('[dashboard] digest refresh failed', { err: String(err) })
@@ -482,7 +486,8 @@ if (!gotSingleInstanceLock) {
       chatService: dashboardChatService,
       aiSettings,
       teamWorkspace: teamWorkspaceStore,
-      listTeamWorkspaceCandidates
+      listTeamWorkspaceCandidates,
+      viewedStore: dashboardViewedStore
     })
     void runWorkspaceMigration()
     dashboardScheduler.start()

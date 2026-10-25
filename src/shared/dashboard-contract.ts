@@ -82,6 +82,75 @@ export interface DashboardProject {
   createdAt: string
 }
 
+/** One day of message activity, split by workspace. Deterministic, main-process. */
+export interface DashboardActivityDay {
+  /** yyyy-mm-dd (UTC) */
+  date: string
+  client: number
+  ours: number
+  isToday: boolean
+}
+
+/** Median first-reply time over the last `windowDays`, or null under 3 pairs. */
+export interface DashboardResponseStats {
+  medianSeconds: number | null
+  pairs: number
+  windowDays: number
+}
+
+export type DashboardAttentionKind =
+  | 'question'
+  | 'needs-reply'
+  | 'blocker'
+  | 'risk'
+  | 'requirement'
+  | 'decision'
+  | 'commitment'
+  | 'file'
+  | 'status'
+
+/** One row for "Needs your attention" / "New since your last visit". */
+export interface DashboardAttentionItem {
+  kind: DashboardAttentionKind
+  text: string
+  atIso?: string
+  source?: DashboardSource
+  channelId?: string
+  ts?: string
+  permalink?: string
+}
+
+export interface DashboardNewSinceCounts {
+  requirements: number
+  decisions: number
+  commitments: number
+  files: number
+  statusChanges: number
+  questions: number
+}
+
+/** Everything the Dashboard page shows that is computed from stored messages. */
+export interface DashboardMetrics {
+  daily: DashboardActivityDay[]
+  messages24h: { client: number; ours: number }
+  lastClientContactAt: string | null
+  ourResponse: DashboardResponseStats
+  waiting: { count: number; oldestIso: string | null; items: DashboardAttentionItem[] }
+  statusSince: string | null
+  /** Empty until at least 3 runs have been recorded. */
+  moodTrend: Array<{ atIso: string; mood: InsightMood }>
+  newSince: {
+    lastViewedAt: string | null
+    counts: DashboardNewSinceCounts
+    items: DashboardAttentionItem[]
+  }
+}
+
+export interface DashboardMarkViewedPayload {
+  projectId: string
+  atIso?: string
+}
+
 export interface DashboardChannelDelta {
   channelId: string
   channelName: string
@@ -117,6 +186,8 @@ export interface DashboardProjectSnapshot {
   syncState: DashboardSyncState
   /** Set when our team workspace failed while the client workspace synced fine. */
   ourWorkspaceError?: string | null
+  /** Deterministic Dashboard-page metrics (absent until the first snapshot build). */
+  metrics?: DashboardMetrics
   /** v2.2 NVIDIA NIM rolling insight (undefined/null = not generated yet). */
   insight?: ProjectInsight | null
   insightUpdatedAt?: string | null

@@ -11,6 +11,7 @@ import type {
   DashboardChatQueryPayload,
   DashboardChatTokenStatus,
   DashboardListChannelsPayload,
+  DashboardMarkViewedPayload,
   DashboardSendMessagePayload,
   DashboardSendMessageResult,
   DashboardSnapshot,
@@ -38,6 +39,7 @@ import { handleInvoke } from './handle'
 import type { HistoryStore } from '../dashboard/history-store'
 import type { DashboardSidebarStateStore } from '../dashboard/sidebar-state'
 import { maskToken, type TeamWorkspaceStore } from '../dashboard/team-workspace-store'
+import type { DashboardViewedStore } from '../dashboard/viewed-store'
 
 export interface DashboardIpcDeps {
   monitorStore: MonitorStore
@@ -61,6 +63,8 @@ export interface DashboardIpcDeps {
   teamWorkspace?: TeamWorkspaceStore
   /** v3 — workspaces the app can already reach, offered when connecting ours */
   listTeamWorkspaceCandidates?: () => Promise<DashboardTeamWorkspaceCandidate[]>
+  /** Phase A — when a card's Dashboard was last looked at */
+  viewedStore?: DashboardViewedStore
 }
 
 export interface DashboardIpcRegistration {
@@ -100,6 +104,16 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
   }
 
   handleInvoke(IpcChannels.DashboardGetSnapshot, async () => publicSnapshot())
+
+  handleInvoke(
+    IpcChannels.DashboardMarkViewed,
+    async (payload: DashboardMarkViewedPayload): Promise<string> => {
+      if (!deps.viewedStore) throw new Error('Dashboard viewing state is unavailable.')
+      const projectId = String(payload?.projectId ?? '').trim()
+      if (!projectId) throw new Error('A project id is required.')
+      return deps.viewedStore.markViewed(projectId, payload.atIso)
+    }
+  )
 
   handleInvoke(
     IpcChannels.DashboardListChannels,

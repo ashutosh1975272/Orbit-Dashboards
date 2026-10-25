@@ -2,6 +2,7 @@ import { SlackPoller } from './slack-poller'
 import type { InsightEngine } from './insight-engine'
 import type {
   DashboardChannelDelta,
+  DashboardMetrics,
   DashboardMonitor,
   DashboardProject,
   DashboardProjectSnapshot,
@@ -13,6 +14,7 @@ import type { DashboardDeltaStore, DashboardStoredMessage } from './delta-store'
 import type { InsightHistoryEntry } from './history-store'
 import type { MonitorStore } from './monitor-store'
 import { summarizeProject } from './summary-engine'
+import { computeMetrics } from './metrics'
 
 export interface DashboardPoller {
   fetchHistory(input: {
@@ -77,6 +79,10 @@ export interface DashboardSyncEngineDeps {
   log?: (msg: string) => void
   /** v2.3 — read-only access to the stored insights (cold start) */
   insightReader?: InsightReader
+  /** Phase A — insight history for status-since, mood trend and "new since". */
+  historyReader?: (projectId: string) => Promise<InsightHistoryEntry[]>
+  /** Phase A — when this card's Dashboard was last looked at. */
+  viewedStore?: { get(projectId: string): Promise<string | null> }
   /** v2.3 — called after a background sync (e.g. to refresh the digest) */
   onSynced?: (snapshots: DashboardProjectSnapshot[]) => void
 }
@@ -90,6 +96,9 @@ export class DashboardSyncEngine {
   private readonly pollerFactory: () => DashboardPoller
   private readonly log: (msg: string) => void
   private readonly insightReader: InsightReader | undefined
+  private readonly historyReader: ((projectId: string) => Promise<InsightHistoryEntry[]>) | undefined
+  private readonly viewedStore: { get(projectId: string): Promise<string | null> } | undefined
+  private readonly metricsCache: Map<string, { key: string; value: DashboardMetrics }> = new Map()
   private readonly onSynced: ((snapshots: DashboardProjectSnapshot[]) => void) | undefined
   private readonly progressCallbacks: Array<(payload: DashboardSyncProgressPayload) => void> = []
   /** per-project cached snapshot — rebuilt after any sync */
@@ -104,6 +113,8 @@ export class DashboardSyncEngine {
     this.pollerFactory = deps.pollerFactory ?? (() => new SlackPoller())
     this.log = deps.log ?? (() => undefined)
     this.insightReader = deps.insightReader
+    this.historyReader = deps.historyReader
+    this.viewedStore = deps.viewedStore
     this.onSynced = deps.onSynced
     if (deps.onProgress) this.progressCallbacks.push(deps.onProgress)
   }
@@ -417,7 +428,7 @@ export class DashboardSyncEngine {
           },
           completion: project.manualCompletion ?? cached.completion
         }
-        out.push(await this.attachLastInsight(project, refreshed))
+        out.push(await this.finishSnapshot(project, refreshed))
         continue
       }
       const perChannel = await this.storedDeltas(project)
@@ -425,9 +436,63 @@ export class DashboardSyncEngine {
       // blank while waiting for the first network sync
       const messages = await this.collectMessages(project)
       const snapshot = this.buildFallbackSnapshot(project, perChannel, messages)
-      out.push(await this.attachLastInsight(project, snapshot))
+      out.push(await this.finishSnapshot(project, snapshot))
     }
     return out
+  }
+
+  /** Attach the stored insight, then the deterministic Dashboard metrics. */
+  private async finishSnapshot(
+    project: DashboardProject,
+    snapshot: DashboardProjectSnapshot
+  ): Promise<DashboardProjectSnapshot> {
+    const withInsight = await this.attachLastInsight(project, snapshot)
+    try {
+      withInsight.metrics = await this.metricsFor(project, withInsight)
+    } catch (err) {
+      // A metrics failure must never blank a card; it keeps the last values.
+      this.logInfo(`[dashboard] metrics failed for ${project.name}: ${String(err)}`)
+    }
+    return withInsight
+  }
+
+  /**
+   * Build (or reuse) the Dashboard metrics. The expensive part reads the stored
+   * channel files, so it is cached until a sync, an insight refresh, a project
+   * edit, or a new visit marker changes the inputs.
+   */
+  private async metricsFor(
+    project: DashboardProject,
+    snapshot: DashboardProjectSnapshot
+  ): Promise<DashboardMetrics> {
+    const history = this.historyReader ? await this.historyReader(project.id) : []
+    const lastViewedAt = this.viewedStore ? await this.viewedStore.get(project.id) : null
+    const key = [
+      snapshot.lastUpdatedAt ?? '',
+      snapshot.totalMessageCount ?? 0,
+      snapshot.insightUpdatedAt ?? '',
+      snapshot.insight?.status ?? '',
+      snapshot.insight?.progress ?? '',
+      project.manualCompletion ?? '',
+      project.startDate ?? '',
+      project.endDate ?? '',
+      history.length,
+      history[0]?.atIso ?? '',
+      lastViewedAt ?? ''
+    ].join('|')
+    const cached = this.metricsCache.get(project.id)
+    if (cached && cached.key === key) return cached.value
+
+    const messages = await this.collectMessages(project)
+    const value = computeMetrics({
+      project,
+      messages,
+      insight: snapshot.insight ?? null,
+      history,
+      lastViewedAt
+    })
+    this.metricsCache.set(project.id, { key, value })
+    return value
   }
 
   /** v2.3 — the AI insight is shown even before the first sync of the session. */

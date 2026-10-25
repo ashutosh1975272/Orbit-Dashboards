@@ -168,6 +168,8 @@ const api: IpcApi = {
   },
   dashboard: {
     getSnapshot: () => ipcRenderer.invoke(IpcChannels.DashboardGetSnapshot),
+    markViewed: (payload) =>
+      ipcRenderer.invoke(IpcChannels.DashboardMarkViewed, payload) as Promise<string>,
     getAppConfig: () => ipcRenderer.invoke(IpcChannels.DashboardGetAppConfig),
     getHistory: (payload: { projectId: string }) =>
       ipcRenderer.invoke(IpcChannels.DashboardGetHistory, payload) as Promise<

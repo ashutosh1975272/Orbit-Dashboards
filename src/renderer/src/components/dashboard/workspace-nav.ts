@@ -405,6 +405,12 @@ export function clampNavWidth(px: number): number {
   return Math.min(NAV_WIDTH_MAX, Math.max(NAV_WIDTH_MIN, Math.round(px)))
 }
 
+/** A reopened card always lands on the Dashboard. Section open/closed state,
+ * widths and the collapsed rail survive; the last selected row does not. */
+export function restoreDashboardOpen(state: WorkspaceNavState): WorkspaceNavState {
+  return { ...state, openGroup: 'dash', selection: null }
+}
+
 export const DEFAULT_NAV: WorkspaceNavState = {
   rev: NAV_REV,
   openGroup: 'dash',

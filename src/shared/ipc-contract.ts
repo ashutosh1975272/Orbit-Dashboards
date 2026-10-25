@@ -15,6 +15,7 @@ import type {
   DashboardSendMessageResult,
   InsightHistoryEntryContract,
   DashboardManualToken,
+  DashboardMarkViewedPayload,
   DashboardSnapshot,
   DashboardSyncProgressPayload,
   DashboardTeamWorkspace,
@@ -114,6 +115,7 @@ export const IpcChannels = {
   SlackHistoryForChannel: 'slack:history-for-channel',
 
   DashboardGetSnapshot: 'dashboard:get-snapshot',
+  DashboardMarkViewed: 'dashboard:mark-viewed',
   DashboardGetAppConfig: 'dashboard:get-app-config',
   DashboardGetHistory: 'dashboard:get-history',
   DashboardGetRecent: 'dashboard:get-recent',
@@ -278,6 +280,7 @@ export interface IpcApi {
   }
   dashboard: {
     getSnapshot: () => Promise<DashboardSnapshot>
+    markViewed: (payload: DashboardMarkViewedPayload) => Promise<string>
     getAppConfig: () => Promise<DashboardAppClientConfig>
     getHistory: (payload: { projectId: string }) => Promise<InsightHistoryEntryContract[]>
     getRecent: () => Promise<RecentActivity[]>
@@ -292,7 +295,11 @@ export interface IpcApi {
     onSyncProgress: (callback: (payload: DashboardSyncProgressPayload) => void) => () => void
     getSidebarState: (projectId: string) => Promise<ProjectSidebarState>
     setSidebarState: (projectId: string, state: ProjectSidebarState) => Promise<void>
-    updateSidebarState: (projectId: string, sidebar: 'left' | 'right', patch: Partial<SidebarState>) => Promise<SidebarState>
+    updateSidebarState: (
+      projectId: string,
+      sidebar: 'left' | 'right',
+      patch: Partial<SidebarState>
+    ) => Promise<SidebarState>
     getMessages: (payload: DashboardChatQueryPayload) => Promise<DashboardChatPage>
     sendMessage: (payload: DashboardSendMessagePayload) => Promise<DashboardSendMessageResult>
     getChatTokenStatus: (projectId: string) => Promise<DashboardChatTokenStatus>
@@ -319,6 +326,7 @@ export type {
   DashboardAiSettingsSavePayload,
   DashboardAiSettingsView,
   DashboardListChannelsPayload,
+  DashboardMarkViewedPayload,
   ActivateProfilePayload,
   AppId,
   ChannelHistoryPayload,

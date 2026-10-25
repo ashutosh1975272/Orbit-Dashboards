@@ -64,6 +64,7 @@ function ProjectCardInner({
       view={view}
       summary={summary}
       project={project}
+      snapshot={snapshot}
       syncing={syncing}
       onSync={() => void syncNow(project.id)}
       onSettings={() => onOpenSettings(project.id)}
@@ -102,6 +103,10 @@ export default memo(ProjectCardInner, (prev, next) => {
     prev.snapshot.project.id === next.snapshot.project.id &&
     sameProject(prev.snapshot.project, next.snapshot.project) &&
     prev.snapshot.lastUpdatedAt === next.snapshot.lastUpdatedAt &&
+    prev.snapshot.insightUpdatedAt === next.snapshot.insightUpdatedAt &&
+    prev.snapshot.syncState === next.snapshot.syncState &&
+    prev.snapshot.ourWorkspaceError === next.snapshot.ourWorkspaceError &&
+    prev.snapshot.metrics === next.snapshot.metrics &&
     prev.expanded === next.expanded &&
     prev.index === next.index &&
     prev.initialTab === next.initialTab &&

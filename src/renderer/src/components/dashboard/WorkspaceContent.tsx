@@ -1,8 +1,12 @@
 import type React from 'react'
 import type { CardView, CardSummary } from './card-view'
-import type { DashboardProject } from '../../../../shared/dashboard-contract'
+import type {
+  DashboardProject,
+  DashboardProjectSnapshot
+} from '../../../../shared/dashboard-contract'
 import CentreContent from './CentreContent'
 import CentreVisuals from './CentreVisuals'
+import DashboardPage from './DashboardPage'
 import NavIcon from './nav-icons'
 import { DetailBody, GuideDetailBody } from './guide-content'
 import SlackChatTab from './SlackChatTab'
@@ -24,6 +28,7 @@ import {
   xomniModeOf,
   type ConnectorChannelLists,
   type OpenGroup,
+  type SelectionId,
   type WorkspaceNavState
 } from './workspace-nav'
 
@@ -31,8 +36,12 @@ interface WorkspaceContentProps {
   view: CardView
   summary: CardSummary
   project: DashboardProject
+  snapshot: DashboardProjectSnapshot
   nav: WorkspaceNavState
   channels: ConnectorChannelLists
+  syncing: boolean
+  onOpenSettings: () => void
+  onSelect: (selection: SelectionId) => void
 }
 
 /** Headings for the bodies no row owns. */
@@ -75,12 +84,34 @@ export default function WorkspaceContent({
   view,
   summary,
   project,
+  snapshot,
   nav,
-  channels
+  channels,
+  syncing,
+  onOpenSettings,
+  onSelect
 }: WorkspaceContentProps): React.ReactElement {
   const { centre, leftSidebar, rightSidebar, identity } = view
   const { title, desc } = panelMeta(nav, channels)
   const sel = nav.selection
+
+  // Dashboard brings its own scroll surface and width; the generic panel header
+  // would repeat the project name above the freshness line.
+  if (nav.openGroup === 'dash') {
+    return (
+      <section className="ws-content is-bare" aria-label="Dashboard">
+        <DashboardPage
+          view={view}
+          summary={summary}
+          project={project}
+          snapshot={snapshot}
+          syncing={syncing}
+          onOpenSettings={onOpenSettings}
+          onSelect={onSelect}
+        />
+      </section>
+    )
+  }
 
   let body: React.ReactNode
   let bare = false

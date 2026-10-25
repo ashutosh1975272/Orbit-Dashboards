@@ -5,6 +5,7 @@ import {
   navFromEntryProps,
   openGroupNav,
   resizeNav,
+  restoreDashboardOpen,
   selectNav,
   toggleConnectorNav,
   toggleInfoGroupNav,
@@ -29,7 +30,10 @@ function readState(projectId: string): WorkspaceNavState {
     const raw = localStorage.getItem(storageKey(projectId))
     if (!raw) return DEFAULT_NAV
     const migrated = migrateNavState(JSON.parse(raw))
-    return migrated ?? DEFAULT_NAV
+    if (!migrated) return DEFAULT_NAV
+    // A card always opens on the Dashboard. Only section open/close state and
+    // the rail width survive a restart; the last selected row does not.
+    return restoreDashboardOpen(migrated)
   } catch {
     return DEFAULT_NAV
   }
@@ -96,10 +100,7 @@ export function useWorkspaceNav(
     (): void => setNav((prev) => ({ ...prev, collapsed: !prev.collapsed })),
     []
   )
-  const resize = useCallback(
-    (width: number): void => setNav((prev) => resizeNav(prev, width)),
-    []
-  )
+  const resize = useCallback((width: number): void => setNav((prev) => resizeNav(prev, width)), [])
 
   return {
     nav,

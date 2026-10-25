@@ -35,6 +35,8 @@ export default function DashboardView(): React.ReactElement | null {
   const loading = useDashboardStore((s) => s.loading)
   const error = useDashboardStore((s) => s.error)
   const loadSnapshot = useDashboardStore((s) => s.loadSnapshot)
+  const applySnapshot = useDashboardStore((s) => s.applySnapshot)
+  const applyProgress = useDashboardStore((s) => s.applyProgress)
   const deleteProject = useDashboardStore((s) => s.deleteProject)
   const syncNow = useDashboardStore((s) => s.syncNow)
   const progress = useDashboardStore((s) => s.progress)
@@ -63,6 +65,26 @@ export default function DashboardView(): React.ReactElement | null {
     }, 60_000)
     return () => window.clearInterval(timer)
   }, [loadSnapshot])
+
+  // Main pushes a snapshot the moment a sync finishes; the 60s poll is only a
+  // backstop. Progress events also drive the per-card "syncing" state.
+  useEffect(() => {
+    const offSnapshot = window.api.dashboard.onSnapshotChanged((snapshot) =>
+      applySnapshot(snapshot)
+    )
+    const offProgress = window.api.dashboard.onSyncProgress((payload) => {
+      applyProgress(payload)
+      if (payload.phase === 'complete' || payload.phase === 'error') {
+        window.setTimeout(() => {
+          void loadSnapshot().catch(() => {})
+        }, 250)
+      }
+    })
+    return () => {
+      offSnapshot()
+      offProgress()
+    }
+  }, [applySnapshot, applyProgress, loadSnapshot])
 
   useEffect(() => {
     try {

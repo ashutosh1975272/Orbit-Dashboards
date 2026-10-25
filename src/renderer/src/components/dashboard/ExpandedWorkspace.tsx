@@ -1,10 +1,15 @@
 import type React from 'react'
-import { useEffect, useMemo, useState } from 'react'
-import type { DashboardProject, DashboardTeamWorkspace } from '../../../../shared/dashboard-contract'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type {
+  DashboardProject,
+  DashboardProjectSnapshot,
+  DashboardTeamWorkspace
+} from '../../../../shared/dashboard-contract'
 import type { CardSummary, CardView } from './card-view'
 import CardHead, { type CardHeadFlag } from './CardHead'
 import { useWorkspaceNav } from '../../hooks/useWorkspaceNav'
 import { useSlackChannels } from '../../hooks/useSlackChannels'
+import { useDashboardStore } from '../../hooks/useDashboard'
 import WorkspaceSidebar from './WorkspaceSidebar'
 import WorkspaceContent from './WorkspaceContent'
 import { buildConnectorChannelLists, type NavEntry, type WorkspaceEntryTab } from './workspace-nav'
@@ -14,6 +19,7 @@ interface ExpandedWorkspaceProps {
   view: CardView
   summary: CardSummary
   project: DashboardProject
+  snapshot: DashboardProjectSnapshot
   syncing: boolean
   onSync: () => void
   onSettings: () => void
@@ -39,6 +45,7 @@ export default function ExpandedWorkspace({
   view,
   summary,
   project,
+  snapshot,
   syncing,
   onSync,
   onSettings,
@@ -68,6 +75,35 @@ export default function ExpandedWorkspace({
   const listing = useSlackChannels(project, 'client')
   const [teamWorkspace, setTeamWorkspace] = useState<DashboardTeamWorkspace | null>(null)
   const [teamLoading, setTeamLoading] = useState(true)
+
+  // "New since your last visit" is measured from the moment the reader stops
+  // looking at the Dashboard (leaving the dash panel or closing the card), not
+  // from when they last clicked something elsewhere.
+  const lastMark = useRef<Promise<unknown>>(Promise.resolve())
+  const markViewed = useCallback((): void => {
+    lastMark.current = window.api.dashboard
+      .markViewed({ projectId: summary.projectId })
+      .catch(() => undefined)
+  }, [summary.projectId])
+  const groupRef = useRef(nav.openGroup)
+  const prevGroup = useRef(nav.openGroup)
+  useEffect(() => {
+    if (prevGroup.current === 'dash' && nav.openGroup !== 'dash') markViewed()
+    prevGroup.current = nav.openGroup
+    groupRef.current = nav.openGroup
+  }, [nav.openGroup, markViewed])
+  const handleToggle = useCallback((): void => {
+    if (groupRef.current === 'dash') markViewed()
+    onToggle()
+  }, [markViewed, onToggle])
+
+  // Recompute "new since your last visit" against the marker written when the
+  // reader left the Dashboard, so coming back never shows a stale diff.
+  const refreshSnapshot = useDashboardStore((s) => s.loadSnapshot)
+  useEffect(() => {
+    if (nav.openGroup !== 'dash') return
+    void lastMark.current.then(() => refreshSnapshot()).catch(() => undefined)
+  }, [nav.openGroup, refreshSnapshot])
 
   useEffect(() => {
     let cancelled = false
@@ -136,7 +172,7 @@ export default function ExpandedWorkspace({
         onSettings={onSettings}
         onEdit={onEdit}
         onRemove={onRemove}
-        onToggle={onToggle}
+        onToggle={handleToggle}
       />
 
       <div
@@ -159,8 +195,12 @@ export default function ExpandedWorkspace({
           view={view}
           summary={summary}
           project={project}
+          snapshot={snapshot}
           nav={nav}
           channels={channelLists}
+          syncing={syncing}
+          onOpenSettings={onSettings}
+          onSelect={select}
         />
       </div>
     </article>

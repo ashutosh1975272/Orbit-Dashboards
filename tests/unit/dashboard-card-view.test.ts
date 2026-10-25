@@ -220,3 +220,42 @@ describe('buildCardSummary — two-workspace isolation', () => {
     expect(vb.status).toBe('on-track')
   })
 })
+
+describe('buildCardSummary — pace', () => {
+  const day = 24 * 60 * 60 * 1000
+  const dateOnly = (offsetDays: number): string =>
+    new Date(Date.now() + offsetDays * day).toISOString().slice(0, 10)
+
+  it('marks a project behind when progress trails elapsed time', () => {
+    const summary = buildCardSummary(
+      baseSnapshot({
+        effectiveDates: { startDate: dateOnly(-9), endDate: dateOnly(1) },
+        completion: 10
+      }),
+      0
+    )
+    expect(summary.pace).toBe('behind')
+    expect(summary.paceLabel).toBe('Behind schedule')
+  })
+
+  it('marks a project ahead when progress leads elapsed time', () => {
+    const summary = buildCardSummary(
+      baseSnapshot({
+        effectiveDates: { startDate: dateOnly(-1), endDate: dateOnly(10) },
+        completion: 50
+      }),
+      0
+    )
+    expect(summary.pace).toBe('ahead')
+    expect(summary.paceLabel).toBe('Ahead of schedule')
+  })
+
+  it('keeps pace neutral when no dates are stated', () => {
+    const summary = buildCardSummary(
+      baseSnapshot({ effectiveDates: {}, completion: 50 }),
+      0
+    )
+    expect(summary.pace).toBe('on-pace')
+    expect(summary.paceLabel).toBe('Dates not stated in chat')
+  })
+})

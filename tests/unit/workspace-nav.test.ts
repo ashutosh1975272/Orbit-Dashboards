@@ -15,6 +15,7 @@ import {
   openGroupNav,
   railSectionSelection,
   resizeNav,
+  restoreDashboardOpen,
   selectNav,
   sectionOfSelection,
   slackSourceOf,
@@ -370,9 +371,9 @@ describe('xomniModeOf and slackSourceOf', () => {
   })
 
   it('read the active row', () => {
-    expect(
-      xomniModeOf({ ...DEFAULT_NAV, openGroup: 'xomni', selection: 'm:agentwork' })
-    ).toBe('agentwork')
+    expect(xomniModeOf({ ...DEFAULT_NAV, openGroup: 'xomni', selection: 'm:agentwork' })).toBe(
+      'agentwork'
+    )
     expect(slackSourceOf({ ...DEFAULT_NAV, openGroup: 'slack', selection: 's:team' })).toBe('team')
   })
 })
@@ -426,3 +427,20 @@ function labelsOfGroup(group: string): string[] {
     .filter((r) => r.group === group)
     .map((r) => r.label)
 }
+
+describe('restoreDashboardOpen', () => {
+  it('drops a persisted row selection but keeps section open state', () => {
+    const persisted: WorkspaceNavState = {
+      ...DEFAULT_NAV,
+      openGroup: 'info',
+      selection: 'g:4',
+      openSections: ['slack'],
+      openInfoGroups: ['project']
+    }
+    const restored = restoreDashboardOpen(persisted)
+    expect(restored.openGroup).toBe('dash')
+    expect(restored.selection).toBeNull()
+    expect(restored.openSections).toEqual(['slack'])
+    expect(restored.openInfoGroups).toEqual(['project'])
+  })
+})
