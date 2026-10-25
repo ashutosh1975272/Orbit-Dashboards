@@ -24,12 +24,12 @@ import {
   type WorkspaceNavState
 } from '../../src/renderer/src/components/dashboard/workspace-nav'
 
-describe('nav model shape (v5)', () => {
+describe('nav model shape (v6)', () => {
   it('has four dropdown sections in the reference order', () => {
     expect(NAV_SECTIONS.map((s) => s.key)).toEqual(['xomni', 'slack', 'info', 'viz'])
     expect(NAV_SECTIONS.map((s) => s.label)).toEqual([
       'Xomni',
-      'Slack',
+      'Channels',
       'Project info',
       'Visualizations'
     ])
@@ -37,7 +37,11 @@ describe('nav model shape (v5)', () => {
 
   it('carries the reference row lists per section', () => {
     expect(rowsOf('xomni')).toEqual(['Chat with project', 'Talk to AgentWork'])
-    expect(rowsOf('slack')).toEqual(['Client Slack', 'Our Slack'])
+    expect(rowsOf('slack')).toEqual(['All channels', 'All channels'])
+    expect(NAV_SECTIONS.find((s) => s.key === 'slack')!.rows.map((r) => r.id)).toEqual([
+      's:client',
+      's:team'
+    ])
     expect(rowsOf('viz')).toEqual(['Progress', 'Time elapsed', 'Last 7 days'])
     expect(INFO_GROUPS.map((g) => g.key)).toEqual(['attention', 'project', 'signals'])
     expect(labelsOfGroup('attention')).toEqual(['Needs reply', 'Blockers', 'Risks', 'Next steps'])

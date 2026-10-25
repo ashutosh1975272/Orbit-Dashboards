@@ -1,10 +1,12 @@
-/** Workspace nav model for the single-sidebar expanded card (v5 layout).
- * Four dropdown sections (Xomni / Slack / Project info / Visualizations) sit
- * under Dashboard, with Settings pinned last. Project info nests three
- * sub-groups that start closed. `NAV_SECTIONS` is the single source for the
- * sidebar tree, the row labels and copy, and selection validity — so the
- * dropdown rules, the legacy-state migration, the deep-link translation and
- * the selection→body map can all be unit-tested without React or a DOM. */
+/** Workspace nav model for the single-sidebar expanded card (v6 layout).
+ * Four dropdown sections (Xomni / Channels / Project info / Visualizations)
+ * sit under Dashboard, with Settings pinned last. Project info nests three
+ * sub-groups that start closed; the Channels section nests one dropdown per
+ * connector, and each connector's dropdown lists its channels. `NAV_SECTIONS`
+ * is the single source for the sidebar tree, the row labels and copy, and
+ * selection validity — so the dropdown rules, the legacy-state migration, the
+ * deep-link translation and the selection→body map can all be unit-tested
+ * without React or a DOM. */
 
 import type { DetailKey } from './guide-model'
 
@@ -23,7 +25,14 @@ export type XomniModeKey = 'project' | 'agentwork'
 /** Which of the two Slack workspaces the chat panel targets. */
 export type SlackSourceKey = 'client' | 'team'
 
+/** Every app the Channels section offers a dropdown for. Only the two Slack
+ * sides have a body today; the rest are listed so the shape is visible early. */
+export type ConnectorKey = SlackSourceKey | 'upwork' | 'teams' | 'googlechat' | 'discord'
+
 export type InfoGroupKey = 'attention' | 'project' | 'signals'
+
+/** A single channel inside a connector's dropdown. */
+export type ChannelSelectionId = `c:${ConnectorKey}:${string}`
 
 export type SelectionId =
   | `v:${VisualKey}`
@@ -31,6 +40,7 @@ export type SelectionId =
   | `g:${GuideSection}`
   | `m:${XomniModeKey}`
   | `s:${SlackSourceKey}`
+  | ChannelSelectionId
 
 export interface NavRow {
   id: SelectionId
@@ -56,6 +66,134 @@ export const INFO_GROUPS: Array<{ key: InfoGroupKey; label: string; icon: string
   { key: 'signals', label: 'Signals', icon: 'activity' }
 ]
 
+export interface NavConnector {
+  key: ConnectorKey
+  label: string
+  icon: string
+  /** Only a wired connector has a centre body and real channels to list. */
+  wired: boolean
+  /** The whole-workspace row inside its dropdown. Null when nothing is wired. */
+  allId: SelectionId | null
+  /** One line shown in the dropdown when there is nothing to list. UI copy. */
+  note: string
+}
+
+/** The Channels section's dropdowns, in order. Slack ships first; the rest are
+ * the same shape waiting for a connection, so their dropdowns say so plainly. */
+export const NAV_CONNECTORS: NavConnector[] = [
+  {
+    key: 'team',
+    label: 'Our channels',
+    icon: 'users',
+    wired: true,
+    allId: 's:team',
+    note: 'Our team workspace is connected once for all cards, from Global settings. Connect it and the channels pinned to this project appear here.'
+  },
+  {
+    key: 'client',
+    label: 'Client channels',
+    icon: 'slack',
+    wired: true,
+    allId: 's:client',
+    note: 'This card has no client workspace to list channels from yet.'
+  },
+  {
+    key: 'upwork',
+    label: 'Upwork',
+    icon: 'plug',
+    wired: false,
+    allId: null,
+    note: 'Upwork is not connected yet. Slack ships first.'
+  },
+  {
+    key: 'teams',
+    label: 'Microsoft Teams',
+    icon: 'plug',
+    wired: false,
+    allId: null,
+    note: 'Microsoft Teams is not connected yet. Slack ships first.'
+  },
+  {
+    key: 'googlechat',
+    label: 'Google Chat',
+    icon: 'plug',
+    wired: false,
+    allId: null,
+    note: 'Google Chat is not connected yet. Slack ships first.'
+  },
+  {
+    key: 'discord',
+    label: 'Discord',
+    icon: 'plug',
+    wired: false,
+    allId: null,
+    note: 'Discord is not connected yet. Slack ships first.'
+  }
+]
+
+export function connectorOf(key: ConnectorKey | null): NavConnector | null {
+  return NAV_CONNECTORS.find((c) => c.key === key) ?? null
+}
+
+/** One channel inside a connector's dropdown. `watched` marks the channels this
+ * card already syncs, so the list can show both without inventing a second
+ * source of truth. */
+export interface ChannelEntry {
+  id: string
+  name: string
+  watched: boolean
+}
+
+export interface ConnectorChannelList {
+  loading: boolean
+  /** A failed listing is shown as its own line — never as an empty list. */
+  error: string | null
+  entries: ChannelEntry[]
+}
+
+export type ConnectorChannelLists = Partial<Record<ConnectorKey, ConnectorChannelList>>
+
+/** Fold the channels a Slack token can see plus the card's watched channels
+ * into the dropdown lists. Only the client side has data today: our team
+ * workspace is connected globally (ticket 04), and an unwired connector gets no
+ * list at all. */
+export function buildConnectorChannelLists(args: {
+  clientLoading: boolean
+  clientError: string | null
+  clientChannels: Array<{ id: string; name: string }>
+  watchedChannels: Array<{ id: string; name: string }>
+  /** Set once a team workspace exists; empty until then. */
+  teamChannels?: Array<{ id: string; name: string }>
+}): ConnectorChannelLists {
+  const merge = (
+    listed: Array<{ id: string; name: string }>,
+    watched: Array<{ id: string; name: string }>
+  ): ChannelEntry[] => {
+    const byId = new Map<string, ChannelEntry>()
+    for (const ch of listed) {
+      byId.set(ch.id, { id: ch.id, name: ch.name, watched: watched.some((w) => w.id === ch.id) })
+    }
+    // A watched channel the token can no longer list still belongs in the
+    // dropdown — the card is reading it, so hiding it would be a lie.
+    for (const ch of watched) {
+      if (!byId.has(ch.id)) byId.set(ch.id, { id: ch.id, name: ch.name, watched: true })
+    }
+    return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name))
+  }
+  return {
+    client: {
+      loading: args.clientLoading,
+      error: args.clientError,
+      entries: merge(args.clientChannels, args.watchedChannels)
+    },
+    team: {
+      loading: false,
+      error: null,
+      entries: merge(args.teamChannels ?? [], [])
+    }
+  }
+}
+
 export const NAV_SECTIONS: NavSection[] = [
   {
     key: 'xomni',
@@ -78,18 +216,18 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     key: 'slack',
-    label: 'Slack',
-    icon: 'slack',
+    label: 'Channels',
+    icon: 'inbox',
     rows: [
       {
         id: 's:client',
-        label: 'Client Slack',
+        label: 'All channels',
         desc: 'The client workspace for this project. Scroll the messages and reply here.',
-        icon: 'inbox'
+        icon: 'slack'
       },
       {
         id: 's:team',
-        label: 'Our Slack',
+        label: 'All channels',
         desc: 'Our own team workspace, for the channels we pin to this project.',
         icon: 'users'
       }
@@ -233,11 +371,13 @@ export interface WorkspaceNavState {
   openSections: SectionKey[]
   /** Which Project info sub-groups currently show their rows. */
   openInfoGroups: InfoGroupKey[]
+  /** Which connector dropdowns currently show their channels. */
+  openConnectors: ConnectorKey[]
   /** Per-section memory of the last selection, restored by the rail icons. */
   sectionSelections: Partial<Record<SectionKey, SelectionId>>
 }
 
-export const NAV_REV = 5
+export const NAV_REV = 6
 
 export const NAV_WIDTH_MIN = 180
 export const NAV_WIDTH_MAX = 400
@@ -246,6 +386,12 @@ export const NAV_WIDTH_DEFAULT = 236
 export const NAV_RAIL_WIDTH = 56
 
 const ALL_SECTIONS: SectionKey[] = NAV_SECTIONS.map((s) => s.key)
+const ALL_CONNECTORS: ConnectorKey[] = NAV_CONNECTORS.map((c) => c.key)
+/** A wired connector's dropdown starts open; an unwired one stays closed
+ * until the reader asks what it would hold. */
+const DEFAULT_OPEN_CONNECTORS: ConnectorKey[] = NAV_CONNECTORS.filter((c) => c.wired).map(
+  (c) => c.key
+)
 
 export function clampNavWidth(px: number): number {
   if (!Number.isFinite(px)) return NAV_WIDTH_DEFAULT
@@ -260,6 +406,7 @@ export const DEFAULT_NAV: WorkspaceNavState = {
   width: NAV_WIDTH_DEFAULT,
   openSections: [...ALL_SECTIONS],
   openInfoGroups: [],
+  openConnectors: [...DEFAULT_OPEN_CONNECTORS],
   sectionSelections: {}
 }
 
@@ -272,11 +419,40 @@ export function navRowOf(id: SelectionId | null): NavRow | null {
 
 function isValidSelection(raw: unknown): raw is SelectionId {
   if (typeof raw !== 'string') return false
-  return ALL_ROWS.some((row) => row.id === raw)
+  if (ALL_ROWS.some((row) => row.id === raw)) return true
+  // Channel ids carry data the model never holds (a Slack channel id), so only
+  // their shape and connector can be checked here.
+  return isChannelId(raw)
+}
+
+/** A selection pointing at one channel inside a connector's dropdown. */
+export function isChannelId(id: string | null): id is ChannelSelectionId {
+  if (!id || !id.startsWith('c:')) return false
+  const parts = id.split(':')
+  return parts.length === 3 && ALL_CONNECTORS.includes(parts[1] as ConnectorKey) && !!parts[2]
+}
+
+/** The connector a selection belongs to, whether it is the whole-workspace row
+ * or one channel inside it. */
+export function connectorOfSelection(id: SelectionId | null): ConnectorKey | null {
+  if (!id) return null
+  if (id.startsWith('s:')) return id.slice(2) as ConnectorKey
+  if (isChannelId(id)) return id.split(':')[1] as ConnectorKey
+  return null
+}
+
+export function channelIdOf(id: SelectionId): string {
+  return id.split(':')[2] ?? ''
+}
+
+/** The selection id for one channel inside a connector's dropdown. */
+export function channelSelectionId(key: ConnectorKey, channelId: string): ChannelSelectionId {
+  return `c:${key}:${channelId}`
 }
 
 /** The section that owns a selection. */
 export function sectionOfSelection(id: SelectionId): SectionKey {
+  if (isChannelId(id) || id.startsWith('s:')) return 'slack'
   return NAV_SECTIONS.find((s) => s.rows.some((r) => r.id === id))?.key ?? 'info'
 }
 
@@ -318,7 +494,7 @@ export function xomniModeOf(nav: WorkspaceNavState): XomniModeKey {
 
 /** The workspace the Slack panel shows; the card's own workspace is default. */
 export function slackSourceOf(nav: WorkspaceNavState): SlackSourceKey {
-  return nav.selection === 's:team' ? 'team' : 'client'
+  return connectorOfSelection(nav.selection) === 'team' ? 'team' : 'client'
 }
 
 export function migrateOpenGroup(raw: unknown): OpenGroup {
@@ -351,13 +527,18 @@ function validInfoGroups(raw: unknown): InfoGroupKey[] {
   return raw.filter((k): k is InfoGroupKey => INFO_GROUPS.some((g) => g.key === k))
 }
 
+function validConnectors(raw: unknown): ConnectorKey[] {
+  if (!Array.isArray(raw)) return []
+  return raw.filter((k): k is ConnectorKey => ALL_CONNECTORS.includes(k as ConnectorKey))
+}
+
 function ensure<T>(list: T[], value: T): T[] {
   return list.includes(value) ? list : [...list, value]
 }
 
-/** Migrate a v3/v4/v4.1/v5 persisted blob (or reject garbage → null) to v5.
- * Only a v5 blob is trusted for its section open/closed list; anything older
- * starts with all four sections open and the info sub-groups closed. */
+/** Migrate a v3/v4/v5/v6 persisted blob (or reject garbage → null) to v6.
+ * Only a v6 blob is trusted for its dropdown open/closed lists; anything older
+ * starts with all four sections open and the wired connectors' lists out. */
 export function migrateNavState(raw: unknown): WorkspaceNavState | null {
   if (!raw || typeof raw !== 'object') return null
   const parsed = raw as Record<string, unknown>
@@ -367,16 +548,22 @@ export function migrateNavState(raw: unknown): WorkspaceNavState | null {
   const savedGroup = migrateOpenGroup(parsed.openGroup)
   const openGroup = selection ? sectionOfSelection(selection) : savedGroup
 
-  // Only a v5 blob carries its own open/closed lists. Older shapes start with
-  // all four sections open and inherit whatever info groups were open then, so
-  // a persisted selection is never hidden behind a closed group.
-  const isV5 = parsed.rev === NAV_REV
-  const openSections = isV5 ? validSections(parsed.openSections) : [...ALL_SECTIONS]
+  // Only a current blob carries its own open/closed lists. Older shapes start
+  // with all four sections open and inherit whatever info groups were open
+  // then, so a persisted selection is never hidden behind a closed group.
+  const isCurrent = parsed.rev === NAV_REV
+  const openSections = isCurrent ? validSections(parsed.openSections) : [...ALL_SECTIONS]
   let openInfoGroups = validInfoGroups(parsed.openInfoGroups)
-  if (!isV5 && selection) {
+  let openConnectors = isCurrent
+    ? validConnectors(parsed.openConnectors)
+    : [...DEFAULT_OPEN_CONNECTORS]
+  if (!isCurrent && selection) {
     const group = infoGroupOf(selection)
     if (group) openInfoGroups = ensure(openInfoGroups, group)
   }
+  // Whatever is selected must be reachable, in every revision.
+  const connector = connectorOfSelection(selection)
+  if (connector) openConnectors = ensure(openConnectors, connector)
 
   const remembered = parsed.sectionSelections
   const sectionSelections: Partial<Record<SectionKey, SelectionId>> =
@@ -402,6 +589,7 @@ export function migrateNavState(raw: unknown): WorkspaceNavState | null {
     width: clampNavWidth(Number(parsed.width ?? DEFAULT_NAV.width)),
     openSections,
     openInfoGroups,
+    openConnectors,
     sectionSelections
   }
 }
@@ -435,6 +623,10 @@ export function navFromEntryProps(
     openInfoGroups: (() => {
       const g = infoGroupOf(selection)
       return g ? ensure(base.openInfoGroups, g) : base.openInfoGroups
+    })(),
+    openConnectors: (() => {
+      const c = connectorOfSelection(selection)
+      return c ? ensure(base.openConnectors, c) : base.openConnectors
     })()
   })
 
@@ -481,18 +673,32 @@ export function toggleInfoGroupNav(
   return { ...prev, openInfoGroups }
 }
 
+/** Toggle one connector's channel list; several can stay open. Never changes
+ * what the centre panel shows. */
+export function toggleConnectorNav(
+  prev: WorkspaceNavState,
+  key: ConnectorKey
+): WorkspaceNavState {
+  const openConnectors = prev.openConnectors.includes(key)
+    ? prev.openConnectors.filter((k) => k !== key)
+    : ensure(prev.openConnectors, key)
+  return { ...prev, openConnectors }
+}
+
 /** Clicking a row: activates its body, remembers it for its section, and makes
- * sure the row is visible (its section and sub-group open). */
+ * sure the row is visible (its section, sub-group and connector open). */
 export function selectNav(prev: WorkspaceNavState, selection: SelectionId): WorkspaceNavState {
   const section = sectionOfSelection(selection)
   const group = infoGroupOf(selection)
+  const connector = connectorOfSelection(selection)
   return {
     ...prev,
     openGroup: section,
     selection,
     sectionSelections: { ...prev.sectionSelections, [section]: selection },
     openSections: ensure(prev.openSections, section),
-    openInfoGroups: group ? ensure(prev.openInfoGroups, group) : prev.openInfoGroups
+    openInfoGroups: group ? ensure(prev.openInfoGroups, group) : prev.openInfoGroups,
+    openConnectors: connector ? ensure(prev.openConnectors, connector) : prev.openConnectors
   }
 }
 

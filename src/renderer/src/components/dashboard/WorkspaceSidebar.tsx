@@ -5,17 +5,22 @@ import NavIcon from './nav-icons'
 import { detailMeta } from './guide-model'
 import {
   INFO_GROUPS,
+  NAV_CONNECTORS,
   NAV_SECTIONS,
   NAV_WIDTH_DEFAULT,
   NAV_WIDTH_MAX,
   NAV_WIDTH_MIN,
+  channelSelectionId,
   clampNavWidth,
+  connectorOfSelection,
   detailKeyOf,
   guideSectionOf,
   isDetailId,
   isGuideId,
   railSectionSelection,
   sectionOfSelection,
+  type ConnectorChannelLists,
+  type ConnectorKey,
   type InfoGroupKey,
   type NavRow,
   type OpenGroup,
@@ -27,10 +32,12 @@ import {
 interface WorkspaceSidebarProps {
   view: CardView
   nav: WorkspaceNavState
+  channels: ConnectorChannelLists
   onOpenGroup: (group: OpenGroup) => void
   onSelect: (selection: SelectionId) => void
   onToggleSection: (key: SectionKey) => void
   onToggleInfoGroup: (key: InfoGroupKey) => void
+  onToggleConnector: (key: ConnectorKey) => void
   onToggleCollapse: () => void
   onResize: (width: number) => void
 }
@@ -93,6 +100,8 @@ interface RowProps {
   /** Dashboard and Settings live in both the rail and the expanded panel. */
   fixed?: boolean
   leaf?: boolean
+  /** A short real-state word after the label — 'synced', never a count. */
+  tag?: string
 }
 
 /** One selectable line: a top-level row with an icon, or a leaf under a
@@ -107,7 +116,8 @@ function Row({
   title,
   railOnly,
   fixed,
-  leaf
+  leaf,
+  tag
 }: RowProps): React.JSX.Element {
   const cls = [
     leaf ? 'ws-nav-subitem' : 'ws-nav-item',
@@ -132,6 +142,7 @@ function Row({
         </span>
       )}
       <span className="ws-nav-label">{label}</span>
+      {tag && <span className="ws-nav-tag">{tag}</span>}
       {typeof count === 'number' && <span className="ws-nav-count">{count}</span>}
     </button>
   )
@@ -140,10 +151,12 @@ function Row({
 export default function WorkspaceSidebar({
   view,
   nav,
+  channels,
   onOpenGroup,
   onSelect,
   onToggleSection,
   onToggleInfoGroup,
+  onToggleConnector,
   onToggleCollapse,
   onResize
 }: WorkspaceSidebarProps): React.ReactElement {
@@ -287,6 +300,72 @@ export default function WorkspaceSidebar({
                               onClick={() => onSelect(row.id)}
                             />
                           ))}
+                      </div>
+                    )
+                  })
+                ) : section.key === 'slack' ? (
+                  NAV_CONNECTORS.map((connector) => {
+                    const list = channels[connector.key]
+                    const allId = connector.allId
+                    const entries = list?.entries ?? []
+                    const open = nav.openConnectors.includes(connector.key)
+                    const holding =
+                      !open && connectorOfSelection(nav.selection) === connector.key
+                    return (
+                      <div key={connector.key} className="ws-nav-group">
+                        <button
+                          type="button"
+                          className={`ws-nav-groupbtn ws-nav-connector${open ? ' is-open' : ''}${
+                            holding ? ' is-holding' : ''
+                          }`}
+                          aria-expanded={open}
+                          title={connector.note}
+                          onClick={() => onToggleConnector(connector.key)}
+                        >
+                          <span className="ws-nav-icon">
+                            <NavIcon name={connector.icon} />
+                          </span>
+                          <span className="ws-nav-label">{connector.label}</span>
+                          {entries.length > 0 && (
+                            <span className="ws-nav-count">{entries.length}</span>
+                          )}
+                          <Chevron open={open} />
+                        </button>
+                        {open && (
+                          <>
+                            {allId && (
+                              <Row
+                                leaf
+                                label="All channels"
+                                title={connector.note}
+                                active={nav.selection === allId}
+                                onClick={() => onSelect(allId)}
+                              />
+                            )}
+                            {list?.loading && <p className="ws-nav-note">Loading channels…</p>}
+                            {list?.error && (
+                              <p className="ws-nav-note is-error">{list.error}</p>
+                            )}
+                            {!list?.loading && !list?.error && entries.length === 0 && (
+                              <p className="ws-nav-note">{connector.note}</p>
+                            )}
+                            {entries.map((channel) => (
+                              <Row
+                                key={channel.id}
+                                leaf
+                                label={`#${channel.name}`}
+                                tag={channel.watched ? 'synced' : undefined}
+                                title={channel.name}
+                                active={
+                                  nav.selection === channelSelectionId(connector.key, channel.id)
+                                }
+                                onClick={() =>
+                                  onSelect(channelSelectionId(connector.key, channel.id))
+                                }
+                              />
+                            ))}
+                          </>
+                        )}
                       </div>
                     )
                   })

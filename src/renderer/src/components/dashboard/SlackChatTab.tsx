@@ -5,6 +5,9 @@ import type { DashboardChatMessage } from '../../../../shared/dashboard-contract
 interface SlackChatTabProps {
   projectId: string
   channels: Array<{ channelId: string; channelName: string }>
+  /** A channel picked from the sidebar's dropdown: the panel shows that one
+   * channel only, so the filter is replaced by its name. */
+  lockedChannel?: { id: string; name: string } | null
 }
 
 const PAGE_SIZE = 50
@@ -33,7 +36,8 @@ function formatChatTime(iso: string): string {
  */
 export default function SlackChatTab({
   projectId,
-  channels
+  channels,
+  lockedChannel
 }: SlackChatTabProps): React.ReactElement {
   const [channelId, setChannelId] = useState<string | null>(null)
   const [messages, setMessages] = useState<DashboardChatMessage[]>([])
@@ -50,15 +54,19 @@ export default function SlackChatTab({
   const stickBottomRef = useRef(true)
 
   const selectedChannel = useMemo(
-    () => channels.find((channel) => channel.channelId === channelId) ?? null,
-    [channels, channelId]
+    () =>
+      lockedChannel
+        ? { channelId: lockedChannel.id, channelName: lockedChannel.name }
+        : (channels.find((channel) => channel.channelId === channelId) ?? null),
+    [channels, channelId, lockedChannel]
   )
+  const activeChannelId = lockedChannel?.id ?? channelId
 
   useEffect(() => {
     let cancelled = false
     stickBottomRef.current = true
     window.api.dashboard
-      .getMessages({ projectId, channelId: channelId ?? undefined, limit: PAGE_SIZE })
+      .getMessages({ projectId, channelId: activeChannelId ?? undefined, limit: PAGE_SIZE })
       .then((page) => {
         if (cancelled) return
         setMessages(page.messages)
@@ -74,7 +82,7 @@ export default function SlackChatTab({
     return () => {
       cancelled = true
     }
-  }, [projectId, channelId])
+  }, [projectId, activeChannelId])
 
   // Auto-scroll to the newest message after the first page / a send.
   useEffect(() => {
@@ -94,7 +102,7 @@ export default function SlackChatTab({
     window.api.dashboard
       .getMessages({
         projectId,
-        channelId: channelId ?? undefined,
+        channelId: activeChannelId ?? undefined,
         beforeTs: nextBeforeTs,
         limit: PAGE_SIZE
       })
@@ -190,22 +198,26 @@ export default function SlackChatTab({
   return (
     <div className="ws-chat">
       <div className="ws-chat-toolbar">
-        <label className="ws-chat-filter">
-          <span>Channel</span>
-          <select
-            className="ws-chat-select"
-            value={channelId ?? ''}
-            onChange={(e) => changeChannel(e.target.value)}
-            aria-label="Filter messages by channel"
-          >
-            <option value="">All channels</option>
-            {channels.map((channel) => (
-              <option key={channel.channelId} value={channel.channelId}>
-                #{channel.channelName}
-              </option>
-            ))}
-          </select>
-        </label>
+        {lockedChannel ? (
+          <span className="ws-chat-channel-name">#{lockedChannel.name}</span>
+        ) : (
+          <label className="ws-chat-filter">
+            <span>Channel</span>
+            <select
+              className="ws-chat-select"
+              value={channelId ?? ''}
+              onChange={(e) => changeChannel(e.target.value)}
+              aria-label="Filter messages by channel"
+            >
+              <option value="">All channels</option>
+              {channels.map((channel) => (
+                <option key={channel.channelId} value={channel.channelId}>
+                  #{channel.channelName}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <span className="ws-chat-count">
           {messages.length} message{messages.length === 1 ? '' : 's'}
         </span>

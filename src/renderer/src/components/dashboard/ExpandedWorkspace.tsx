@@ -4,9 +4,10 @@ import type { DashboardProject } from '../../../../shared/dashboard-contract'
 import type { CardSummary, CardView } from './card-view'
 import CardHead, { type CardHeadFlag } from './CardHead'
 import { useWorkspaceNav } from '../../hooks/useWorkspaceNav'
+import { useSlackChannels } from '../../hooks/useSlackChannels'
 import WorkspaceSidebar from './WorkspaceSidebar'
 import WorkspaceContent from './WorkspaceContent'
-import type { NavEntry, WorkspaceEntryTab } from './workspace-nav'
+import { buildConnectorChannelLists, type NavEntry, type WorkspaceEntryTab } from './workspace-nav'
 import type { DetailKey } from './guide-model'
 
 interface ExpandedWorkspaceProps {
@@ -54,8 +55,22 @@ export default function ExpandedWorkspace({
     if (!initialTab && !initialGuideSection && !initialDetailKey) return null
     return { initialTab, initialGuideSection, initialDetailKey }
   }, [initialTab, initialGuideSection, initialDetailKey])
-  const { nav, openGroup, select, toggleSection, toggleInfoGroup, toggleCollapse, resize } =
+  const { nav, openGroup, select, toggleSection, toggleInfoGroup, toggleConnector, toggleCollapse, resize } =
     useWorkspaceNav(summary.projectId, entry)
+  const listing = useSlackChannels(project)
+  const channelLists = useMemo(
+    () =>
+      buildConnectorChannelLists({
+        clientLoading: listing.loading,
+        clientError: listing.error,
+        clientChannels: listing.channels,
+        watchedChannels: identity.channels.map((c) => ({
+          id: c.channelId,
+          name: c.channelName
+        }))
+      }),
+    [listing, identity.channels]
+  )
 
   const statusFlag: CardHeadFlag | null = summary.status
     ? (STATUS_FLAGS[summary.status] ?? { label: summary.status, tone: 'muted' })
@@ -95,14 +110,22 @@ export default function ExpandedWorkspace({
         <WorkspaceSidebar
           view={view}
           nav={nav}
+          channels={channelLists}
           onOpenGroup={openGroup}
           onSelect={select}
           onToggleSection={toggleSection}
           onToggleInfoGroup={toggleInfoGroup}
+          onToggleConnector={toggleConnector}
           onToggleCollapse={toggleCollapse}
           onResize={resize}
         />
-        <WorkspaceContent view={view} summary={summary} project={project} nav={nav} />
+        <WorkspaceContent
+          view={view}
+          summary={summary}
+          project={project}
+          nav={nav}
+          channels={channelLists}
+        />
       </div>
     </article>
   )

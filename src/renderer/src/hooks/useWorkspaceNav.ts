@@ -6,8 +6,10 @@ import {
   openGroupNav,
   resizeNav,
   selectNav,
+  toggleConnectorNav,
   toggleInfoGroupNav,
   toggleSectionNav,
+  type ConnectorKey,
   type InfoGroupKey,
   type NavEntry,
   type OpenGroup,
@@ -34,10 +36,11 @@ function readState(projectId: string): WorkspaceNavState {
 }
 
 /** Per-project nav state for the single-sidebar workspace: which rail entry is
- * open, the current centre selection, the open sections and Project Info
- * sub-groups, and whether the rail is collapsed. A deep-link entry (compact
- * chip / gear) moves the selection on top of the persisted state; it never
- * resets the width, the rail or the sections the user closed. */
+ * open, the current centre selection, the open sections, Project Info
+ * sub-groups and connector channel lists, and whether the rail is collapsed. A
+ * deep-link entry (compact chip / gear) moves the selection on top of the
+ * persisted state; it never resets the width, the rail or the dropdowns the
+ * user closed. */
 export function useWorkspaceNav(
   projectId: string,
   entry?: NavEntry | null
@@ -47,6 +50,7 @@ export function useWorkspaceNav(
   select: (selection: SelectionId) => void
   toggleSection: (key: SectionKey) => void
   toggleInfoGroup: (key: InfoGroupKey) => void
+  toggleConnector: (key: ConnectorKey) => void
   toggleCollapse: () => void
   resize: (width: number) => void
 } {
@@ -84,6 +88,10 @@ export function useWorkspaceNav(
     (key: InfoGroupKey): void => setNav((prev) => toggleInfoGroupNav(prev, key)),
     []
   )
+  const toggleConnector = useCallback(
+    (key: ConnectorKey): void => setNav((prev) => toggleConnectorNav(prev, key)),
+    []
+  )
   const toggleCollapse = useCallback(
     (): void => setNav((prev) => ({ ...prev, collapsed: !prev.collapsed })),
     []
@@ -93,5 +101,14 @@ export function useWorkspaceNav(
     []
   )
 
-  return { nav, openGroup, select, toggleSection, toggleInfoGroup, toggleCollapse, resize }
+  return {
+    nav,
+    openGroup,
+    select,
+    toggleSection,
+    toggleInfoGroup,
+    toggleConnector,
+    toggleCollapse,
+    resize
+  }
 }

@@ -1790,10 +1790,14 @@ button:disabled {
 /* ============ Dashboard feature (ADR-0007) — additive ============ */
 /* Dashboard sidebar entry (native row after Recents) — v2.0.1 */
 .dash-entry {
-  padding: 2px 10px 6px;
+  /* Air between the app title and the entry — the two never touch. */
+  margin-top: 12px;
+  padding: 2px 12px 8px;
 }
 .dash-entry-row {
+  font-size: 0.98rem;
   font-weight: 600;
+  padding: 8px 12px;
 }
 .dash-entry-row.is-active,
 .dash-entry-app.is-active {
@@ -1812,10 +1816,11 @@ button:disabled {
   transform: rotate(90deg);
 }
 .dash-entry-apps {
-  padding: 2px 0 4px 22px;
+  padding: 2px 0 4px 24px;
 }
 .dash-entry-app {
-  font-size: 0.86rem;
+  font-size: 0.92rem;
+  padding: 6px 12px;
 }
 
 .dash-view {
@@ -3357,6 +3362,20 @@ body.is-resizing-nav { cursor: col-resize; user-select: none; }
 }
 .ws-nav-item.is-empty,
 .ws-nav-subitem.is-empty { color: var(--text-faint); }
+/* A real state word after a row label — 'synced' on a channel this card reads. */
+.ws-nav-tag {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+/* One honest line inside a dropdown that has nothing to list yet. */
+.ws-nav-note {
+  margin: 4px 8px 6px 26px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-faint);
+}
+.ws-nav-note.is-error { color: var(--danger); }
 /* Inert rows use aria-disabled, not the disabled attribute: a disabled button
    swallows its tooltip, and the reason is the whole point of the row. */
 .ws-nav-item[aria-disabled='true'],
@@ -3442,6 +3461,13 @@ body.is-resizing-nav { cursor: col-resize; user-select: none; }
   min-width: 0;
   max-width: 260px;
   font-size: 12.5px;
+}
+.ws-chat-channel-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  overflow-wrap: break-word;
+  min-width: 0;
 }
 .ws-chat-count {
   flex-shrink: 0;

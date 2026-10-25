@@ -9,8 +9,12 @@ import SlackChatTab from './SlackChatTab'
 import ProjectSettingsTab from './ProjectSettingsTab'
 import AgentChatPanel from './AgentChatPanel'
 import {
+  channelIdOf,
+  connectorOf,
+  connectorOfSelection,
   detailKeyOf,
   guideSectionOf,
+  isChannelId,
   isDetailId,
   isGuideId,
   isVisualId,
@@ -18,6 +22,7 @@ import {
   slackSourceOf,
   visualKeyOf,
   xomniModeOf,
+  type ConnectorChannelLists,
   type OpenGroup,
   type WorkspaceNavState
 } from './workspace-nav'
@@ -27,19 +32,40 @@ interface WorkspaceContentProps {
   summary: CardSummary
   project: DashboardProject
   nav: WorkspaceNavState
+  channels: ConnectorChannelLists
 }
 
 /** Headings for the bodies no row owns. */
 const GROUP_META: Record<OpenGroup, { title: string; desc: string }> = {
   dash: { title: 'Dashboard', desc: 'Everything about this project at a glance.' },
   xomni: { title: 'Xomni', desc: 'Chat with this project.' },
-  slack: { title: 'Slack', desc: 'Messages from the connected workspaces.' },
+  slack: { title: 'Channels', desc: 'Messages from the connected workspaces.' },
   info: { title: 'Project info', desc: 'What this card has learned about the project.' },
   viz: { title: 'Visualizations', desc: 'Charts built from this project’s own numbers.' },
   settings: { title: 'Settings', desc: 'Model, key, channels and dates for this card.' }
 }
 
-function panelMeta(nav: WorkspaceNavState): { title: string; desc: string } {
+function panelMeta(
+  nav: WorkspaceNavState,
+  channels: ConnectorChannelLists
+): { title: string; desc: string } {
+  const sel = nav.selection
+  if (sel && isChannelId(sel)) {
+    const key = connectorOfSelection(sel)
+    const connector = connectorOf(key)
+    const id = channelIdOf(sel)
+    const entry = channels[key ?? 'client']?.entries.find((ch) => ch.id === id)
+    return {
+      title: entry ? `#${entry.name}` : (connector?.label ?? 'Channels'),
+      desc: 'One channel from this connector. Replies post here.'
+    }
+  }
+  // A connector's whole-workspace row is named "All channels" in the dropdown,
+  // which only reads clearly next to the connector's own label.
+  if (sel && sel.startsWith('s:')) {
+    const connector = connectorOf(connectorOfSelection(sel))
+    if (connector) return { title: `All of ${connector.label}`, desc: connector.note }
+  }
   const row = navRowOf(nav.selection)
   if (row) return { title: row.label, desc: row.desc }
   return GROUP_META[nav.openGroup]
@@ -49,10 +75,11 @@ export default function WorkspaceContent({
   view,
   summary,
   project,
-  nav
+  nav,
+  channels
 }: WorkspaceContentProps): React.ReactElement {
   const { centre, leftSidebar, rightSidebar, identity } = view
-  const { title, desc } = panelMeta(nav)
+  const { title, desc } = panelMeta(nav, channels)
   const sel = nav.selection
 
   let body: React.ReactNode
@@ -92,6 +119,16 @@ export default function WorkspaceContent({
             channelId: c.channelId,
             channelName: c.channelName
           }))}
+          lockedChannel={
+            sel && isChannelId(sel)
+              ? (() => {
+                  const id = channelIdOf(sel)
+                  const entry = channels.client?.entries.find((ch) => ch.id === id)
+                  const watched = identity.channels.find((c) => c.channelId === id)
+                  return { id, name: entry?.name ?? watched?.channelName ?? id }
+                })()
+              : null
+          }
         />
       )
     }

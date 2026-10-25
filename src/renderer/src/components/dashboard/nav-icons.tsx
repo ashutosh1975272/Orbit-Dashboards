@@ -74,6 +74,13 @@ const SHAPES: Record<string, React.ReactNode> = {
       <path d="M4 13.5v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" />
     </>
   ),
+  plug: (
+    <>
+      <path d="M8.5 3.5v5M15.5 3.5v5" />
+      <path d="M6 8.5h12v3a6 6 0 0 1-6 6 6 6 0 0 1-6-6z" />
+      <path d="M12 17.5v3" />
+    </>
+  ),
   users: (
     <>
       <circle cx="9.5" cy="8" r="3.2" />
