@@ -9,6 +9,47 @@ export type DashboardTokenSource = 'oauth' | 'manual'
 export type DashboardMood = 'good' | 'neutral' | 'tense'
 export type DashboardSyncState = 'idle' | 'syncing' | 'error'
 
+/** Where a stored message came from: the card's client workspace, or our own. */
+export type DashboardSource = 'client' | 'ours'
+
+export type DashboardTeamWorkspaceSource = 'oauth' | 'manual' | 'none'
+
+/** One workspace the app can already reach, offered when connecting ours. */
+export interface DashboardTeamWorkspaceCandidate {
+  profileId: string
+  profileName: string
+  teamId: string
+  teamName: string
+  teamDomain: string
+  scopes: string[]
+}
+
+/** Public view of the one team workspace shared by every card. Never a token. */
+export interface DashboardTeamWorkspace {
+  connected: boolean
+  profileId: string | null
+  teamId: string | null
+  teamName: string | null
+  source: DashboardTeamWorkspaceSource
+  /** Mask such as "••••abcd"; null when nothing is connected. */
+  maskedToken: string | null
+  /** The channels pinned from this workspace onto every card. */
+  channels: DashboardMonitor[]
+  updatedAt: string | null
+}
+
+export interface DashboardTeamWorkspaceConnectPayload {
+  source: 'oauth' | 'manual'
+  profileId?: string
+  teamId?: string
+  /** Raw token, only for source = 'manual'. Never returned by main. */
+  token?: string
+}
+
+export interface DashboardTeamWorkspaceChannelsPayload {
+  channels: DashboardMonitor[]
+}
+
 export interface DashboardMonitor {
   /** Monitored Slack channel (public channel, private group, or mpim). */
   channelId: string
@@ -44,6 +85,8 @@ export interface DashboardProject {
 export interface DashboardChannelDelta {
   channelId: string
   channelName: string
+  /** Which workspace this channel belongs to (absent on rows stored before v3). */
+  source?: DashboardSource
   messageCount: number
   /** New messages added by the latest sync (tiny +N chip on the card). */
   newMessageCount?: number
@@ -72,6 +115,8 @@ export interface DashboardProjectSnapshot {
   /** ISO of the last successful sync covering this project. */
   lastUpdatedAt: string | null
   syncState: DashboardSyncState
+  /** Set when our team workspace failed while the client workspace synced fine. */
+  ourWorkspaceError?: string | null
   /** v2.2 NVIDIA NIM rolling insight (undefined/null = not generated yet). */
   insight?: ProjectInsight | null
   insightUpdatedAt?: string | null
@@ -150,10 +195,12 @@ export type DashboardSyncProgressPayload = {
 }
 
 export interface DashboardListChannelsPayload {
-  tokenSource: 'oauth' | 'manual'
+  tokenSource?: 'oauth' | 'manual'
   profileId?: string
   teamId?: string
   manualTokenKey?: string
+  /** 'ours' lists the globally connected team workspace instead of a card's. */
+  source?: DashboardSource
 }
 
 export interface SyncNowPayload {
@@ -375,6 +422,8 @@ export interface DashboardChatMessage {
   userId: string
   /** Display name when resolvable; falls back to the user id (ADR-0007). */
   userName: string
+  /** Workspace this message came from. */
+  source: DashboardSource
   text: string
   /** ISO timestamp derived from ts. */
   atIso: string
@@ -395,7 +444,9 @@ export interface DashboardChatPage {
 
 export interface DashboardChatQueryPayload {
   projectId: string
-  /** undefined = all watched channels. */
+  /** Which workspace to read; undefined = the card's client workspace. */
+  source?: DashboardSource
+  /** undefined = every watched channel in that workspace. */
   channelId?: string
   /** Return messages strictly older than this Slack ts. */
   beforeTs?: string
@@ -405,6 +456,8 @@ export interface DashboardChatQueryPayload {
 
 export interface DashboardSendMessagePayload {
   projectId: string
+  /** Which workspace to post into; undefined = the card's client workspace. */
+  source?: DashboardSource
   channelId: string
   text: string
 }

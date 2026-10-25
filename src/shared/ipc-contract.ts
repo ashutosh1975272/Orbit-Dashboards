@@ -17,6 +17,10 @@ import type {
   DashboardManualToken,
   DashboardSnapshot,
   DashboardSyncProgressPayload,
+  DashboardTeamWorkspace,
+  DashboardTeamWorkspaceCandidate,
+  DashboardTeamWorkspaceChannelsPayload,
+  DashboardTeamWorkspaceConnectPayload,
   DashboardViewSetPayload,
   ManualTokenPayload,
   ProjectDeletePayload,
@@ -132,7 +136,13 @@ export const IpcChannels = {
 
   DashboardGetAiSettings: 'dashboard:get-ai-settings',
   DashboardSaveAiSettings: 'dashboard:save-ai-settings',
-  DashboardListAiModels: 'dashboard:list-ai-models'
+  DashboardListAiModels: 'dashboard:list-ai-models',
+
+  DashboardTeamWorkspaceGet: 'dashboard:team-workspace-get',
+  DashboardTeamWorkspaceCandidates: 'dashboard:team-workspace-candidates',
+  DashboardTeamWorkspaceConnect: 'dashboard:team-workspace-connect',
+  DashboardTeamWorkspaceChannels: 'dashboard:team-workspace-channels',
+  DashboardTeamWorkspaceClear: 'dashboard:team-workspace-clear'
 } as const
 
 export type IpcChannel = (typeof IpcChannels)[keyof typeof IpcChannels]
@@ -289,6 +299,15 @@ export interface IpcApi {
     getAiSettings: (payload?: DashboardAiSettingsQueryPayload) => Promise<DashboardAiSettingsView>
     saveAiSettings: (payload: DashboardAiSettingsSavePayload) => Promise<DashboardAiSettingsView>
     listAiModels: (payload?: DashboardAiModelsQueryPayload) => Promise<DashboardAiModelsResult>
+    getTeamWorkspace: () => Promise<DashboardTeamWorkspace>
+    listTeamWorkspaceCandidates: () => Promise<DashboardTeamWorkspaceCandidate[]>
+    connectTeamWorkspace: (
+      payload: DashboardTeamWorkspaceConnectPayload
+    ) => Promise<DashboardTeamWorkspace>
+    setTeamWorkspaceChannels: (
+      payload: DashboardTeamWorkspaceChannelsPayload
+    ) => Promise<DashboardTeamWorkspace>
+    clearTeamWorkspace: () => Promise<DashboardTeamWorkspace>
   }
 }
 
@@ -315,6 +334,8 @@ export type {
   DashboardSendMessageResult,
   DashboardSnapshot,
   DashboardSyncProgressPayload,
+  DashboardTeamWorkspace,
+  DashboardTeamWorkspaceCandidate,
   DashboardViewSetPayload,
   ManualTokenPayload,
   OpenWorkspacePayload,

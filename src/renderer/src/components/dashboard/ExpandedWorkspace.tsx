@@ -1,6 +1,6 @@
 import type React from 'react'
-import { useMemo } from 'react'
-import type { DashboardProject } from '../../../../shared/dashboard-contract'
+import { useEffect, useMemo, useState } from 'react'
+import type { DashboardProject, DashboardTeamWorkspace } from '../../../../shared/dashboard-contract'
 import type { CardSummary, CardView } from './card-view'
 import CardHead, { type CardHeadFlag } from './CardHead'
 import { useWorkspaceNav } from '../../hooks/useWorkspaceNav'
@@ -55,21 +55,57 @@ export default function ExpandedWorkspace({
     if (!initialTab && !initialGuideSection && !initialDetailKey) return null
     return { initialTab, initialGuideSection, initialDetailKey }
   }, [initialTab, initialGuideSection, initialDetailKey])
-  const { nav, openGroup, select, toggleSection, toggleInfoGroup, toggleConnector, toggleCollapse, resize } =
-    useWorkspaceNav(summary.projectId, entry)
-  const listing = useSlackChannels(project)
+  const {
+    nav,
+    openGroup,
+    select,
+    toggleSection,
+    toggleInfoGroup,
+    toggleConnector,
+    toggleCollapse,
+    resize
+  } = useWorkspaceNav(summary.projectId, entry)
+  const listing = useSlackChannels(project, 'client')
+  const [teamWorkspace, setTeamWorkspace] = useState<DashboardTeamWorkspace | null>(null)
+  const [teamLoading, setTeamLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    window.api.dashboard
+      .getTeamWorkspace()
+      .then((workspace) => {
+        if (cancelled) return
+        setTeamWorkspace(workspace)
+        setTeamLoading(false)
+      })
+      .catch(() => {
+        if (!cancelled) setTeamLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const channelLists = useMemo(
     () =>
       buildConnectorChannelLists({
         clientLoading: listing.loading,
         clientError: listing.error,
         clientChannels: listing.channels,
+        // The card reads only the channels pinned in Global settings, not every
+        // channel the team token can reach.
+        teamLoading,
+        teamChannels: (teamWorkspace?.channels ?? []).map((c) => ({
+          id: c.channelId,
+          name: c.channelName
+        })),
+        teamConnected: teamWorkspace?.connected ?? false,
         watchedChannels: identity.channels.map((c) => ({
           id: c.channelId,
           name: c.channelName
         }))
       }),
-    [listing, identity.channels]
+    [listing, teamLoading, teamWorkspace, identity.channels]
   )
 
   const statusFlag: CardHeadFlag | null = summary.status

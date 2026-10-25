@@ -10,10 +10,14 @@ import type {
   DashboardChatPage,
   DashboardChatQueryPayload,
   DashboardChatTokenStatus,
+  DashboardListChannelsPayload,
   DashboardSendMessagePayload,
   DashboardSendMessageResult,
   DashboardSnapshot,
   DashboardSyncProgressPayload,
+  DashboardTeamWorkspaceCandidate,
+  DashboardTeamWorkspaceChannelsPayload,
+  DashboardTeamWorkspaceConnectPayload,
   ManualTokenPayload,
   ProjectDeletePayload,
   ProjectUpsertPayload,
@@ -33,6 +37,7 @@ import type { SlackChannelSummary } from '../../shared/types'
 import { handleInvoke } from './handle'
 import type { HistoryStore } from '../dashboard/history-store'
 import type { DashboardSidebarStateStore } from '../dashboard/sidebar-state'
+import { maskToken, type TeamWorkspaceStore } from '../dashboard/team-workspace-store'
 
 export interface DashboardIpcDeps {
   monitorStore: MonitorStore
@@ -52,6 +57,10 @@ export interface DashboardIpcDeps {
   chatService?: DashboardChatService
   /** v2.7 — global + per-project AI provider settings */
   aiSettings?: AiSettingsService
+  /** v3 — the one team workspace shared by every card */
+  teamWorkspace?: TeamWorkspaceStore
+  /** v3 — workspaces the app can already reach, offered when connecting ours */
+  listTeamWorkspaceCandidates?: () => Promise<DashboardTeamWorkspaceCandidate[]>
 }
 
 export interface DashboardIpcRegistration {
@@ -94,14 +103,15 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
 
   handleInvoke(
     IpcChannels.DashboardListChannels,
-    async (payload: {
-      tokenSource: 'oauth' | 'manual'
-      profileId?: string
-      teamId?: string
-      manualTokenKey?: string
-    }): Promise<SlackChannelSummary[]> => {
+    async (payload: DashboardListChannelsPayload): Promise<SlackChannelSummary[]> => {
       let token: string | null = null
-      if (payload.tokenSource === 'manual') {
+      if (payload.source === 'ours') {
+        const connection = await deps.teamWorkspace?.getConnection()
+        if (!connection) return []
+        token =
+          connection.token ??
+          (await deps.oauthTokenProvider.tryGet(connection.profileId, connection.teamId))
+      } else if (payload.tokenSource === 'manual') {
         token = payload.manualTokenKey
           ? await deps.monitorStore.getManualToken(payload.manualTokenKey)
           : null
@@ -222,9 +232,8 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
 
   // v2.4 — Sidebar state per project
   if (deps.sidebarStateStore) {
-    handleInvoke(
-      IpcChannels.DashboardSidebarGet,
-      async (payload: { projectId: string }) => deps.sidebarStateStore!.get(payload.projectId)
+    handleInvoke(IpcChannels.DashboardSidebarGet, async (payload: { projectId: string }) =>
+      deps.sidebarStateStore!.get(payload.projectId)
     )
 
     handleInvoke(
@@ -236,7 +245,11 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
 
     handleInvoke(
       IpcChannels.DashboardSidebarUpdate,
-      async (payload: { projectId: string; sidebar: 'left' | 'right'; patch: Partial<SidebarState> }) => {
+      async (payload: {
+        projectId: string
+        sidebar: 'left' | 'right'
+        patch: Partial<SidebarState>
+      }) => {
         if (payload.sidebar === 'left') {
           return deps.sidebarStateStore!.updateLeft(payload.projectId, payload.patch)
         } else {
@@ -263,6 +276,62 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
       async (projectId: string): Promise<DashboardChatTokenStatus> =>
         deps.chatService!.chatTokenStatus(projectId)
     )
+  }
+
+  // v3 — our team workspace: connect once, pin its channels, every card reads it.
+  if (deps.teamWorkspace) {
+    const store = deps.teamWorkspace
+    handleInvoke(IpcChannels.DashboardTeamWorkspaceGet, async () => store.readPublic())
+
+    handleInvoke(
+      IpcChannels.DashboardTeamWorkspaceCandidates,
+      async (): Promise<DashboardTeamWorkspaceCandidate[]> =>
+        (await deps.listTeamWorkspaceCandidates?.()) ?? []
+    )
+
+    handleInvoke(
+      IpcChannels.DashboardTeamWorkspaceConnect,
+      async (payload: DashboardTeamWorkspaceConnectPayload) => {
+        const poller = new SlackPoller()
+        let token: string | null = null
+        if (payload.source === 'manual') {
+          token = payload.token?.trim() ?? null
+          if (!token) throw new Error('Paste a Slack token to connect our workspace.')
+        } else {
+          if (!payload.profileId || !payload.teamId) {
+            throw new Error('Pick a workspace to connect.')
+          }
+          token = await deps.oauthTokenProvider.tryGet(payload.profileId, payload.teamId)
+          if (!token) {
+            throw new Error('That workspace has no stored token any more. Reconnect it first.')
+          }
+        }
+        // Verify with Slack before storing: a dead token must never look connected.
+        const check = await poller.authTest(token)
+        if (!check.valid) throw new Error(check.error ?? 'Slack rejected this token')
+        const teamId = check.teamId ?? payload.teamId ?? ''
+        if (!teamId) throw new Error('Slack did not report a workspace id for this token.')
+        return store.connect({
+          payload,
+          profileId:
+            payload.source === 'manual' ? `manual:${teamId}` : (payload.profileId as string),
+          teamId,
+          teamName: check.teamName ?? teamId,
+          token: payload.source === 'manual' ? (token as string) : undefined,
+          maskedToken: maskToken(token)
+        })
+      }
+    )
+
+    handleInvoke(
+      IpcChannels.DashboardTeamWorkspaceChannels,
+      async (payload: DashboardTeamWorkspaceChannelsPayload) => store.setChannels(payload.channels)
+    )
+
+    handleInvoke(IpcChannels.DashboardTeamWorkspaceClear, async () => {
+      await store.clear()
+      return store.readPublic()
+    })
   }
 
   // v2.7 — AI provider settings (keys stay in main; public views are masked)

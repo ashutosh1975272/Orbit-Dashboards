@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { DashboardProject } from '../../../shared/dashboard-contract'
+import type { DashboardProject, DashboardSource } from '../../../shared/dashboard-contract'
 
 export interface SlackChannelListing {
   loading: boolean
@@ -10,39 +10,42 @@ export interface SlackChannelListing {
 const EMPTY: SlackChannelListing = { loading: false, error: null, channels: [] }
 const LOADING: SlackChannelListing = { loading: true, error: null, channels: [] }
 
-/** The last settled listing, tagged with the project it was fetched for. The
- * tag is what lets the hook tell "this card's list" from "the previous card's
- * list" during render, without writing state before the fetch settles. */
+/** The last settled listing, tagged with the workspace it was fetched for. The
+ * tag is what lets the hook tell "this workspace's list" from "the previous
+ * one's list" during render, without writing state before the fetch settles. */
 interface SettledListing extends SlackChannelListing {
-  projectId: string | null
+  key: string | null
 }
 
-const UNSETTLED: SettledListing = { projectId: null, ...EMPTY }
+const UNSETTLED: SettledListing = { key: null, ...EMPTY }
 
-/** Every channel the card's own Slack token can reach, listed once the first
- * card that shows the Channels section asks for it. A failure stays a failure:
- * the dropdown shows the reason rather than an empty list that would read as
- * "no channels". While a fetch is in flight, or right after the card changed,
- * the listing reads as loading so one card never shows another card's channels. */
-export function useSlackChannels(project: DashboardProject | null): SlackChannelListing {
+/** Every channel the selected workspace's token can reach. `source` is the
+ * card's own client workspace by default; 'ours' reads the one team workspace
+ * connected globally. A failure stays a failure: the dropdown shows the reason
+ * rather than an empty list that would read as "no channels". While a fetch is
+ * in flight, or right after the workspace changed, the listing reads as
+ * loading so one workspace never shows another's channels. */
+export function useSlackChannels(
+  project: DashboardProject | null,
+  source: DashboardSource = 'client'
+): SlackChannelListing {
   const [settled, setSettled] = useState<SettledListing>(UNSETTLED)
-  const projectId = project?.id ?? null
-  // Depend on the token's identity, not the object: a caller that rebuilds the
-  // project object each render must not restart the listing.
+  // Our workspace is global, so it does not depend on which card asked.
+  const key = source === 'ours' ? 'ours' : (project?.id ?? null)
   const tokenSource = project?.tokenSource ?? 'oauth'
   const profileId = project?.profileId
   const teamId = project?.teamId
   const manualTokenKey = project?.manualTokenKey
 
   useEffect(() => {
-    if (!projectId) return
+    if (!key) return
     let cancelled = false
     window.api.dashboard
-      .listChannels({ tokenSource, profileId, teamId, manualTokenKey })
+      .listChannels({ source, tokenSource, profileId, teamId, manualTokenKey })
       .then((channels) => {
         if (cancelled) return
         setSettled({
-          projectId,
+          key,
           loading: false,
           error: null,
           channels: channels.map((c) => ({ id: c.id, name: c.name }))
@@ -51,7 +54,7 @@ export function useSlackChannels(project: DashboardProject | null): SlackChannel
       .catch((err: unknown) => {
         if (cancelled) return
         setSettled({
-          projectId,
+          key,
           loading: false,
           error: err instanceof Error ? err.message : 'Could not list the channels.',
           channels: []
@@ -60,9 +63,9 @@ export function useSlackChannels(project: DashboardProject | null): SlackChannel
     return () => {
       cancelled = true
     }
-  }, [projectId, tokenSource, profileId, teamId, manualTokenKey])
+  }, [key, source, tokenSource, profileId, teamId, manualTokenKey])
 
-  if (!projectId) return EMPTY
-  if (settled.projectId !== projectId) return LOADING
+  if (!key) return EMPTY
+  if (settled.key !== key) return LOADING
   return { loading: settled.loading, error: settled.error, channels: settled.channels }
 }

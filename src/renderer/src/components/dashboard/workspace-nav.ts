@@ -151,7 +151,10 @@ export interface ConnectorChannelList {
   entries: ChannelEntry[]
 }
 
-export type ConnectorChannelLists = Partial<Record<ConnectorKey, ConnectorChannelList>>
+export type ConnectorChannelLists = Partial<Record<ConnectorKey, ConnectorChannelList>> & {
+  /** True once the one team workspace is connected (ticket 04). */
+  teamConnected?: boolean
+}
 
 /** Fold the channels a Slack token can see plus the card's watched channels
  * into the dropdown lists. Only the client side has data today: our team
@@ -164,6 +167,9 @@ export function buildConnectorChannelLists(args: {
   watchedChannels: Array<{ id: string; name: string }>
   /** Set once a team workspace exists; empty until then. */
   teamChannels?: Array<{ id: string; name: string }>
+  teamLoading?: boolean
+  teamError?: string | null
+  teamConnected?: boolean
 }): ConnectorChannelLists {
   const merge = (
     listed: Array<{ id: string; name: string }>,
@@ -187,10 +193,11 @@ export function buildConnectorChannelLists(args: {
       entries: merge(args.clientChannels, args.watchedChannels)
     },
     team: {
-      loading: false,
-      error: null,
+      loading: args.teamLoading ?? false,
+      error: args.teamError ?? null,
       entries: merge(args.teamChannels ?? [], [])
-    }
+    },
+    teamConnected: args.teamConnected ?? false
   }
 }
 

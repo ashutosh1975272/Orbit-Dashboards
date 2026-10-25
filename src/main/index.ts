@@ -6,7 +6,11 @@ import dockIcon from '../../resources/dockIcon.png?asset'
 import trayIcon from '../../resources/trayIcon.png?asset'
 import { APP_BUNDLE_ID, APP_DISPLAY_NAME } from '../shared/brand'
 import { IpcChannels } from '../shared/ipc-contract'
-import type { DashboardDigest, RecentActivity } from '../shared/dashboard-contract'
+import type {
+  DashboardDigest,
+  DashboardTeamWorkspaceCandidate,
+  RecentActivity
+} from '../shared/dashboard-contract'
 import { AdminAuthController, defaultAdminSessionPath } from './admin-auth'
 import { AppLockController, notifyUnreadIncrease } from './app-lock'
 import { AppSettingsStore, defaultAppSettingsPath } from './app-settings'
@@ -20,6 +24,7 @@ import { MonitorStore } from './dashboard/monitor-store'
 import { DashboardInsightSyncEngine } from './dashboard/sync-engine'
 import { DashboardScheduler } from './dashboard/scheduler'
 import { DashboardSidebarStateStore } from './dashboard/sidebar-state'
+import { TeamWorkspaceStore } from './dashboard/team-workspace-store'
 import { migrateWorkspaceCards } from './dashboard/workspace-migration'
 import { buildRecentFeed } from './dashboard/recent-feed'
 import { DashboardDigestStore, refreshDigest } from './dashboard/digest'
@@ -235,6 +240,51 @@ if (!gotSingleInstanceLock) {
     })
     const dashboardDeltaStore = new DashboardDeltaStore({ rootDir: dashboardRoot })
     const dashboardSidebarStateStore = new DashboardSidebarStateStore(userData)
+    // v3 — one team workspace shared by every card (ticket 04). The secret stays
+    // encrypted here; cards only ever see the pinned channel list.
+    const teamWorkspaceStore = new TeamWorkspaceStore({
+      rootDir: dashboardRoot,
+      encryptionAvailable: (await import('electron')).safeStorage.isEncryptionAvailable()
+    })
+    const teamWorkspaceReader = {
+      getConnection: async (): Promise<{
+        profileId: string
+        teamId: string
+        token: string | null
+        channels: Array<{ channelId: string; channelName: string }>
+      } | null> => {
+        const connection = await teamWorkspaceStore.getConnection()
+        if (!connection) return null
+        const token =
+          connection.token ?? (await tokenStore.tryGet(connection.profileId, connection.teamId))
+        return {
+          profileId: connection.profileId,
+          teamId: connection.teamId,
+          token,
+          channels: connection.channels
+        }
+      }
+    }
+    const listTeamWorkspaceCandidates = async (): Promise<
+      DashboardTeamWorkspaceCandidate[]
+    > => {
+      const profiles = await profileStore.list()
+      const byTeam = new Map<string, DashboardTeamWorkspaceCandidate>()
+      for (const profile of profiles) {
+        for (const workspace of await tokenStore.listWorkspaces(profile.id)) {
+          if (!workspace.teamId || byTeam.has(workspace.teamId)) continue
+          byTeam.set(workspace.teamId, {
+            profileId: profile.id,
+            profileName: profileDisplayLabel(profile),
+            teamId: workspace.teamId,
+            teamName: workspace.teamName,
+            teamDomain: workspace.teamDomain,
+            scopes: workspace.scopes
+          })
+        }
+      }
+      return [...byTeam.values()]
+    }
     // v2.2 — NVIDIA NIM rolling insights (universal key/model from .env)
     const nimPrimary =
       process.env.NVIDIA_NIM_MODEL_PRIMARY ?? 'nvidia/nemotron-3.5-super-vl-120b-a12b'
@@ -301,6 +351,7 @@ if (!gotSingleInstanceLock) {
       manualTokenProvider: {
         getManualToken: (key: string) => dashboardMonitorStore.getManualToken(key)
       },
+      teamWorkspace: teamWorkspaceReader,
       insightEngine,
       insightReader: {
         getLastInsight: (projectId: string) => insightEngine.existingInsight(projectId),
@@ -330,6 +381,7 @@ if (!gotSingleInstanceLock) {
       monitorStore: dashboardMonitorStore,
       deltaStore: dashboardDeltaStore,
       oauthTokenProvider: { tryGet: (profileId, teamId) => tokenStore.tryGet(profileId, teamId) },
+      teamWorkspace: teamWorkspaceReader,
       oauthScopesProvider: async (profileId, teamId) => {
         const links = await tokenStore.listWorkspaces(profileId)
         return links.find((link) => link.teamId === teamId)?.scopes ?? null
@@ -428,7 +480,9 @@ if (!gotSingleInstanceLock) {
       getDigest,
       sidebarStateStore: dashboardSidebarStateStore,
       chatService: dashboardChatService,
-      aiSettings
+      aiSettings,
+      teamWorkspace: teamWorkspaceStore,
+      listTeamWorkspaceCandidates
     })
     void runWorkspaceMigration()
     dashboardScheduler.start()

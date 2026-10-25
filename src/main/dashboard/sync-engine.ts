@@ -2,8 +2,10 @@ import { SlackPoller } from './slack-poller'
 import type { InsightEngine } from './insight-engine'
 import type {
   DashboardChannelDelta,
+  DashboardMonitor,
   DashboardProject,
   DashboardProjectSnapshot,
+  DashboardSource,
   DashboardSyncProgressPayload,
   ProjectInsight
 } from '../../shared/dashboard-contract'
@@ -29,6 +31,33 @@ export interface ManualTokenProvider {
   getManualToken(key: string): Promise<string | null>
 }
 
+/** The one team workspace shared by every card (ticket 04). */
+export interface TeamWorkspaceReader {
+  getConnection(): Promise<{
+    profileId: string
+    teamId: string
+    token: string | null
+    channels: DashboardMonitor[]
+  } | null>
+}
+
+/** One workspace a sync run has to read. */
+interface SyncWorkspace {
+  source: DashboardSource
+  profileId: string
+  teamId: string
+  token: string
+  monitors: DashboardMonitor[]
+}
+
+/** The same workspace without a token — enough to read what is already stored. */
+interface StoredWorkspace {
+  source: DashboardSource
+  profileId: string
+  teamId: string
+  monitors: DashboardMonitor[]
+}
+
 /** v2.3 — lets the engine show the last AI insight without a network sync. */
 export interface InsightReader {
   getLastInsight: (projectId: string) => Promise<ProjectInsight | null>
@@ -40,6 +69,8 @@ export interface DashboardSyncEngineDeps {
   deltaStore: DashboardDeltaStore
   oauthTokenProvider: OAuthTokenProvider
   manualTokenProvider?: ManualTokenProvider
+  /** v3 — our team workspace (optional; a card still syncs its client workspace alone). */
+  teamWorkspace?: TeamWorkspaceReader
   pollerFactory?: () => DashboardPoller
   onProgress?: (payload: DashboardSyncProgressPayload) => void
   /** diagnostics (never secrets) */
@@ -55,6 +86,7 @@ export class DashboardSyncEngine {
   private readonly deltaStore: DashboardDeltaStore
   private readonly oauthTokenProvider: OAuthTokenProvider
   private readonly manualTokenProvider?: ManualTokenProvider
+  private readonly teamWorkspace: TeamWorkspaceReader | undefined
   private readonly pollerFactory: () => DashboardPoller
   private readonly log: (msg: string) => void
   private readonly insightReader: InsightReader | undefined
@@ -68,6 +100,7 @@ export class DashboardSyncEngine {
     this.deltaStore = deps.deltaStore
     this.oauthTokenProvider = deps.oauthTokenProvider
     this.manualTokenProvider = deps.manualTokenProvider
+    this.teamWorkspace = deps.teamWorkspace
     this.pollerFactory = deps.pollerFactory ?? (() => new SlackPoller())
     this.log = deps.log ?? (() => undefined)
     this.insightReader = deps.insightReader
@@ -111,46 +144,47 @@ export class DashboardSyncEngine {
     return this.oauthTokenProvider.tryGet(project.profileId, project.teamId)
   }
 
-  /** Pull new messages for every monitored channel and append to the store. */
-  private async syncCore(
-    project: DashboardProject,
-    token: string
+  /** Pull new messages for every channel of one workspace and append them. */
+  private async syncWorkspace(
+    workspace: SyncWorkspace,
+    poller: DashboardPoller
   ): Promise<DashboardChannelDelta[]> {
-    const poller = this.pollerFactory()
     const perChannel: DashboardChannelDelta[] = []
 
-    for (const monitor of project.monitors) {
+    for (const monitor of workspace.monitors) {
       const before = await this.deltaStore.readSnapshotMeta(
-        project.profileId,
-        project.teamId,
+        workspace.profileId,
+        workspace.teamId,
         monitor.channelId
       )
       const cursor = before?.cursor
 
       const result = await poller.fetchHistory({
-        token,
+        token: workspace.token,
         channelId: monitor.channelId,
         afterTs: cursor,
         limit: 200
       })
 
       const stored = await this.deltaStore.appendMessages({
-        profileId: project.profileId,
-        teamId: project.teamId,
+        profileId: workspace.profileId,
+        teamId: workspace.teamId,
         channelId: monitor.channelId,
         channelName: monitor.channelName,
-        messages: result.messages
+        messages: result.messages,
+        source: workspace.source
       })
 
       const after = await this.deltaStore.readSnapshotMeta(
-        project.profileId,
-        project.teamId,
+        workspace.profileId,
+        workspace.teamId,
         monitor.channelId
       )
 
       perChannel.push({
         channelId: monitor.channelId,
         channelName: monitor.channelName,
+        source: workspace.source,
         messageCount: after?.messageCount ?? stored.added,
         newMessageCount: stored.added,
         latestMessageAt: new Date(Number(stored.cursor) * 1000).toISOString(),
@@ -161,15 +195,64 @@ export class DashboardSyncEngine {
     return perChannel
   }
 
-  private perChannelDelta(delta: {
-    channel: { id: string; name: string }
-    messages: DashboardStoredMessage[]
-    cursor: string
-    lastSyncAt: string
-  }): DashboardChannelDelta {
+  /** Read our team workspace without throwing: a missing one is simply absent. */
+  private async ourWorkspace(): Promise<{
+    connection: {
+      profileId: string
+      teamId: string
+      token: string | null
+      channels: DashboardMonitor[]
+    } | null
+    error: string | null
+  }> {
+    if (!this.teamWorkspace) return { connection: null, error: null }
+    try {
+      return { connection: await this.teamWorkspace.getConnection(), error: null }
+    } catch (err) {
+      return {
+        connection: null,
+        error: err instanceof Error ? err.message : 'could not read our workspace'
+      }
+    }
+  }
+
+  /** Workspaces this card reads: its own (always) and ours (when connected). */
+  private async storedWorkspaces(
+    project: DashboardProject
+  ): Promise<{ workspaces: StoredWorkspace[]; error: string | null }> {
+    const workspaces: StoredWorkspace[] = [
+      {
+        source: 'client',
+        profileId: project.profileId,
+        teamId: project.teamId,
+        monitors: project.monitors
+      }
+    ]
+    const { connection, error } = await this.ourWorkspace()
+    if (connection && connection.channels.length > 0) {
+      workspaces.push({
+        source: 'ours',
+        profileId: connection.profileId,
+        teamId: connection.teamId,
+        monitors: connection.channels
+      })
+    }
+    return { workspaces, error }
+  }
+
+  private perChannelDelta(
+    delta: {
+      channel: { id: string; name: string }
+      messages: DashboardStoredMessage[]
+      cursor: string
+      lastSyncAt: string
+    },
+    source: DashboardSource
+  ): DashboardChannelDelta {
     return {
       channelId: delta.channel.id,
       channelName: delta.channel.name,
+      source,
       messageCount: delta.messages.length,
       latestMessageAt: new Date(Number(delta.cursor) * 1000).toISOString(),
       cursor: delta.cursor,
@@ -200,7 +283,48 @@ export class DashboardSyncEngine {
             : 'Workspace not connected via OAuth yet'
         )
       }
-      const perChannel = await this.syncCore(project, token)
+      const poller = this.pollerFactory()
+      const clientDeltas = await this.syncWorkspace(
+        {
+          source: 'client',
+          profileId: project.profileId,
+          teamId: project.teamId,
+          token,
+          monitors: project.monitors
+        },
+        poller
+      )
+
+      // Our team workspace is additive: if it fails, the client sync still
+      // counts and the card keeps showing the data it already had.
+      let ourDeltas: DashboardChannelDelta[] = []
+      let ourWorkspaceError: string | null = null
+      const { connection, error: readError } = await this.ourWorkspace()
+      if (readError) ourWorkspaceError = readError
+      if (connection) {
+        if (!connection.token) {
+          ourWorkspaceError =
+            'Our team workspace has no usable token. Reconnect it in Global settings.'
+        } else if (connection.channels.length > 0) {
+          try {
+            ourDeltas = await this.syncWorkspace(
+              {
+                source: 'ours',
+                profileId: connection.profileId,
+                teamId: connection.teamId,
+                token: connection.token,
+                monitors: connection.channels
+              },
+              poller
+            )
+          } catch (err) {
+            ourWorkspaceError = err instanceof Error ? err.message : 'our workspace sync failed'
+            this.log(`[dashboard] our-workspace sync failed: ${ourWorkspaceError}`)
+          }
+        }
+      }
+
+      const perChannel = [...clientDeltas, ...ourDeltas]
       const messages = await this.collectMessages(project)
       const snapshot = summarizeProject({
         project,
@@ -221,6 +345,7 @@ export class DashboardSyncEngine {
         perChannel,
         lastUpdatedAt: new Date().toISOString()
       })
+      snapshot.ourWorkspaceError = ourWorkspaceError
       this.lastResults.set(project.id, snapshot)
       this.progress({
         syncing: false,
@@ -336,18 +461,20 @@ export class DashboardSyncEngine {
   }
 
   private async storedDeltas(project: DashboardProject): Promise<DashboardChannelDelta[]> {
-    const loaded: Array<{
-      channel: { id: string; name: string }
-      messages: DashboardStoredMessage[]
-      cursor: string
-      lastSyncAt: string
-    } | null> = []
+    const { workspaces } = await this.storedWorkspaces(project)
+    const out: DashboardChannelDelta[] = []
 
-    for (const monitor of project.monitors) {
-      const d = await this.deltaStore.load(project.profileId, project.teamId, monitor.channelId)
-      if (d) loaded.push(d)
+    for (const workspace of workspaces) {
+      for (const monitor of workspace.monitors) {
+        const d = await this.deltaStore.load(
+          workspace.profileId,
+          workspace.teamId,
+          monitor.channelId
+        )
+        if (d) out.push(this.perChannelDelta(d, workspace.source))
+      }
     }
-    return loaded.filter(Boolean).map((d) => this.perChannelDelta(d as NonNullable<typeof d>))
+    return out
   }
 
   private buildFallbackSnapshot(
@@ -365,14 +492,19 @@ export class DashboardSyncEngine {
   }
 
   private async collectMessages(project: DashboardProject): Promise<DashboardStoredMessage[]> {
+    const { workspaces } = await this.storedWorkspaces(project)
     const out: DashboardStoredMessage[] = []
-    for (const monitor of project.monitors) {
-      const messages = await this.deltaStore.messagesSince(
-        project.profileId,
-        project.teamId,
-        monitor.channelId
-      )
-      out.push(...messages)
+    for (const workspace of workspaces) {
+      for (const monitor of workspace.monitors) {
+        const messages = await this.deltaStore.messagesSince(
+          workspace.profileId,
+          workspace.teamId,
+          monitor.channelId
+        )
+        for (const message of messages) {
+          out.push(message.source ? message : { ...message, source: workspace.source })
+        }
+      }
     }
     return out
   }

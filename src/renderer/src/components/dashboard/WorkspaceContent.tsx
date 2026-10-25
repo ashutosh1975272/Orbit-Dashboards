@@ -95,7 +95,7 @@ export default function WorkspaceContent({
     )
     bare = true
   } else if (nav.openGroup === 'slack') {
-    if (slackSourceOf(nav) === 'team') {
+    if (slackSourceOf(nav) === 'team' && !channels.teamConnected) {
       body = (
         <div className="ws-agent">
           <div className="ws-agent-empty">
@@ -112,9 +112,12 @@ export default function WorkspaceContent({
         </div>
       )
     } else {
+      const source = slackSourceOf(nav) === 'team' ? 'ours' : 'client'
+      const listed = channels[connectorOfSelection(sel) === 'team' ? 'team' : 'client']
       body = (
         <SlackChatTab
           projectId={summary.projectId}
+          source={source}
           channels={identity.channels.map((c) => ({
             channelId: c.channelId,
             channelName: c.channelName
@@ -123,7 +126,7 @@ export default function WorkspaceContent({
             sel && isChannelId(sel)
               ? (() => {
                   const id = channelIdOf(sel)
-                  const entry = channels.client?.entries.find((ch) => ch.id === id)
+                  const entry = listed?.entries.find((ch) => ch.id === id)
                   const watched = identity.channels.find((c) => c.channelId === id)
                   return { id, name: entry?.name ?? watched?.channelName ?? id }
                 })()
@@ -152,8 +155,8 @@ export default function WorkspaceContent({
       // the rail before picking a row must not pretend to be the Dashboard.
       body = (
         <p className="ws-empty">
-          Pick a row under Project info — needs reply, blockers, requirements, history — to see
-          what this card has learned.
+          Pick a row under Project info — needs reply, blockers, requirements, history — to see what
+          this card has learned.
         </p>
       )
     }

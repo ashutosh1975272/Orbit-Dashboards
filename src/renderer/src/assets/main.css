@@ -4475,6 +4475,14 @@ body.is-resizing-nav { cursor: col-resize; user-select: none; }
   line-height: 1.4;
   color: var(--text-muted);
 }
+.ai-settings-channel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
 .ai-settings-inherited {
   margin: 0;
   font-size: 12px;

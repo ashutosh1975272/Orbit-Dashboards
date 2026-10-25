@@ -20,6 +20,8 @@ import type {
   DashboardSendMessageResult,
   DashboardSnapshot,
   DashboardSyncProgressPayload,
+  DashboardTeamWorkspace,
+  DashboardTeamWorkspaceCandidate,
   InsightHistoryEntryContract,
   RecentActivity,
   ProjectSidebarState,
@@ -196,23 +198,66 @@ const api: IpcApi = {
       return () => ipcRenderer.removeListener(IpcChannels.DashboardSyncProgress, listener)
     },
     getSidebarState: (projectId: string) =>
-      ipcRenderer.invoke(IpcChannels.DashboardSidebarGet, { projectId }) as Promise<ProjectSidebarState>,
+      ipcRenderer.invoke(IpcChannels.DashboardSidebarGet, {
+        projectId
+      }) as Promise<ProjectSidebarState>,
     setSidebarState: (projectId: string, state: ProjectSidebarState) =>
       ipcRenderer.invoke(IpcChannels.DashboardSidebarSet, { projectId, state }),
-    updateSidebarState: (projectId: string, sidebar: 'left' | 'right', patch: Partial<SidebarState>) =>
-      ipcRenderer.invoke(IpcChannels.DashboardSidebarUpdate, { projectId, sidebar, patch }) as Promise<SidebarState>,
+    updateSidebarState: (
+      projectId: string,
+      sidebar: 'left' | 'right',
+      patch: Partial<SidebarState>
+    ) =>
+      ipcRenderer.invoke(IpcChannels.DashboardSidebarUpdate, {
+        projectId,
+        sidebar,
+        patch
+      }) as Promise<SidebarState>,
     getMessages: (payload) =>
       ipcRenderer.invoke(IpcChannels.DashboardGetMessages, payload) as Promise<DashboardChatPage>,
     sendMessage: (payload) =>
-      ipcRenderer.invoke(IpcChannels.DashboardSendMessage, payload) as Promise<DashboardSendMessageResult>,
+      ipcRenderer.invoke(
+        IpcChannels.DashboardSendMessage,
+        payload
+      ) as Promise<DashboardSendMessageResult>,
     getChatTokenStatus: (projectId) =>
-      ipcRenderer.invoke(IpcChannels.DashboardChatTokenStatus, projectId) as Promise<DashboardChatTokenStatus>,
+      ipcRenderer.invoke(
+        IpcChannels.DashboardChatTokenStatus,
+        projectId
+      ) as Promise<DashboardChatTokenStatus>,
     getAiSettings: (payload) =>
-      ipcRenderer.invoke(IpcChannels.DashboardGetAiSettings, payload) as Promise<DashboardAiSettingsView>,
+      ipcRenderer.invoke(
+        IpcChannels.DashboardGetAiSettings,
+        payload
+      ) as Promise<DashboardAiSettingsView>,
     saveAiSettings: (payload) =>
-      ipcRenderer.invoke(IpcChannels.DashboardSaveAiSettings, payload) as Promise<DashboardAiSettingsView>,
+      ipcRenderer.invoke(
+        IpcChannels.DashboardSaveAiSettings,
+        payload
+      ) as Promise<DashboardAiSettingsView>,
     listAiModels: (payload) =>
-      ipcRenderer.invoke(IpcChannels.DashboardListAiModels, payload) as Promise<DashboardAiModelsResult>
+      ipcRenderer.invoke(
+        IpcChannels.DashboardListAiModels,
+        payload
+      ) as Promise<DashboardAiModelsResult>,
+    getTeamWorkspace: () =>
+      ipcRenderer.invoke(IpcChannels.DashboardTeamWorkspaceGet) as Promise<DashboardTeamWorkspace>,
+    listTeamWorkspaceCandidates: () =>
+      ipcRenderer.invoke(IpcChannels.DashboardTeamWorkspaceCandidates) as Promise<
+        DashboardTeamWorkspaceCandidate[]
+      >,
+    connectTeamWorkspace: (payload) =>
+      ipcRenderer.invoke(
+        IpcChannels.DashboardTeamWorkspaceConnect,
+        payload
+      ) as Promise<DashboardTeamWorkspace>,
+    setTeamWorkspaceChannels: (payload) =>
+      ipcRenderer.invoke(
+        IpcChannels.DashboardTeamWorkspaceChannels,
+        payload
+      ) as Promise<DashboardTeamWorkspace>,
+    clearTeamWorkspace: () =>
+      ipcRenderer.invoke(IpcChannels.DashboardTeamWorkspaceClear) as Promise<DashboardTeamWorkspace>
   }
 }
 

@@ -1,5 +1,6 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import type { DashboardSource } from '../../shared/dashboard-contract'
 
 export interface DashboardStoredMessage {
   ts: string
@@ -9,6 +10,12 @@ export interface DashboardStoredMessage {
   subtype?: string
   /** slack permalink/url if available */
   permalink?: string
+  /** Which workspace this message came from. Absent on rows stored before v3. */
+  source?: DashboardSource
+  /** Thread parent ts when this message is a reply. */
+  threadTs?: string
+  /** Reply count Slack reported on the thread parent. */
+  replyCount?: number
 }
 
 export interface StoredChannelRef {
@@ -71,6 +78,8 @@ export class DashboardDeltaStore {
     channelId: string
     channelName: string
     messages: DashboardStoredMessage[]
+    /** Workspace tag stored on every message (default 'client' for old callers). */
+    source?: DashboardSource
     now?: string
   }): Promise<AppendOnlyResult> {
     const path = this.channelFilePath(input.profileId, input.teamId, input.channelId)
@@ -100,7 +109,10 @@ export class DashboardDeltaStore {
         user: m.user,
         text: m.text,
         subtype: m.subtype,
-        permalink: m.permalink
+        permalink: m.permalink,
+        source: m.source ?? input.source ?? 'client',
+        threadTs: m.threadTs,
+        replyCount: m.replyCount
       })
       added += 1
     }

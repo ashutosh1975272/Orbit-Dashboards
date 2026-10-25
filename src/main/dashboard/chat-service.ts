@@ -5,7 +5,8 @@ import type {
   DashboardChatTokenStatus,
   DashboardProject,
   DashboardSendMessagePayload,
-  DashboardSendMessageResult
+  DashboardSendMessageResult,
+  DashboardSource
 } from '../../shared/dashboard-contract'
 import type { DashboardDeltaStore, DashboardStoredMessage } from './delta-store'
 import { compareTs } from './delta-store'
@@ -33,11 +34,29 @@ export interface ChatServiceDeps {
   monitorStore: MonitorStore
   deltaStore: DashboardDeltaStore
   oauthTokenProvider: { tryGet(profileId: string, teamId: string): Promise<string | null> }
+  /** v3 — the globally connected team workspace (read-only here). */
+  teamWorkspace?: {
+    getConnection(): Promise<{
+      profileId: string
+      teamId: string
+      token: string | null
+      channels: Array<{ channelId: string; channelName: string }>
+    } | null>
+  }
   /** Stored scopes from the OAuth workspace link (best effort). */
   oauthScopesProvider?: (profileId: string, teamId: string) => Promise<string[] | null>
   pollerFactory?: () => ChatPoller
   log?: (msg: string) => void
   now?: () => number
+}
+
+/** One workspace the chat panel can read: the card's own, or ours. */
+interface ChatWorkspace {
+  source: DashboardSource
+  profileId: string
+  teamId: string
+  token: string | null
+  monitors: Array<{ channelId: string; channelName: string }>
 }
 
 export interface ChatRow {
@@ -105,6 +124,7 @@ export class DashboardChatService {
   private readonly monitorStore: MonitorStore
   private readonly deltaStore: DashboardDeltaStore
   private readonly oauthTokenProvider: ChatServiceDeps['oauthTokenProvider']
+  private readonly teamWorkspace: ChatServiceDeps['teamWorkspace']
   private readonly oauthScopesProvider?: ChatServiceDeps['oauthScopesProvider']
   private readonly pollerFactory: () => ChatPoller
   private readonly log: (msg: string) => void
@@ -115,6 +135,7 @@ export class DashboardChatService {
     this.monitorStore = deps.monitorStore
     this.deltaStore = deps.deltaStore
     this.oauthTokenProvider = deps.oauthTokenProvider
+    this.teamWorkspace = deps.teamWorkspace
     this.oauthScopesProvider = deps.oauthScopesProvider
     this.pollerFactory = deps.pollerFactory ?? ((): ChatPoller => new SlackPoller())
     this.log = deps.log ?? ((): void => undefined)
@@ -134,12 +155,42 @@ export class DashboardChatService {
     return this.oauthTokenProvider.tryGet(project.profileId, project.teamId)
   }
 
+  /** Resolve the workspace a panel is reading: the card's own, or our team's. */
+  private async workspaceFor(
+    project: DashboardProject,
+    source: DashboardSource
+  ): Promise<ChatWorkspace | null> {
+    if (source === 'ours') {
+      if (!this.teamWorkspace) return null
+      const connection = await this.teamWorkspace.getConnection()
+      if (!connection) return null
+      return {
+        source: 'ours',
+        profileId: connection.profileId,
+        teamId: connection.teamId,
+        token: connection.token,
+        monitors: connection.channels
+      }
+    }
+    return {
+      source: 'client',
+      profileId: project.profileId,
+      teamId: project.teamId,
+      token: await this.tokenFor(project),
+      monitors: project.monitors
+    }
+  }
+
   /** Best-effort names + token owner + scopes, cached per workspace for 5 minutes. */
   private async workspaceContext(
     project: DashboardProject,
-    token: string
+    token: string,
+    identity?: { profileId: string; teamId: string; label?: string }
   ): Promise<ChatWorkspaceContext> {
-    const key = `${project.profileId}:${project.teamId}`
+    const profileId = identity?.profileId ?? project.profileId
+    const teamId = identity?.teamId ?? project.teamId
+    const label = identity?.label ?? project.name
+    const key = `${profileId}:${teamId}`
     const cached = this.contextCache.get(key)
     const now = this.now()
     if (cached && now - cached.at < CONTEXT_TTL_MS) return cached
@@ -154,12 +205,12 @@ export class DashboardChatService {
       selfUserId = auth.userId ?? null
       scopes = Array.isArray(auth.scopes) ? auth.scopes : null
     } catch (err) {
-      this.log(`[dashboard] chat auth.test failed for ${project.name}: ${String(err)}`)
+      this.log(`[dashboard] chat auth.test failed for ${label}: ${String(err)}`)
     }
     try {
       names = await poller.usersList(token)
     } catch (err) {
-      this.log(`[dashboard] chat users.list failed for ${project.name}: ${String(err)}`)
+      this.log(`[dashboard] chat users.list failed for ${label}: ${String(err)}`)
     }
 
     const context: ChatWorkspaceContext = { at: now, names, selfUserId, scopes }
@@ -238,7 +289,8 @@ export class DashboardChatService {
     project: DashboardProject,
     row: { channelId: string; channelName: string },
     msg: DashboardStoredMessage,
-    context: ChatWorkspaceContext | null
+    context: ChatWorkspaceContext | null,
+    source: DashboardSource
   ): DashboardChatMessage {
     const userId = msg.user ?? ''
     const selfUserId = project.selfUserId ?? context?.selfUserId ?? null
@@ -249,6 +301,7 @@ export class DashboardChatService {
       channelName: row.channelName,
       userId,
       userName: resolved || (selfUserId && userId === selfUserId ? 'You' : userId || 'Unknown'),
+      source,
       text: msg.text ?? '',
       atIso: isoFromTs(msg.ts),
       isMine: Boolean(selfUserId && userId === selfUserId)
@@ -259,13 +312,21 @@ export class DashboardChatService {
     const project = await this.projectFor(payload.projectId)
     if (!project) return { messages: [], nextBeforeTs: null, hasMore: false }
 
+    const source = payload.source ?? 'client'
+    const workspace = await this.workspaceFor(project, source)
+    if (!workspace) return { messages: [], nextBeforeTs: null, hasMore: false }
+
     const monitors = payload.channelId
-      ? project.monitors.filter((m) => m.channelId === payload.channelId)
-      : project.monitors
+      ? workspace.monitors.filter((m) => m.channelId === payload.channelId)
+      : workspace.monitors
 
     const rows: ChatRow[] = []
     for (const monitor of monitors) {
-      const delta = await this.deltaStore.load(project.profileId, project.teamId, monitor.channelId)
+      const delta = await this.deltaStore.load(
+        workspace.profileId,
+        workspace.teamId,
+        monitor.channelId
+      )
       for (const msg of delta?.messages ?? []) {
         if (!isDisplayable(msg)) continue
         rows.push({
@@ -282,14 +343,17 @@ export class DashboardChatService {
 
     let context: ChatWorkspaceContext | null = null
     try {
-      const token = await this.tokenFor(project)
-      if (token) context = await this.workspaceContext(project, token)
+      if (workspace.token)
+        context = await this.workspaceContext(project, workspace.token, {
+          profileId: workspace.profileId,
+          teamId: workspace.teamId
+        })
     } catch {
       // names fall back to Slack ids
     }
 
     return {
-      messages: page.map((row) => this.toChatMessage(project, row, row.msg, context)),
+      messages: page.map((row) => this.toChatMessage(project, row, row.msg, context, source)),
       nextBeforeTs,
       hasMore
     }
@@ -312,7 +376,16 @@ export class DashboardChatService {
     if (!project) {
       return { ok: false, code: 'not_connected', error: 'This project no longer exists.' }
     }
-    const monitor = project.monitors.find((m) => m.channelId === payload.channelId)
+    const source = payload.source ?? 'client'
+    const workspace = await this.workspaceFor(project, source)
+    if (!workspace) {
+      return {
+        ok: false,
+        code: 'not_connected',
+        error: 'Our team workspace is not connected. Connect it in Global settings.'
+      }
+    }
+    const monitor = workspace.monitors.find((m) => m.channelId === payload.channelId)
     if (!monitor) {
       return {
         ok: false,
@@ -321,18 +394,22 @@ export class DashboardChatService {
       }
     }
 
-    const token = await this.tokenFor(project)
+    const token = workspace.token
     if (!token) {
       return { ok: false, code: 'not_connected', error: NOT_CONNECTED_MESSAGE }
     }
 
-    const scopes = await this.scopesFor(project, token)
-    if (scopes && scopes.length > 0 && !scopes.includes('chat:write')) {
-      return {
-        ok: false,
-        code: 'missing_scope',
-        missingScope: 'chat:write',
-        error: MISSING_SCOPE_MESSAGE
+    // Scopes are only known for the card's own OAuth link; for our workspace we
+    // let Slack answer, so a working token is never blocked by missing metadata.
+    if (source === 'client') {
+      const scopes = await this.scopesFor(project, token)
+      if (scopes && scopes.length > 0 && !scopes.includes('chat:write')) {
+        return {
+          ok: false,
+          code: 'missing_scope',
+          missingScope: 'chat:write',
+          error: MISSING_SCOPE_MESSAGE
+        }
       }
     }
 
@@ -345,18 +422,23 @@ export class DashboardChatService {
 
       let context: ChatWorkspaceContext | null = null
       try {
-        context = await this.workspaceContext(project, token)
+        context = await this.workspaceContext(project, token, {
+          profileId: workspace.profileId,
+          teamId: workspace.teamId
+        })
       } catch {
         // message still succeeded; names fall back to ids
       }
-      const selfUserId = project.selfUserId ?? context?.selfUserId ?? undefined
+      const selfUserId =
+        context?.selfUserId ?? (source === 'client' ? project.selfUserId : undefined) ?? undefined
 
       // Persist locally so the reply survives reloads and the next sync dedupes it.
       await this.deltaStore.appendMessages({
-        profileId: project.profileId,
-        teamId: project.teamId,
+        profileId: workspace.profileId,
+        teamId: workspace.teamId,
         channelId: monitor.channelId,
         channelName: monitor.channelName,
+        source,
         messages: [{ ts: sent.ts, user: selfUserId, text }]
       })
 
@@ -366,7 +448,8 @@ export class DashboardChatService {
           project,
           { channelId: monitor.channelId, channelName: monitor.channelName },
           { ts: sent.ts, user: selfUserId, text },
-          context
+          context,
+          source
         )
       }
     } catch (err) {

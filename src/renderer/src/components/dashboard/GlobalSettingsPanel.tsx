@@ -1,5 +1,6 @@
 import type React from 'react'
 import AiSettingsForm from './AiSettingsForm'
+import TeamSlackSettings from './TeamSlackSettings'
 
 interface GlobalSettingsPanelProps {
   open: boolean
@@ -24,7 +25,11 @@ export default function GlobalSettingsPanel({
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div className="settings-panel global-settings-panel" role="dialog" aria-label="Global settings">
+      <div
+        className="settings-panel global-settings-panel"
+        role="dialog"
+        aria-label="Global settings"
+      >
         <header className="settings-header">
           <h2>Global settings</h2>
           <button type="button" className="btn ghost" onClick={onClose}>
@@ -35,6 +40,17 @@ export default function GlobalSettingsPanel({
           Set once for every card. A card that overrides a value keeps its own, and says which
           source is in effect.
         </p>
+
+        <section className="ws-settings-section global-settings-section">
+          <div className="ws-settings-head">
+            <h4>Our team Slack</h4>
+            <p>
+              One workspace for your own team, connected once. Its pinned channels are added to
+              every card next to that card&apos;s client channels.
+            </p>
+          </div>
+          <TeamSlackSettings />
+        </section>
 
         <section className="ws-settings-section global-settings-section">
           <div className="ws-settings-head">

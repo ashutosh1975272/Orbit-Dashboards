@@ -1,9 +1,11 @@
 import type React from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { DashboardChatMessage } from '../../../../shared/dashboard-contract'
+import type { DashboardChatMessage, DashboardSource } from '../../../../shared/dashboard-contract'
 
 interface SlackChatTabProps {
   projectId: string
+  /** Which workspace to read and post into (defaults to the card's own). */
+  source?: DashboardSource
   channels: Array<{ channelId: string; channelName: string }>
   /** A channel picked from the sidebar's dropdown: the panel shows that one
    * channel only, so the filter is replaced by its name. */
@@ -36,6 +38,7 @@ function formatChatTime(iso: string): string {
  */
 export default function SlackChatTab({
   projectId,
+  source = 'client',
   channels,
   lockedChannel
 }: SlackChatTabProps): React.ReactElement {
@@ -66,7 +69,7 @@ export default function SlackChatTab({
     let cancelled = false
     stickBottomRef.current = true
     window.api.dashboard
-      .getMessages({ projectId, channelId: activeChannelId ?? undefined, limit: PAGE_SIZE })
+      .getMessages({ projectId, source, channelId: activeChannelId ?? undefined, limit: PAGE_SIZE })
       .then((page) => {
         if (cancelled) return
         setMessages(page.messages)
@@ -82,7 +85,7 @@ export default function SlackChatTab({
     return () => {
       cancelled = true
     }
-  }, [projectId, activeChannelId])
+  }, [projectId, source, activeChannelId])
 
   // Auto-scroll to the newest message after the first page / a send.
   useEffect(() => {
@@ -102,6 +105,7 @@ export default function SlackChatTab({
     window.api.dashboard
       .getMessages({
         projectId,
+        source,
         channelId: activeChannelId ?? undefined,
         beforeTs: nextBeforeTs,
         limit: PAGE_SIZE
@@ -149,6 +153,7 @@ export default function SlackChatTab({
       channelName: channel.channelName,
       userId: 'me',
       userName: 'You',
+      source,
       text,
       atIso: new Date().toISOString(),
       isMine: true,
@@ -165,6 +170,7 @@ export default function SlackChatTab({
     try {
       const result = await window.api.dashboard.sendMessage({
         projectId,
+        source,
         channelId: channel.channelId,
         text
       })
