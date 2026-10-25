@@ -1,5 +1,21 @@
 # Status Ledger
 
+## Chat with project — Phase 4 tests (2026-10-25, commit `eff1222`)
+- `npm run typecheck` (node + web): PASS (exit 0)
+- `npm test`: PASS — 44 files, **370/370** tests (exit 0); **72 new tests in 7 new files**
+  - `project-chat-sources` 8: split/bold marker, malformed JSON, hold-back, id parsing, ref mapping/dedupe/limit
+  - `project-chat-context` 7: project-state formatting, `m1..mN` id mapping, evidence ordering, history cap 20, 700-char truncation, exact fallback
+  - `project-chat-retrieval` 11: BM25 + recency, stopwords, recent-window exclusion, chunk cap, ours source, project isolation, blank rows, unknown project
+  - `project-chat-service` 20: stream + host refs, no-answer `[]`, fabricated ids, stop partial `stopped`/no sources, 401/403/429/5xx/network/empty-answer, key missing, RUN_ACTIVE, retry without duplicate user, 200-message cap, clear, status exactly 4 leak-free fields, malformed ids
+  - `project-chat-eval` 5: fixtures A–E (recent answer, older keyword, no-answer, fabricated id, injected Slack instruction stays untrusted evidence)
+  - `chat-markdown` 8 (jsdom): raw HTML stays text, `javascript:`/`data:`/relative/mailto never anchors, http(s) rel/target, code fence, headings/lists/inline, line breaks
+  - `agent-chat-panel` 13 (jsdom): model chip + source badges, hash + settings open, key-missing pause, history + source jump, stream → done, foreign project/run events ignored, Stop, error + retry (no duplicate user), rejected start, clear confirmation, initial question, AgentWork empty state
+- `npm run build`: PASS — main 401.85 kB, preload 18.52 kB, renderer 82 modules, client built 1.67s (exit 0); only the pre-existing `chrome-cookie-probe` static+dynamic import warning
+- lint (new/changed files): **0 errors, 0 warnings** (prettier autofix); repo-wide 26 pre-existing errors untouched
+- production change: one additive regex fix — `MARKER_RE` now also recognizes `**SOURCES:** []` (bold colon inside the bold). All other feature code unchanged.
+- test tooling: `jsdom` + `@testing-library/react` dev deps only; `tests/ui/**` typechecked by `tsconfig.web.json`, `tests/unit/**` by `tsconfig.node.json`
+- no live Electron run this phase (test-only + marker regex); live proofs from Phases 2/2b/3 remain valid. Stop, Clear chat and history-after-restart are covered by tests here but were not exercised live.
+
 ## Chat with project — Phase 3 model selection (2026-10-25, commit `972b3df`)
 - `npm run typecheck` (node + web): PASS (exit 0)
 - `npm test`: PASS — 37 files, **298/298** tests (exit 0, no regressions)
