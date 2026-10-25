@@ -63,6 +63,7 @@ export interface DashboardIpcDeps {
   sidebarStateStore?: DashboardSidebarStateStore
   /** v2.6 — Slack Chat tab (local history + replies) */
   chatService?: DashboardChatService
+  projectChatService?: any
   /** v2.7 — global + per-project AI provider settings */
   aiSettings?: AiSettingsService
   /** v2.8 — one effective config resolver for Slack + AI */
@@ -318,6 +319,27 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
       async (projectId: string): Promise<DashboardChatTokenStatus> =>
         deps.chatService!.chatTokenStatus(projectId)
     )
+  }
+  if (deps.projectChatService) {
+    const pcs = deps.projectChatService
+    handleInvoke(IpcChannels.DashboardProjectChat, async (payload: { projectId: string; message: string }) => {
+      const win = deps.getMainWindow()
+      try {
+        for await (const _ of pcs.stream(payload.projectId, payload.message, (t: string) => {
+          win?.webContents.send('chat:chunk', { projectId: payload.projectId, chunk: t })
+        })) {
+        }
+        win?.webContents.send('chat:done', { projectId: payload.projectId })
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        win?.webContents.send('chat:error', { projectId: payload.projectId, error: msg })
+      }
+      return { ok: true }
+    })
+    handleInvoke(IpcChannels.DashboardProjectChatClear, async (projectId: string) => {
+      await pcs.clearHistory(projectId)
+      return { ok: true }
+    })
   }
 
   // v3 — our team workspace: connect once, pin its channels, every card reads it.

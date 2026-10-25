@@ -29,6 +29,7 @@ import { migrateWorkspaceCards } from './dashboard/workspace-migration'
 import { buildRecentFeed } from './dashboard/recent-feed'
 import { DashboardDigestStore, refreshDigest } from './dashboard/digest'
 import { DashboardChatService } from './dashboard/chat-service'
+import { ProjectChatService } from './dashboard/project-chat-service'
 import { HistoryStore } from './dashboard/history-store'
 import { DashboardViewedStore } from './dashboard/viewed-store'
 import { DashboardScheduleStore } from './dashboard/schedule-store'
@@ -414,6 +415,13 @@ if (!gotSingleInstanceLock) {
       },
       log: (msg) => log.info(msg)
     })
+    const projectChatService = new ProjectChatService({
+      rootDir: dashboardRoot,
+      monitorStore: dashboardMonitorStore,
+      configService,
+      insightEngine,
+      deltaStore: dashboardDeltaStore
+    })
 
     // v2.2 — one-time workspace migration: stamp + split legacy mixed cards.
     // Runs in the background: it talks to Slack and must never block startup.
@@ -545,6 +553,7 @@ if (!gotSingleInstanceLock) {
       getDigest,
       sidebarStateStore: dashboardSidebarStateStore,
       chatService: dashboardChatService,
+      projectChatService,
       aiSettings,
       configService,
       teamWorkspace: teamWorkspaceStore,

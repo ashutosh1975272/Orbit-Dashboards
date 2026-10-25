@@ -144,6 +144,8 @@ export const IpcChannels = {
   DashboardGetMessages: 'dashboard:get-messages',
   DashboardSendMessage: 'dashboard:send-message',
   DashboardChatTokenStatus: 'dashboard:chat-token-status',
+  DashboardProjectChat: 'dashboard:project-chat',
+  DashboardProjectChatClear: 'dashboard:project-chat-clear',
 
   DashboardGetAiSettings: 'dashboard:get-ai-settings',
   DashboardSaveAiSettings: 'dashboard:save-ai-settings',
