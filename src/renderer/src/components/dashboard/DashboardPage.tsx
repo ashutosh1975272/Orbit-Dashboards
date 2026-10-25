@@ -10,6 +10,7 @@ import type {
   InsightStatus
 } from '../../../../shared/dashboard-contract'
 import { useProjectActivity } from '../../hooks/useProjectActivity'
+import { dashboardApi } from '../../lib/dashboard-api'
 import type { CardSummary, CardView } from './card-view'
 import { requestMessageJump } from './jump-to-message'
 import type { SelectionId } from './workspace-nav'
@@ -241,7 +242,7 @@ function FreshnessLine({
 
   useEffect(() => {
     let alive = true
-    window.api.dashboard
+    dashboardApi()
       .getSchedules()
       .then((state) => {
         if (!alive) return
@@ -249,7 +250,7 @@ function FreshnessLine({
         setNextRunAt(state.nextRunAt)
       })
       .catch(() => undefined)
-    const off = window.api.dashboard.onSchedulesChanged((state) => {
+    const off = dashboardApi().onSchedulesChanged((state) => {
       if (!alive) return
       setEnabled(state.settings.slackSync.enabled)
       setNextRunAt(state.nextRunAt)
@@ -343,7 +344,7 @@ export default function DashboardPage({
   useEffect(() => {
     let alive = true
     const refresh = (): void => {
-      window.api.dashboard
+      dashboardApi()
         .getProjectChatStatus(summary.projectId)
         .then((status) => {
           if (alive) setHasKey(status.hasKey)
@@ -351,7 +352,7 @@ export default function DashboardPage({
         .catch(() => undefined)
     }
     refresh()
-    const off = window.api.dashboard.onConfigChanged(refresh)
+    const off = dashboardApi().onConfigChanged(refresh)
     return () => {
       alive = false
       off()
@@ -988,9 +989,7 @@ export default function DashboardPage({
                       <span>{deliverableCounts['not-started']} not started</span>
                     </div>
                   </>
-                ) : (
-                  <p className="dash-muted">No deliverables stated yet.</p>
-                )}
+                ) : null}
               </section>
 
               {activity && (activity.participants.length > 0 || activity.channels.length > 0) ? (

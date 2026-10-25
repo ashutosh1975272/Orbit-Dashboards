@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { DashboardProjectActivity } from '../../../shared/dashboard-contract'
+import { dashboardApi } from '../lib/dashboard-api'
 
 export interface ProjectActivityState {
   activity: DashboardProjectActivity | null
@@ -17,7 +18,7 @@ export function useProjectActivity(
 
   useEffect(() => {
     let alive = true
-    window.api.dashboard
+    dashboardApi()
       .getProjectActivity(projectId)
       .then((next) => {
         if (alive) setEntry({ projectId, activity: next })
