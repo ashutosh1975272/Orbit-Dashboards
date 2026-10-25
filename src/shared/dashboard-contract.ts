@@ -637,6 +637,84 @@ export interface DashboardChatTokenStatus {
   missingWriteScope: boolean
 }
 
+/* ===== Chat with project (read-only agent chat) ===== */
+
+/** A message the answer is allowed to cite. Built by the host from the
+ * retrieved context, never trusted from the model. */
+export interface DashboardProjectChatSourceRef {
+  source: DashboardSource
+  channelId: string
+  channelName: string
+  ts: string
+  permalink?: string
+}
+
+export interface DashboardProjectChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+  atIso: string
+  /** Only assistant messages that finished normally carry sources. */
+  sources?: DashboardProjectChatSourceRef[]
+  /** Assistant answer was cut short by Stop. Partial text, no sources. */
+  stopped?: boolean
+}
+
+export interface DashboardProjectChatPayload {
+  projectId: string
+  message: string
+  /** Reserved for multiple threads; the current build stores one thread. */
+  conversationId?: string
+  /** Re-run after an error without appending the user turn twice. */
+  retry?: boolean
+}
+
+export type DashboardProjectChatErrorCode =
+  | 'PROJECT_NOT_FOUND'
+  | 'AI_KEY_MISSING'
+  | 'RUN_ACTIVE'
+  | 'AUTH_INVALID'
+  | 'RATE_LIMITED'
+  | 'NETWORK'
+  | 'CANCELLED'
+  | 'INTERNAL'
+
+export type DashboardProjectChatStartResult =
+  { ok: true; runId: string } | { ok: false; code: DashboardProjectChatErrorCode; error: string }
+
+export interface DashboardProjectChatChunkEvent {
+  projectId: string
+  runId: string
+  chunk: string
+}
+
+export interface DashboardProjectChatDoneEvent {
+  projectId: string
+  runId: string
+  content: string
+  sources: DashboardProjectChatSourceRef[]
+  stopped: boolean
+}
+
+export interface DashboardProjectChatErrorEvent {
+  projectId: string
+  runId: string
+  code: DashboardProjectChatErrorCode
+  error: string
+  retryable: boolean
+}
+
+export interface DashboardProjectChatHistoryResult {
+  messages: DashboardProjectChatMessage[]
+}
+
+/** Renderer-safe chat status: no key and no key mask. */
+export interface DashboardProjectChatStatus {
+  hasKey: boolean
+  model: string
+  modelSource: AiSettingsSource
+  keySource: AiSettingsSource
+}
+
 /* ===== v2.7 — AI provider settings (global + per project) ===== */
 
 export type AiProviderId = 'nvidia-nim'

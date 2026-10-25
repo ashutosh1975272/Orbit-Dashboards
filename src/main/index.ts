@@ -30,6 +30,7 @@ import { buildRecentFeed } from './dashboard/recent-feed'
 import { DashboardDigestStore, refreshDigest } from './dashboard/digest'
 import { DashboardChatService } from './dashboard/chat-service'
 import { ProjectChatService } from './dashboard/project-chat-service'
+import { DashboardChatRetriever } from './dashboard/chat-retrieval'
 import { HistoryStore } from './dashboard/history-store'
 import { DashboardViewedStore } from './dashboard/viewed-store'
 import { DashboardScheduleStore } from './dashboard/schedule-store'
@@ -420,7 +421,12 @@ if (!gotSingleInstanceLock) {
       monitorStore: dashboardMonitorStore,
       configService,
       insightEngine,
-      deltaStore: dashboardDeltaStore
+      retriever: new DashboardChatRetriever({
+        monitorStore: dashboardMonitorStore,
+        configService,
+        deltaStore: dashboardDeltaStore,
+        teamWorkspace: teamWorkspaceStore
+      })
     })
 
     // v2.2 — one-time workspace migration: stamp + split legacy mixed cards.

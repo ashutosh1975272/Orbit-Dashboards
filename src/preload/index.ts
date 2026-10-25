@@ -19,6 +19,13 @@ import type {
   DashboardChatPage,
   DashboardChatTokenStatus,
   DashboardGlobalConfig,
+  DashboardProjectChatChunkEvent,
+  DashboardProjectChatDoneEvent,
+  DashboardProjectChatErrorEvent,
+  DashboardProjectChatHistoryResult,
+  DashboardProjectChatPayload,
+  DashboardProjectChatStartResult,
+  DashboardProjectChatStatus,
   DashboardSendMessageResult,
   DashboardSchedulesState,
   DashboardSnapshot,
@@ -248,6 +255,49 @@ const api: IpcApi = {
         IpcChannels.DashboardChatTokenStatus,
         projectId
       ) as Promise<DashboardChatTokenStatus>,
+    projectChat: (payload: DashboardProjectChatPayload) =>
+      ipcRenderer.invoke(
+        IpcChannels.DashboardProjectChat,
+        payload
+      ) as Promise<DashboardProjectChatStartResult>,
+    cancelProjectChat: (payload: { projectId: string; runId?: string }) =>
+      ipcRenderer.invoke(IpcChannels.DashboardProjectChatCancel, payload) as Promise<{
+        ok: boolean
+      }>,
+    getProjectChatHistory: (projectId: string) =>
+      ipcRenderer.invoke(
+        IpcChannels.DashboardProjectChatHistory,
+        projectId
+      ) as Promise<DashboardProjectChatHistoryResult>,
+    getProjectChatStatus: (projectId: string) =>
+      ipcRenderer.invoke(
+        IpcChannels.DashboardProjectChatStatus,
+        projectId
+      ) as Promise<DashboardProjectChatStatus>,
+    onProjectChatChunk: (callback: (event: DashboardProjectChatChunkEvent) => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        payload: DashboardProjectChatChunkEvent
+      ): void => callback(payload)
+      ipcRenderer.on(IpcChannels.DashboardProjectChatChunk, listener)
+      return () => ipcRenderer.removeListener(IpcChannels.DashboardProjectChatChunk, listener)
+    },
+    onProjectChatDone: (callback: (event: DashboardProjectChatDoneEvent) => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        payload: DashboardProjectChatDoneEvent
+      ): void => callback(payload)
+      ipcRenderer.on(IpcChannels.DashboardProjectChatDone, listener)
+      return () => ipcRenderer.removeListener(IpcChannels.DashboardProjectChatDone, listener)
+    },
+    onProjectChatError: (callback: (event: DashboardProjectChatErrorEvent) => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        payload: DashboardProjectChatErrorEvent
+      ): void => callback(payload)
+      ipcRenderer.on(IpcChannels.DashboardProjectChatError, listener)
+      return () => ipcRenderer.removeListener(IpcChannels.DashboardProjectChatError, listener)
+    },
     getAiSettings: (payload) =>
       ipcRenderer.invoke(
         IpcChannels.DashboardGetAiSettings,

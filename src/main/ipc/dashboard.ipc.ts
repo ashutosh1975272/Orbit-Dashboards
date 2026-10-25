@@ -12,6 +12,7 @@ import type {
   DashboardChatPage,
   DashboardChatQueryPayload,
   DashboardChatTokenStatus,
+  DashboardProjectChatPayload,
   DashboardListChannelsPayload,
   DashboardMarkViewedPayload,
   DashboardRunSchedulePayload,
@@ -39,11 +40,12 @@ import type { DashboardChatService } from '../dashboard/chat-service'
 import { SlackPoller } from '../dashboard/slack-poller'
 import { listChannels } from '../slack/slack-api-client'
 import type { SlackChannelSummary } from '../../shared/types'
-import { handleInvoke } from './handle'
+import { handleInvoke, handleInvokeWithEvent } from './handle'
 import type { HistoryStore } from '../dashboard/history-store'
 import type { DashboardSidebarStateStore } from '../dashboard/sidebar-state'
 import { maskToken, type TeamWorkspaceStore } from '../dashboard/team-workspace-store'
 import type { ConfigService } from '../dashboard/config-service'
+import type { ProjectChatService, ProjectChatSink } from '../dashboard/project-chat-service'
 import { describeMissingScopes, missingSlackScopes } from '../dashboard/slack-scopes'
 import type { DashboardViewedStore } from '../dashboard/viewed-store'
 
@@ -63,7 +65,7 @@ export interface DashboardIpcDeps {
   sidebarStateStore?: DashboardSidebarStateStore
   /** v2.6 — Slack Chat tab (local history + replies) */
   chatService?: DashboardChatService
-  projectChatService?: any
+  projectChatService?: ProjectChatService
   /** v2.7 — global + per-project AI provider settings */
   aiSettings?: AiSettingsService
   /** v2.8 — one effective config resolver for Slack + AI */
@@ -321,23 +323,45 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
     )
   }
   if (deps.projectChatService) {
-    const pcs = deps.projectChatService
-    handleInvoke(IpcChannels.DashboardProjectChat, async (payload: { projectId: string; message: string }) => {
-      const win = deps.getMainWindow()
-      try {
-        for await (const _ of pcs.stream(payload.projectId, payload.message, (t: string) => {
-          win?.webContents.send('chat:chunk', { projectId: payload.projectId, chunk: t })
-        })) {
+    const service = deps.projectChatService
+    handleInvokeWithEvent(
+      IpcChannels.DashboardProjectChat,
+      async (event, payload: DashboardProjectChatPayload) => {
+        // Replies go only to the window that asked, tagged with projectId+runId.
+        const sender = event.sender
+        const send = (channel: string, data: unknown): void => {
+          if (!sender.isDestroyed()) sender.send(channel, data)
         }
-        win?.webContents.send('chat:done', { projectId: payload.projectId })
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err)
-        win?.webContents.send('chat:error', { projectId: payload.projectId, error: msg })
+        const sink: ProjectChatSink = {
+          chunk: (data) => send(IpcChannels.DashboardProjectChatChunk, data),
+          done: (data) => send(IpcChannels.DashboardProjectChatDone, data),
+          error: (data) => send(IpcChannels.DashboardProjectChatError, data)
+        }
+        try {
+          return await service.start(payload, sink)
+        } catch (err) {
+          return {
+            ok: false as const,
+            code: 'INTERNAL' as const,
+            error: err instanceof Error ? err.message : 'Chat failed.'
+          }
+        }
       }
-      return { ok: true }
-    })
+    )
+    handleInvoke(
+      IpcChannels.DashboardProjectChatCancel,
+      async (payload: { projectId: string; runId?: string }) => ({
+        ok: service.cancel(String(payload?.projectId ?? ''), payload?.runId)
+      })
+    )
+    handleInvoke(IpcChannels.DashboardProjectChatHistory, async (projectId: string) => ({
+      messages: await service.loadHistory(String(projectId ?? ''))
+    }))
+    handleInvoke(IpcChannels.DashboardProjectChatStatus, async (projectId: string) =>
+      service.status(String(projectId ?? ''))
+    )
     handleInvoke(IpcChannels.DashboardProjectChatClear, async (projectId: string) => {
-      await pcs.clearHistory(projectId)
+      await service.clearHistory(String(projectId ?? ''))
       return { ok: true }
     })
   }

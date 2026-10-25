@@ -12,6 +12,13 @@ import type {
   DashboardChatPage,
   DashboardChatQueryPayload,
   DashboardChatTokenStatus,
+  DashboardProjectChatChunkEvent,
+  DashboardProjectChatDoneEvent,
+  DashboardProjectChatErrorEvent,
+  DashboardProjectChatHistoryResult,
+  DashboardProjectChatPayload,
+  DashboardProjectChatStartResult,
+  DashboardProjectChatStatus,
   DashboardSendErrorCode,
   DashboardSendMessagePayload,
   DashboardSendMessageResult,
@@ -146,6 +153,12 @@ export const IpcChannels = {
   DashboardChatTokenStatus: 'dashboard:chat-token-status',
   DashboardProjectChat: 'dashboard:project-chat',
   DashboardProjectChatClear: 'dashboard:project-chat-clear',
+  DashboardProjectChatCancel: 'dashboard:project-chat-cancel',
+  DashboardProjectChatHistory: 'dashboard:project-chat-history',
+  DashboardProjectChatStatus: 'dashboard:project-chat-status',
+  DashboardProjectChatChunk: 'dashboard:project-chat-chunk',
+  DashboardProjectChatDone: 'dashboard:project-chat-done',
+  DashboardProjectChatError: 'dashboard:project-chat-error',
 
   DashboardGetAiSettings: 'dashboard:get-ai-settings',
   DashboardSaveAiSettings: 'dashboard:save-ai-settings',
@@ -321,6 +334,13 @@ export interface IpcApi {
     getMessages: (payload: DashboardChatQueryPayload) => Promise<DashboardChatPage>
     sendMessage: (payload: DashboardSendMessagePayload) => Promise<DashboardSendMessageResult>
     getChatTokenStatus: (projectId: string) => Promise<DashboardChatTokenStatus>
+    projectChat: (payload: DashboardProjectChatPayload) => Promise<DashboardProjectChatStartResult>
+    cancelProjectChat: (payload: { projectId: string; runId?: string }) => Promise<{ ok: boolean }>
+    getProjectChatHistory: (projectId: string) => Promise<DashboardProjectChatHistoryResult>
+    getProjectChatStatus: (projectId: string) => Promise<DashboardProjectChatStatus>
+    onProjectChatChunk: (callback: (event: DashboardProjectChatChunkEvent) => void) => () => void
+    onProjectChatDone: (callback: (event: DashboardProjectChatDoneEvent) => void) => () => void
+    onProjectChatError: (callback: (event: DashboardProjectChatErrorEvent) => void) => () => void
     getAiSettings: (payload?: DashboardAiSettingsQueryPayload) => Promise<DashboardAiSettingsView>
     saveAiSettings: (payload: DashboardAiSettingsSavePayload) => Promise<DashboardAiSettingsView>
     listAiModels: (payload?: DashboardAiModelsQueryPayload) => Promise<DashboardAiModelsResult>
@@ -357,6 +377,13 @@ export type {
   DashboardChatPage,
   DashboardChatQueryPayload,
   DashboardChatTokenStatus,
+  DashboardProjectChatChunkEvent,
+  DashboardProjectChatDoneEvent,
+  DashboardProjectChatErrorEvent,
+  DashboardProjectChatHistoryResult,
+  DashboardProjectChatPayload,
+  DashboardProjectChatStartResult,
+  DashboardProjectChatStatus,
   DashboardManualToken,
   DashboardSendErrorCode,
   DashboardSendMessagePayload,
