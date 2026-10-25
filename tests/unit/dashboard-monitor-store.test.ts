@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { MonitorStore } from '../../src/main/dashboard/monitor-store'
+const fakeVault = { encrypt: (p: string) => Buffer.from(p).toString('base64'), decrypt: (b: string) => Buffer.from(b, 'base64').toString('utf8') }
 import type { DashboardProject } from '../../src/shared/dashboard-contract'
 
 const dirs: string[] = []
@@ -27,7 +28,7 @@ afterEach(async () => {
 async function tmpStore(): Promise<MonitorStore> {
   const dir = await mkdtemp(join(tmpdir(), 'dash-monitor-'))
   dirs.push(dir)
-  return new MonitorStore({ rootDir: dir, encryptionAvailable: false })
+  return new MonitorStore({ rootDir: dir, encryptionAvailable: true, vault: fakeVault })
 }
 
 describe('MonitorStore', () => {
@@ -47,10 +48,10 @@ describe('MonitorStore', () => {
     expect(await store.listProjects()).toHaveLength(0)
   })
 
-  it('stores manual tokens (plaintext fallback when os encryption na)', async () => {
+  it('stores manual tokens encrypted when os encryption available', async () => {
     const store = await tmpStore()
     const saved = await store.saveManualToken('DASH_TOKEN_ACME', 'xoxp-000')
-    expect(saved.plaintext).toBe(true)
+    expect(saved.plaintext).toBe(false)
     const token = await store.getManualToken('DASH_TOKEN_ACME')
     expect(token).toBe('xoxp-000')
     const listed = await store.listManualTokens()

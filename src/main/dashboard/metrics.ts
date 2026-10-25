@@ -220,15 +220,9 @@ export function buildWaiting(insight: ProjectInsight | null): DashboardMetrics['
     })
   }
 
-  // oldest waiting age: newest client message behind needs-reply, or blocker sinceIso
-  const ages = [
-    last?.whenIso,
-    ...(insight.blockers ?? []).map((b) => b.sinceIso).filter(Boolean) as string[]
-  ].filter(Boolean) as string[]
-  const oldestIso = ages.length ? ages.reduce((a, b) => (new Date(a).getTime() <= new Date(b).getTime() ? a : b)) : null
   return {
-    count: items.length,
-    oldestIso,
+    count: insight.clientAsk?.openQuestions?.length ?? 0,
+    oldestIso: null,
     items: items.slice(0, MAX_ATTENTION_ITEMS)
   }
 }

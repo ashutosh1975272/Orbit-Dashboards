@@ -32,7 +32,7 @@ describe('nav model shape (v6)', () => {
     expect(NAV_SECTIONS.map((s) => s.key)).toEqual(['xomni', 'slack', 'info', 'viz'])
     expect(NAV_SECTIONS.map((s) => s.label)).toEqual([
       'Xomni',
-      'Connect channel',
+      'Slack',
       'Project info',
       'Visualizations'
     ])

@@ -30,7 +30,8 @@ interface EncryptedVault {
 
 let vault: EncryptedVault | null = null
 
-async function getVault(): Promise<EncryptedVault> {
+async function getVaultOverride(override: EncryptedVault | null): Promise<EncryptedVault> {
+  if (override) return override
   if (!vault) {
     const { safeStorage } = (await import('electron')) as typeof import('electron')
     vault = {
@@ -46,9 +47,11 @@ export class MonitorStore {
   private readonly filePath: string
   private encryptionAvailable: boolean
 
-  constructor(options: { rootDir: string; encryptionAvailable: boolean }) {
+  private vaultOverride: EncryptedVault | null
+  constructor(options: { rootDir: string; encryptionAvailable: boolean; vault?: EncryptedVault }) {
     this.filePath = join(options.rootDir, 'monitors.json')
     this.encryptionAvailable = options.encryptionAvailable
+    this.vaultOverride = options.vault ?? null
   }
 
   async listProjects(): Promise<DashboardProject[]> {
@@ -153,7 +156,7 @@ export class MonitorStore {
     const data = await this.read()
     data.manualTokens = {
       ...data.manualTokens,
-      [key]: (await getVault()).encrypt(token)
+      [key]: (await getVaultOverride(this.vaultOverride)).encrypt(token)
     }
     await this.write(data)
     return { plaintext: false }
@@ -164,7 +167,7 @@ export class MonitorStore {
     if (raw === null) return null
     if (!this.encryptionAvailable) return raw
     try {
-      return (await getVault()).decrypt(raw.replace(/[\r\n]/g, ''))
+      return (await getVaultOverride(this.vaultOverride)).decrypt(raw.replace(/[\r\n]/g, ''))
     } catch {
       // legacy plaintext entry written by the fallback path
       return raw.split('\u0000').join('')

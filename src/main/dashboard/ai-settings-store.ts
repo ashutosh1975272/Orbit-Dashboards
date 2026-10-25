@@ -153,7 +153,7 @@ export class AiSettingsStore {
     if (stored.apiKeyEnc) {
       if (!this.encryptionAvailable) return null
       try {
-        return (await getVault()).decrypt(stored.apiKeyEnc.replace(/[\r\n]/g, ''))
+        return (await this.activeVault()).decrypt(stored.apiKeyEnc.replace(/[\r\n]/g, ''))
       } catch {
         return null
       }
@@ -220,7 +220,7 @@ export class AiSettingsStore {
       // Encrypt any plaintext key written by the patch before persisting.
       for (const record of [data.global, ...Object.values(data.projects)]) {
         if (record.apiKeyPlain) {
-          record.apiKeyEnc = (await getVault()).encrypt(record.apiKeyPlain)
+          record.apiKeyEnc = (await this.activeVault()).encrypt(record.apiKeyPlain)
           delete record.apiKeyPlain
         }
       }
