@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   DEFAULT_NAV,
   INFO_GROUPS,
+  NAV_CONNECTORS,
   NAV_REV,
   NAV_SECTIONS,
   NAV_WIDTH_MAX,
@@ -30,9 +31,30 @@ describe('nav model shape (v6)', () => {
     expect(NAV_SECTIONS.map((s) => s.key)).toEqual(['xomni', 'slack', 'info', 'viz'])
     expect(NAV_SECTIONS.map((s) => s.label)).toEqual([
       'Xomni',
-      'Channels',
+      'Connect channel',
       'Project info',
       'Visualizations'
+    ])
+  })
+
+  it('lists Our Slack first, then Client Slack, then future connectors', () => {
+    expect(NAV_CONNECTORS.map((c) => c.key)).toEqual([
+      'team',
+      'client',
+      'upwork',
+      'teams',
+      'whatsapp',
+      'googlechat',
+      'discord'
+    ])
+    expect(NAV_CONNECTORS.map((c) => c.label)).toEqual([
+      'Our Slack',
+      'Client Slack',
+      'Upwork',
+      'Microsoft Teams',
+      'WhatsApp',
+      'Google Chat',
+      'Discord'
     ])
   })
 

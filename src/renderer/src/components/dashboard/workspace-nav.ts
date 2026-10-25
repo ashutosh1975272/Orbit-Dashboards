@@ -27,7 +27,13 @@ export type SlackSourceKey = 'client' | 'team'
 
 /** Every app the Channels section offers a dropdown for. Only the two Slack
  * sides have a body today; the rest are listed so the shape is visible early. */
-export type ConnectorKey = SlackSourceKey | 'upwork' | 'teams' | 'googlechat' | 'discord'
+export type ConnectorKey =
+  | SlackSourceKey
+  | 'upwork'
+  | 'teams'
+  | 'whatsapp'
+  | 'googlechat'
+  | 'discord'
 
 export type InfoGroupKey = 'attention' | 'project' | 'signals'
 
@@ -78,24 +84,25 @@ export interface NavConnector {
   note: string
 }
 
-/** The Channels section's dropdowns, in order. Slack ships first; the rest are
- * the same shape waiting for a connection, so their dropdowns say so plainly. */
+/** The Connect channel dropdowns, in order. Our Slack ships first, then the
+ * project's client Slack; the rest are the same shape waiting for a connection,
+ * so their dropdowns say so plainly. */
 export const NAV_CONNECTORS: NavConnector[] = [
   {
     key: 'team',
-    label: 'Our channels',
+    label: 'Our Slack',
     icon: 'users',
     wired: true,
     allId: 's:team',
-    note: 'Our team workspace is connected once for all cards, from Global settings. Connect it and the channels pinned to this project appear here.'
+    note: 'Our own Slack workspace is connected once for all cards, from Global settings. The channels mapped to this project appear here.'
   },
   {
     key: 'client',
-    label: 'Client channels',
+    label: 'Client Slack',
     icon: 'slack',
     wired: true,
     allId: 's:client',
-    note: 'This card has no client workspace to list channels from yet.'
+    note: 'This project’s client Slack workspace has no channels to list yet.'
   },
   {
     key: 'upwork',
@@ -112,6 +119,14 @@ export const NAV_CONNECTORS: NavConnector[] = [
     wired: false,
     allId: null,
     note: 'Microsoft Teams is not connected yet. Slack ships first.'
+  },
+  {
+    key: 'whatsapp',
+    label: 'WhatsApp',
+    icon: 'plug',
+    wired: false,
+    allId: null,
+    note: 'WhatsApp is not connected yet. Slack ships first.'
   },
   {
     key: 'googlechat',
@@ -229,19 +244,19 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     key: 'slack',
-    label: 'Channels',
+    label: 'Connect channel',
     icon: 'inbox',
     rows: [
       {
         id: 's:client',
         label: 'All channels',
-        desc: 'The client workspace for this project. Scroll the messages and reply here.',
+        desc: 'The client Slack workspace for this project. Scroll the messages and reply here.',
         icon: 'slack'
       },
       {
         id: 's:team',
         label: 'All channels',
-        desc: 'Our own team workspace, for the channels we pin to this project.',
+        desc: 'Our own Slack workspace, for the channels mapped to this project.',
         icon: 'users'
       }
     ]

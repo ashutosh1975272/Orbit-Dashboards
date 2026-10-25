@@ -49,7 +49,7 @@ interface WorkspaceContentProps {
 const GROUP_META: Record<OpenGroup, { title: string; desc: string }> = {
   dash: { title: 'Dashboard', desc: 'Everything about this project at a glance.' },
   xomni: { title: 'Xomni', desc: 'Chat with this project.' },
-  slack: { title: 'Channels', desc: 'Messages from the connected workspaces.' },
+  slack: { title: 'Connect channel', desc: 'Messages from Our Slack and the client’s Slack workspace.' },
   info: { title: 'Project info', desc: 'What this card has learned about the project.' },
   viz: { title: 'Visualizations', desc: 'Charts built from this project’s own numbers.' },
   settings: { title: 'Settings', desc: 'Model, key, channels and dates for this card.' }

@@ -48,7 +48,7 @@ export default function DashboardRail(): React.JSX.Element {
               ▤
             </span>
             <span className="ws-copy">
-              <span className="ws-title">Projects</span>
+              <span className="ws-title">Project</span>
             </span>
           </button>
         </div>

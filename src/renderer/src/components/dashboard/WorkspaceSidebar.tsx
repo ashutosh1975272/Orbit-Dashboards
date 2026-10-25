@@ -383,16 +383,6 @@ export default function WorkspaceSidebar({
                   ))
                 ))}
 
-              {section.key === 'xomni' && sectionOpen && (
-                <Row
-                  icon="clock"
-                  label="Schedules"
-                  title="Schedules arrive with Phase E."
-                  active={false}
-                  disabled
-                  onClick={() => undefined}
-                />
-              )}
             </Fragment>
           )
         })}
