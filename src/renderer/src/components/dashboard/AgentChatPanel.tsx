@@ -155,6 +155,16 @@ export default function AgentChatPanel({
     scrollToBottom(true)
   }, [scrollToBottom])
 
+  // The model chip and the key banner both land on the card's AI section.
+  const openModelSettings = useCallback((): void => {
+    try {
+      window.history.replaceState(null, '', '#project-ai-settings')
+    } catch {
+      /* file:// history is best-effort */
+    }
+    onOpenSettings?.()
+  }, [onOpenSettings])
+
   // ---- history + status -------------------------------------------------
   useEffect(() => {
     let cancelled = false
@@ -506,8 +516,11 @@ export default function AgentChatPanel({
               <button
                 type="button"
                 className="chat-model-chip"
-                title={`Model: ${status.model} (${modelSourceLabel(status.modelSource)}). Key: ${status.keySource}.`}
-                onClick={onOpenSettings}
+                data-testid="chat-model-chip"
+                data-model-source={status.modelSource}
+                aria-label={`Model ${status.model}, ${modelSourceLabel(status.modelSource)}. Open AI settings.`}
+                title={`Model: ${status.model} (${modelSourceLabel(status.modelSource)}). Key: ${status.keySource}. Open AI settings.`}
+                onClick={openModelSettings}
               >
                 <span className="chat-model-name">{status.model}</span>
                 <span className={`chat-model-source is-${status.modelSource}`}>
@@ -515,7 +528,11 @@ export default function AgentChatPanel({
                 </span>
               </button>
             ) : (
-              <button type="button" className="chat-model-chip is-missing" onClick={onOpenSettings}>
+              <button
+                type="button"
+                className="chat-model-chip is-missing"
+                onClick={openModelSettings}
+              >
                 No AI key
               </button>
             )
@@ -551,7 +568,7 @@ export default function AgentChatPanel({
       {keyMissing ? (
         <div className="chat-key" role="status">
           <span>No AI key is set for this project. Answers are paused.</span>
-          <button type="button" onClick={onOpenSettings}>
+          <button type="button" onClick={openModelSettings}>
             Open AI settings
           </button>
         </div>

@@ -39,6 +39,7 @@ export default function AiSettingsForm({ projectId }: AiSettingsFormProps): Reac
   const [showKey, setShowKey] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [resetting, setResetting] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -126,6 +127,15 @@ export default function AiSettingsForm({ projectId }: AiSettingsFormProps): Reac
 
   const storedHasKey = isProject ? Boolean(view?.project?.hasKey) : Boolean(view?.global?.hasKey)
   const storedMask = isProject ? view?.project?.apiKeyMask : view?.global.apiKeyMask
+  // A reset is only useful when a project field actually changes the effective
+  // value; an override that stores nothing is already equivalent to global.
+  const projectOverrideActive =
+    isProject &&
+    Boolean(
+      view?.project &&
+      !view.project.useGlobal &&
+      (view.project.model || view.project.embeddingModel || view.project.hasKey)
+    )
 
   const keyHint = ((): string => {
     if (!view) return ''
@@ -174,6 +184,29 @@ export default function AiSettingsForm({ projectId }: AiSettingsFormProps): Reac
       setError(err instanceof Error ? err.message : 'Could not save AI settings')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const resetToGlobal = async (): Promise<void> => {
+    if (!isProject) return
+    setResetting(true)
+    setError(null)
+    setNotice(null)
+    setTestResult(null)
+    try {
+      const next = await window.api.dashboard.saveAiSettings({ projectId, useGlobal: true })
+      setView(next)
+      setUseGlobal(true)
+      setModel('')
+      setEmbeddingModel('')
+      setProvider(next.global.provider)
+      setNotice('Now using global config.')
+      setLoadingModels(true)
+      await loadModels()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not reset to global config')
+    } finally {
+      setResetting(false)
     }
   }
 
@@ -246,6 +279,22 @@ export default function AiSettingsForm({ projectId }: AiSettingsFormProps): Reac
           {KEY_SOURCE_LABEL[view.effective.keySource]}
           {view.effective.apiKeyMask ? ` ${view.effective.apiKeyMask}` : ''}
         </p>
+      ) : null}
+
+      {projectOverrideActive && view ? (
+        <div className="ai-settings-override" data-testid="ai-project-override">
+          <span>
+            <b>Project override is active</b> — chat uses {view.effective.chatModel}.
+          </span>
+          <button
+            type="button"
+            className="dash-subtle"
+            disabled={saving || resetting}
+            onClick={() => void resetToGlobal()}
+          >
+            {resetting ? 'Resetting…' : 'Reset to global'}
+          </button>
+        </div>
       ) : null}
 
       <label className="ai-settings-field">

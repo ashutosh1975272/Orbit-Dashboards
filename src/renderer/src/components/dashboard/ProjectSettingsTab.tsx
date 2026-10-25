@@ -1,6 +1,9 @@
 import type React from 'react'
 import { useEffect, useState } from 'react'
-import type { DashboardChatTokenStatus, DashboardProject } from '../../../../shared/dashboard-contract'
+import type {
+  DashboardChatTokenStatus,
+  DashboardProject
+} from '../../../../shared/dashboard-contract'
 import { useDashboardStore } from '../../hooks/useDashboard'
 import AiSettingsForm from './AiSettingsForm'
 import DashboardWizard from './DashboardWizard'
@@ -25,7 +28,6 @@ export default function ProjectSettingsTab({
 
   useEffect(() => {
     let cancelled = false
-    setTokenStatus(null)
     void window.api.dashboard
       .getChatTokenStatus(project.id)
       .then((status) => {
@@ -38,6 +40,20 @@ export default function ProjectSettingsTab({
       cancelled = true
     }
   }, [project.id])
+
+  // The chat model chip links here; consume the one-shot hash after landing.
+  useEffect(() => {
+    if (typeof window === 'undefined' || window.location.hash !== '#project-ai-settings') return
+    try {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search)
+    } catch {
+      /* file:// history is best-effort */
+    }
+    const section = document.getElementById('project-ai-settings')
+    if (!section) return
+    section.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    section.focus({ preventScroll: true })
+  }, [])
 
   const saveSchedule = async (): Promise<void> => {
     setSaving(true)
@@ -64,7 +80,12 @@ export default function ProjectSettingsTab({
 
   return (
     <div className="ws-settings">
-      <section className="ws-settings-section">
+      <section
+        className="ws-settings-section"
+        id="project-ai-settings"
+        tabIndex={-1}
+        aria-label="AI settings"
+      >
         <header className="ws-settings-head">
           <h4>AI settings</h4>
           <p>
@@ -97,8 +118,8 @@ export default function ProjectSettingsTab({
         <header className="ws-settings-head">
           <h4>Slack token &amp; permissions</h4>
           <p>
-            Read-only here. Slack Chat reads history with this token; sending replies
-            additionally needs the <b>chat:write</b> scope.
+            Read-only here. Slack Chat reads history with this token; sending replies additionally
+            needs the <b>chat:write</b> scope.
           </p>
         </header>
         {tokenStatus === null ? (
@@ -122,7 +143,8 @@ export default function ProjectSettingsTab({
             </p>
             {tokenStatus.maskedToken ? (
               <p className="ws-settings-token-line">
-                Token: <code>{tokenStatus.maskedToken}</code> (full token stays encrypted in this app)
+                Token: <code>{tokenStatus.maskedToken}</code> (full token stays encrypted in this
+                app)
               </p>
             ) : null}
             {tokenStatus.scopes ? (
@@ -141,8 +163,8 @@ export default function ProjectSettingsTab({
             {tokenStatus.canSend === false ? (
               <p className="ai-settings-error">
                 Read-only: this token is missing the <b>chat:write</b> scope, so Orbit cannot post
-                replies. Add <b>chat:write</b> to the Slack app&apos;s User Token Scopes (OAuth &amp;
-                Permissions), reinstall or reconnect the workspace, then try again.
+                replies. Add <b>chat:write</b> to the Slack app&apos;s User Token Scopes (OAuth
+                &amp; Permissions), reinstall or reconnect the workspace, then try again.
               </p>
             ) : null}
           </div>
