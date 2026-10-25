@@ -85,7 +85,7 @@ One header owns the page: title, a quiet status sub-line, view mode, the actions
 
 ### 2.5 Wizard overlay
 
-When `wizardOpenFor` is set, `<DashboardWizard />` renders over the page. It is the same wizard used by `New project` and by each project's Settings tab (edit mode, prefilled).
+When `wizardOpenFor` is set, `<DashboardWizard />` renders over the page. It is the same wizard used by `New project` and by each card's Settings body (edit mode, prefilled).
 
 ---
 
@@ -138,15 +138,27 @@ Rendered when the card is expanded (mode `expanded`, or `mixed` + id in `expande
 
 ```
 Agentwork  [Waiting on client] [Needs my reply]   AgentWork  Agentwork-Application
-AI 7h ago  private/nvidia/nemotron-3.5-super-120b-a12b            [Sync] [Collapse] [⋯]   ← CardHead
-[ Summary ] [ Slack Chat ] [ Agentwork ] [ Project Requirements 1 ] [ Scope & Deliverables ]
-[ Decisions 0 ] [ Commitments 0 ] [ Files & Links 0 ] [ People & Channels 2 ]      [ Settings ]
-┌──────────────────┬──────────────────────────────┬──────────────────┐
-│ Overview         │  centre content              │ Project Details  │
-│ progress, time,  │  situation · just changed ·  │ Needs Reply  2   │
-│ 7-day activity   │  next step · highlights      │ Blockers     0   │
-└──────────────────┴──────────────────────────────┴──────────────────┘
+AI 7h ago  private/nvidia/nemotron-3.5-super-120b-a12b                     [Sync] [⋯]   ← CardHead
+┌────────────────────┬──────────────────────────────────────────────────┐
+│ Dashboard      ▸   │  Agentwork                    ← muted eyebrow     │
+│ Xomni          ▾   │  Risks                        ← 22px heading      │
+│  Chat with project │                                                   │
+│  Talk to AgentWork │  Things called out in chat that could go wrong.   │
+│  Schedules (inert) │  <the body this row owns>                         │
+│ Slack          ▾   │                                                   │
+│  Client Slack    2 │                                                   │
+│  Our Slack         │                                                   │
+│ Project info   ▾   │                                                   │
+│  Needs attention ▾ │                                                   │
+│  Project       ▸   │                                                   │
+│  Signals       ▸   │                                                   │
+│ Visualizations ▾   │                                                   │
+│ Settings     (pin) │                                                   │
+└────────────────────┴──────────────────────────────────────────────────┘
+   sidebar (nav)              centre panel (content)
 ```
+
+One nav and one content area. The old 10-tab bar and the three-pane Summary are gone: every former tab is now a row in the sidebar, and a row's body renders full measure in the centre.
 
 ### 4.1 No breadcrumb
 
@@ -183,54 +195,60 @@ Expanded cards use `CardHead.tsx`. Two halves:
 | Button | Label | Action |
 |---|---|---|
 | Sync | `Sync` (or `Syncing…`, disabled) | `syncNow(projectId)` |
-| Collapse | `Collapse` | Collapses in place, scrolls the row to the top, flashes it |
-| Menu | `⋯` | **Project settings** (opens the Settings tab) · **Delete project** (red) |
+| Menu | `⋯` | **Edit project** (opens the wizard prefilled) · **Project settings** (selects the Settings row) · **Collapse** (collapses in place, scrolls the row to the top, flashes it) · **Delete project** (red) |
 
-### 4.4 Tabs (10 tabs)
+Collapse lives in the menu, not in the header row: the header carries identity and the one action that matters (Sync).
 
-The tab bar **wraps** onto a second line when the card is narrow — no horizontal scrollbar. Settings is pushed to the right edge of the last row.
+### 4.4 The workspace sidebar (v5)
 
-| Tab | What it shows |
-|---|---|
-| **Summary** (default) | Three panes: left visuals (progress donut, time bars, 7-day activity), centre a flat stack (situation, just changed, next step / highlights / last client message) with hairline dividers instead of nested cards, right 7 Project Details cards. Detail cards open in the centre; the back button returns to the summary. Sidebars collapse to a 40 px rail and persist per project. |
-| **Slack Chat** | Locally stored messages from the project's watched channels (delta store): sender, time, text, `#channel` chip. Channel filter, auto-scroll to newest, older pages load on scroll-up. The composer posts replies through `dashboard:send-message` → `chat.postMessage`; sends update optimistically and errors show inline. **This is the only writable surface.** |
-| **&lt;Project name&gt;** | Project-scoped AI chat (placeholder for now). Label = project name. |
-| **Project Requirements** | Full-width guide section 2: requirement text, source-file chip, `by <who>`, timestamp. Empty: "No requirements found in chat". |
-| **Scope & Deliverables** | Full-width guide section 3 (in scope / out of scope / deliverables). |
-| **Decisions** | Full-width guide section 4. |
-| **Commitments** | Full-width guide section 5. |
-| **Files & Links** | Full-width guide section 6 (type chip, shared by, date, Open link). |
-| **People & Channels** | Full-width guide section 7 (people with Client/Us, channels with message count). |
-| **Settings** | Per-project configuration, pinned right: AI key/model (or **Use global settings**), workspace & channels (the wizard rendered inline), and manual schedule/completion. See §4.4.1. |
+`WorkspaceSidebar.tsx` draws the tree from `NAV_SECTIONS` in `workspace-nav.ts` — that model is the single source for the rows, their labels, copy, icons and validity, and it is unit-tested without React or a DOM.
 
-Data tabs carry a count badge that dims at zero. The numbered Project Guide left nav and the standalone Chat/Project Guide/Files tabs from the pre-v2.6 layout are gone; the section bodies described below are the data-tab bodies.
+| Part | Rows | Behaviour |
+|---|---|---|
+| **Dashboard** (top) | — | The default landing: the flat Summary stack (`CentreContent`). |
+| **Xomni** | Chat with project · Talk to AgentWork · Schedules | The first two open the chat panel (`AgentChatPanel`) in bare mode. **Schedules is inert** — `aria-disabled` with its reason as the tooltip (`aria-disabled`, not `disabled`, because a disabled button swallows its own tooltip). |
+| **Slack** | Client Slack · Our Slack | Client Slack opens the card's own workspace messages (`SlackChatTab`: channel strip, auto-scroll to newest, older pages on scroll-up, sender/time/`#channel` chip). Its composer posts through `dashboard:send-message` → `chat.postMessage`, updates optimistically and shows errors inline — **the app's only writable Slack surface**. Our Slack opens the "Connect workspace" empty state until a team workspace exists (ticket 04) — never an invented list. |
+| **Project info** | three sub-groups, **closed on first open**: Needs attention (Needs reply, Blockers, Risks, Next steps) · Project (Requirements, Scope and deliverables, Decisions, Commitments, Files and links, People and channels) · Signals (Client mood, Activity, History) | Each row opens its body: `d:` → a `guide-content` detail body, `g:` → a guide-section body. Risks stays a row because a compact chip deep-links to it. |
+| **Visualizations** | Progress · Time elapsed · Last 7 days | The chart renders **only** in the centre (`CentreVisuals only={key}`, bigger donut/taller bars), never in the sidebar. |
+| **Settings** (pinned footer) | — | The per-card Settings body (§4.4.1). |
 
-#### 4.4.1 Settings tab (v2.7)
+Interaction rules:
 
-The card-header **⋯ → Project settings** (or the compact row's `⋯`) opens this tab instead of a modal. It has three sections:
+- Section headers and sub-group headers open and close on click; the chevron rotates to −90deg while closed (transform only, with a `prefers-reduced-motion` fallback). Toggling a section never changes the centre.
+- Exactly one row is active panel-wide: soft fill plus the 3x14px accent marker on the left edge. A closed section or sub-group that owns the active body carries the marker itself (`is-holding`), so the active body always has a visible home.
+- Rows show a plain number in one right-aligned column when their real count is non-zero, and dim (`is-empty`) at zero. No badges, pills or chips.
+- State persists per project under `orbit.workspace.nav.<projectId>` (`rev: 5`): open sections, open sub-groups, the single active row, and one remembered row per section for the rail. Blobs saved by v3/v4/v4.1 load through `migrateNavState()` — older shapes get all sections open and their saved sub-groups carried over, a remembered row always wins the centre, and invalid rows drop to `null`.
+- Geometry: 236px default, drag-resizable 180–400px (double-click the divider resets, Arrow keys nudge by 12px, 32px with Shift), collapsible to a 56px icon rail via the `«` button. The rail shows Dashboard, Xomni, Slack, Project info, Visualizations and Settings as icons with tooltips and accessible names, each restoring its section's remembered row; a card narrower than 720px auto-collapses through a container query without touching the saved state.
+- A deep-link (compact chip → Risks, gear → Settings) applies on top of the persisted state, so it moves the selection and never resets the width, the rail or the sections the user closed.
+
+Look: the sidebar is one surface step below the centre (`--nav-bg` / `--content-bg`) behind a single 1px divider, no borders on rows; 32px rows (children 30px), 8px radius, 13px body, 12px muted sentence-case section labels; 16px outline icons (`nav-icons.tsx`), muted at rest, accent when active. The centre is padded 40px/48px to a ~860px measure and opens with the project name as a small muted eyebrow above a 22px sentence-case heading. Chat and Slack bodies are `is-bare` — they fill the panel and skip that header.
+
+#### 4.4.1 Settings (the sidebar's pinned row)
+
+The card-header **⋯ → Project settings** (or the compact row's `⋯`, or the Settings row) selects this body. It has four sections:
 
 | Section | Controls | Behaviour |
 |---|---|---|
 | **AI settings** | Provider (`NVIDIA NIM`), Model dropdown (loaded from `dashboard:list-ai-models`), API key (password field with **Show/Hide**), **Use global settings** | Stored per project. With the toggle on, the project key/model are ignored and the dashboard settings apply. The **EFFECTIVE NOW** box shows e.g. `Using global: nvidia/nemotron-3.5-super-120b-a12b · global key ••••abcd`. Only the mask ever reaches the renderer; keys are encrypted with `safeStorage` in the main process. |
 | **Workspace & channels** | Summary line + **Edit workspace & channels** | Mounts the 5-step `DashboardWizard` inline (starts at channel selection, preserves OAuth connectors). Saving triggers a sync. |
+| **Slack token & permissions** | Read-only status line: connection, workspace name, masked token, granted scopes, and whether `chat:write` is present | `dashboard:chat-token-status` → `DashboardChatService.chatTokenStatus()`. The raw token never leaves the main process; the renderer gets the mask. When Slack reports no scopes for the token type, the panel says sending is decided by the token instead of guessing. |
 | **Schedule & completion** | Start date, End date, Completion % (0–100) | Writes through `upsertProject`; manual values win over dates/percentages extracted from chat. |
 
 The dashboard-level panel (header **⋯ → AI settings**) edits the same form without a project scope: its key/model are the fallback for every project. Resolution order per field is **project override (unless `useGlobal`) → dashboard global → environment defaults**; the insight engine and project chat both obtain providers through `AiSettingsService.resolveSettings(projectId)`. With no key anywhere, AI features stay off and the card keeps its heuristic insight.
 
-### 4.5 Left panel — Overview (Summary tab)
+### 4.5 Visualizations (the sidebar's chart rows)
 
-The left pane of Summary is the project's visual state, not a navigation list:
+The Dashboard body (`CentreContent`) is the project's flat summary stack: situation, just changed, next step / highlights / last client message, separated by hairline dividers. The charts that used to sit in a left pane are now three sidebar rows, each rendering alone in the centre at a larger scale:
 
-| Block | Contents | Source |
+| Row | Contents | Source |
 |---|---|---|
-| Progress | Donut `0–100%` with the percentage in the middle | `summary.progress` |
-| Time elapsed | Start → due with a pace verdict (behind / on pace / ahead); `Dates not stated in chat` + **Add dates** when missing | `effectiveDates`, `paceLabel` |
-| Work done / time used | Flat bars comparing completion against elapsed time | `progress`, `daysUsed/daysTotal` |
-| Last 7 days | One bar per day, today in accent, tooltip with the count | `week[]` |
+| Progress | Donut `0–100%`, 180px when opened alone, percentage in the middle | `summary.progress` |
+| Time elapsed | Start → due with a pace verdict (behind / on pace / ahead); `Dates not stated in chat` + **Add dates** when missing; work-done vs time-used bars | `effectiveDates`, `paceLabel`, `daysUsed/daysTotal` |
+| Last 7 days | One bar per day at 160px tall, today in accent, tooltip with the count | `week[]` |
 
-The pane collapses to a 40 px rail with `‹`, persists per project, and the centre `›` toggles the right pane the same way. The guide sections are **tabs**, not a left nav.
+No chart renders inside the sidebar itself.
 
-**Guide section bodies (the data tabs):**
+**Guide section bodies (the `g:` rows):**
 
 | # | Body contents |
 |---|---|
@@ -242,11 +260,11 @@ The pane collapses to a 40 px rail with `‹`, persists per project, and the cen
 | 6 | File cards: name, type chip (PDF/DOCX/LINK/IMAGE/OTHER), `shared by`, date, **Open** link |
 | 7 | **People** (name · role · Client/Us chip) and **Channels** (#name · message count · `new` chip) |
 
-Each data tab renders its section body full width in the centre; the tab itself carries the count badge. From a Project Details card, the back control returns to the Summary.
+Each `g:` row renders its section body in the centre; the sidebar row carries the plain count. Section 1 (dates and milestones) is shown inside the Time elapsed and Dashboard bodies rather than as its own row.
 
-### 4.6 Right panel — Project Details (7 detail cards)
+### 4.6 Project info bodies (the `d:` rows)
 
-Each is a clickable summary card with a count badge, a tone colour, and a one-line summary. Clicking opens its full body in the centre panel.
+Seven detail bodies, each opened by its sidebar row with the count in the right column. The sidebar groups them under Needs attention / Project / Signals; the grouping changes nothing about the bodies.
 
 | Card | Count | Summary line | Body |
 |---|---|---|---|
@@ -258,9 +276,9 @@ Each is a clickable summary card with a count badge, a tone colour, and a one-li
 | **Activity** (info) | 1 if any message in 24 h | `24h N · 7d N · client <age>` | 2×2 stats (24h, 7d, Client age, Me age) + last client message + my last reply |
 | **History** (muted) | #history entries | `from → to` of latest | Each entry: `from → to`, timestamp, `+N msgs`; empty → `No status changes recorded yet` |
 
-### 4.7 Schedule & completion (Settings tab)
+### 4.7 Schedule & completion (Settings body)
 
-Moved out of the old ✎ modal. Open the card-header **⋯ → Project settings** → **Settings** tab → **Schedule & completion**.
+Moved out of the old ✎ modal. Open the card-header **⋯ → Project settings** (or the sidebar's **Settings** row) → **Schedule & completion**.
 
 | Field | Meaning |
 |---|---|
@@ -311,13 +329,13 @@ Each chip expands the row and lands on that detail card; there is no second togg
 
 | Aspect | Compact row | Expanded |
 |---|---|---|
-| Header | inline identity + status label, no actions until `⋯` | CardHead (Sync, Collapse, `⋯`) + status chips + AI badge |
+| Header | inline identity + status label, no actions until `⋯` | CardHead (Sync, `⋯`) + status chips + AI badge |
 | Status | text label beside the identity, coloured left bar | chips beside the project name |
-| Body | one situation line + state chips | 10 tabs + 3-panel Summary |
-| Chat | none | Slack Chat (writable) · project AI chat |
-| Project guide | none (chips jump into a detail) | full tabs for sections 2–7 |
-| Details | progress meter, pace tooltip, client age | 7 detail cards with counts |
-| Edit/Delete | `⋯` → Project settings / Delete | Settings tab / `⋯` → Delete |
+| Body | one situation line + state chips | sidebar nav + one centre body per row |
+| Chat | none | Client Slack (writable) · Xomni chat |
+| Project guide | none (chips jump into a detail) | guide rows 2–7 under Project info |
+| Details | progress meter, pace tooltip, client age | detail rows with plain counts |
+| Edit/Delete | `⋯` → Project settings / Delete | Settings row / `⋯` → Edit project · Delete |
 | Purpose | scan many projects fast | work one project in depth |
 
 ---
@@ -340,7 +358,7 @@ Each chip expands the row and lands on that detail card; there is no second togg
 | **Needs reply** | `insight.clientAsk.needsReply` |
 | **Urgency** | `insight.clientAsk.urgency` (low / normal / high) |
 | **Inactive 24h+** | No last client message AND last sync older than 24 h |
-| **Row chips** | `openQuestions`, `blockers`, `risks` lengths (files/requirements live in the tabs) |
+| **Row chips** | `openQuestions`, `blockers`, `risks` lengths (files and requirements are sidebar rows) |
 | **AI badge** | `AI <age> <model>` (or `heuristic …`, or `no insight yet`); the badge's dot-separated parts render as separate spans, never as a middle-dot string |
 | **Synced label** | `synced <age>` from `lastUpdatedAt` |
 | **Score** | Same importance formula as the Recent feed (used for ordering/debug) |
@@ -355,17 +373,23 @@ Each chip expands the row and lands on that detail card; there is no second togg
 |---|---|
 | `DashboardView.tsx` | Page shell: one header (title, sub-line, view mode, actions menu, New project), focus line, project list, empty/loading/error states, wizard host, dashboard AI settings panel |
 | `DashboardRail.tsx` | Sidebar entry (Dashboard → Slack) |
-| `ProjectCard.tsx` | Per-project switch between compact/expanded, settings-tab focus, memoised |
-| `CardHead.tsx` | Expanded header: identity, true-state chips, Sync/Collapse/`⋯`, AI badge |
+| `ProjectCard.tsx` | Per-project switch between compact/expanded, deep-link entry props, memoised |
+| `CardHead.tsx` | Expanded header: identity, true-state chips, Sync, `⋯` (Edit project · Project settings · Collapse · Delete), AI badge |
 | `CompactCard.tsx` | Dense project row: identity, situation, state chips, meter, age, `⋯` |
-| `ExpandedWorkspace.tsx` | Full workspace: header, wrapping tab bar, 3-panel Summary |
-| `ProjectSettingsTab.tsx` | Settings tab: AI form, inline workspace wizard, schedule/completion |
+| `ExpandedWorkspace.tsx` | Full workspace shell: CardHead + `WorkspaceSidebar` + `WorkspaceContent` in a `--ws-nav-w minmax(0,1fr)` grid |
+| `WorkspaceSidebar.tsx` | The nav tree drawn from `NAV_SECTIONS`: dropdown sections, Project info sub-groups, counts, rail icons, drag resizer |
+| `WorkspaceContent.tsx` | The centre: selection → body map, eyebrow/heading/desc chrome, bare bodies for chat and Slack |
+| `workspace-nav.ts` | Pure nav model: sections and rows, selection ids, persistence shape, migration, toggles, deep-link merge, rail defaults |
+| `useWorkspaceNav.ts` | Per-project nav state hook: reads/migrates `orbit.workspace.nav.<projectId>`, writes it back, exposes the actions |
+| `nav-icons.tsx` | The 16px outline icon set used by the sidebar and the rail |
+| `AgentChatPanel.tsx` | Xomni body: project chat / AgentWork mode shell and its empty state |
+| `ProjectSettingsTab.tsx` | Settings body: AI form, inline workspace wizard, Slack token status, schedule/completion |
 | `AiSettingsForm.tsx` | Shared AI settings form (project scope and global scope) |
 | `AiSettingsPanel.tsx` | Dashboard-level AI settings modal |
 | `guide-model.ts` | Guide sections, detail cards, hints, completion, chat-thread builder, date formatters |
 | `guide-content.tsx` | Bodies for the 7 guide sections and 7 detail cards |
-| `CentreContent.tsx` | Summary centre: one flat stack (Summary, Highlights, Last client message) separated by hairline dividers |
-| `CentreVisuals.tsx` | Summary tab visuals (progress donut, time bars, 7-day activity) |
+| `CentreContent.tsx` | Dashboard body: one flat stack (Summary, Highlights, Last client message) separated by hairline dividers |
+| `CentreVisuals.tsx` | Progress / Time elapsed / Last 7 days; `only={key}` renders one chart large for its sidebar row |
 | `card-view.ts` | Pure view-model: `buildCardView`, `buildCardSummary`, all derived values |
 | `DashboardWizard.tsx` | 5-step add-project overlay, or inline channel editor in Settings |
 | `ErrorBoundary.tsx` | Per-card and page-level crash isolation |
@@ -384,14 +408,13 @@ Each chip expands the row and lands on that detail card; there is no second togg
 | Header | `Client projects`, sub-line `1 project · Synced 4m ago · Every 5 min`, `Compact / Expanded / Mixed`, `⋯`, `New project` |
 | Focus line | `Across workspaces` — `Reply to AgentWork client confirming start and request project details` |
 | Project row | Agentwork · AgentWork · Agentwork-Application · Waiting on client · situation line · `1 question` · `Needs reply` · 0% · 15d |
-| Expanded header | `Agentwork` + `Waiting on client` + `Needs my reply` chips · AgentWork · Agentwork-Application · `AI 7h ago  private/nvidia/nemotron-3.5-super-120b-a12b` · Sync · Collapse · `⋯` |
-| Tabs | Summary · Slack Chat · Agentwork · Requirements 1 · Scope · Decisions · Commitments · Files · People 2 · Settings (gear, right-aligned) |
-| Overview left | `0%` progress donut, `Time elapsed — Dates not stated in chat`, time and 7-day activity bars |
-| Summary centre | One flat stack with hairline dividers: Situation, Just changed, Next step (`Reply to the client confirming we can start and ask for project details`), Highlights, Last client message |
-| Details right | Needs Reply & Open Questions 2 (`can we start here ?`), Blockers 0, Risks 0, Next Steps 1, Client Mood, Activity, History |
+| Expanded header | `Agentwork` + `Waiting on client` + `Needs my reply` chips · AgentWork · Agentwork-Application · `AI 7h ago  private/nvidia/nemotron-3.5-super-120b-a12b` · Sync · `⋯` |
+| Sidebar | Dashboard · Xomni (Chat with project, Talk to AgentWork, Schedules) · Slack (Client Slack 2, Our Slack) · Project info (Needs attention: Needs reply 2 · Blockers 0 · Risks 0 · Next steps 1; Project: Requirements 1 · …; Signals: …) · Visualizations (Progress, Time elapsed, Last 7 days) · Settings |
+| Dashboard body | `0%` progress, `Time elapsed — Dates not stated in chat`, 7-day activity, then the flat stack: Situation, Just changed, Next step (`Reply to the client confirming we can start and ask for project details`), Highlights, Last client message |
+| Detail rows | Needs reply 2 (`can we start here ?`), Blockers 0, Risks 0, Next steps 1, Client mood, Activity, History |
 
-This matches the code paths above: one project → one row, tab badges from `view.leftSidebar`/`view.rightSidebar` counts, guide ticks driven by `guideComplete()`, detail counts from `detailMeta()`, situation/next-step text from the insight with the heuristic fallback.
+This matches the code paths above: one project → one row, sidebar counts from `view.leftSidebar`/`view.rightSidebar`, guide ticks driven by `guideComplete()`, detail counts from `detailMeta()`, situation/next-step text from the insight with the heuristic fallback.
 
 ---
 
-*Originally generated from the source at `f369e5d`. Updated for v2.6 (10-tab workspace, writable Slack Chat), v2.8 (single dashboard header, dense project rows, in-place expansion, true-state chips instead of the status/filter strip, Recent strip removed, focus line renamed `Across workspaces`) and v2.9 (flat Summary centre with hairline dividers, short tab labels, icon-only Settings tab). If the card design changes, update this file in the same commit.*
+*Originally generated from the source at `f369e5d`. Updated for v2.6 (10-tab workspace, writable Slack Chat), v2.8 (single dashboard header, dense project rows, in-place expansion, true-state chips instead of the status/filter strip, Recent strip removed, focus line renamed `Across workspaces`), v2.9 (flat Summary centre with hairline dividers, short tab labels, icon-only Settings tab) and **v3.0 — the single-sidebar workspace** (the 10-tab bar and the three-pane Summary are replaced by one nav tree plus one centre body: dropdown sections, Project info sub-groups, a 236px/56px resizable rail, per-project nav persistence at `rev: 5`, chart rows rendered only in the centre, Collapse moved into the card menu with **Edit project** beside it, and a read-only Slack token status section in Settings). If the card design changes, update this file in the same commit.*

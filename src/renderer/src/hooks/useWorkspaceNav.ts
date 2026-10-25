@@ -1,0 +1,97 @@
+import { useCallback, useEffect, useState } from 'react'
+import {
+  DEFAULT_NAV,
+  migrateNavState,
+  navFromEntryProps,
+  openGroupNav,
+  resizeNav,
+  selectNav,
+  toggleInfoGroupNav,
+  toggleSectionNav,
+  type InfoGroupKey,
+  type NavEntry,
+  type OpenGroup,
+  type SectionKey,
+  type SelectionId,
+  type WorkspaceNavState
+} from '../components/dashboard/workspace-nav'
+
+const STORAGE_PREFIX = 'orbit.workspace.nav.'
+
+function storageKey(projectId: string): string {
+  return `${STORAGE_PREFIX}${projectId}`
+}
+
+function readState(projectId: string): WorkspaceNavState {
+  try {
+    const raw = localStorage.getItem(storageKey(projectId))
+    if (!raw) return DEFAULT_NAV
+    const migrated = migrateNavState(JSON.parse(raw))
+    return migrated ?? DEFAULT_NAV
+  } catch {
+    return DEFAULT_NAV
+  }
+}
+
+/** Per-project nav state for the single-sidebar workspace: which rail entry is
+ * open, the current centre selection, the open sections and Project Info
+ * sub-groups, and whether the rail is collapsed. A deep-link entry (compact
+ * chip / gear) moves the selection on top of the persisted state; it never
+ * resets the width, the rail or the sections the user closed. */
+export function useWorkspaceNav(
+  projectId: string,
+  entry?: NavEntry | null
+): {
+  nav: WorkspaceNavState
+  openGroup: (group: OpenGroup) => void
+  select: (selection: SelectionId) => void
+  toggleSection: (key: SectionKey) => void
+  toggleInfoGroup: (key: InfoGroupKey) => void
+  toggleCollapse: () => void
+  resize: (width: number) => void
+} {
+  const [nav, setNav] = useState<WorkspaceNavState>(() => {
+    const persisted = readState(projectId)
+    return (entry && navFromEntryProps(entry, persisted)) || persisted
+  })
+
+  useEffect(() => {
+    if (!entry) return
+    setNav((prev) => navFromEntryProps(entry, prev) ?? prev)
+  }, [entry])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(storageKey(projectId), JSON.stringify(nav))
+    } catch {
+      // Storage unavailable — nav still works for this session.
+    }
+  }, [projectId, nav])
+
+  const openGroup = useCallback(
+    (group: OpenGroup): void => setNav((prev) => openGroupNav(prev, group)),
+    []
+  )
+  const select = useCallback(
+    (selection: SelectionId): void => setNav((prev) => selectNav(prev, selection)),
+    []
+  )
+  const toggleSection = useCallback(
+    (key: SectionKey): void => setNav((prev) => toggleSectionNav(prev, key)),
+    []
+  )
+  const toggleInfoGroup = useCallback(
+    (key: InfoGroupKey): void => setNav((prev) => toggleInfoGroupNav(prev, key)),
+    []
+  )
+  const toggleCollapse = useCallback(
+    (): void => setNav((prev) => ({ ...prev, collapsed: !prev.collapsed })),
+    []
+  )
+  const resize = useCallback(
+    (width: number): void => setNav((prev) => resizeNav(prev, width)),
+    []
+  )
+
+  return { nav, openGroup, select, toggleSection, toggleInfoGroup, toggleCollapse, resize }
+}

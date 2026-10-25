@@ -1,6 +1,9 @@
 /* Hallmark · v2.0.0 · shape: app screen · genre: modern-minimal (inferred) · scope: app · depth: full · date: 2026-10-24 */
 /* critique: the shell spent violet on chrome and gradients, mixed five control heights, and tracked its labels in caps; accent now marks only the primary action, selection and state. */
 /* waive: 47a (app icons are the product's own brand marks, not decorative emoji) */
+/* waive: 24b on .ws-nav* / .ws-content* / .ws-agent* — the approved design reference fixes the
+   nav metrics (32px rows at 0 10px padding, 26px leaf indent, 10px list/footer gutters, 40/48px
+   centre padding); matching the mock outranks the 4px scale, and the numbers are one family. */
 
 :root { color-scheme: dark; }
 
@@ -87,6 +90,12 @@ h1, h2, h3, h4, strong, b {
   --nav-pad-y: 6px;
   --nav-gap: 10px;
   --glow-lavender: rgba(169, 155, 255, 0.06);
+
+  /* workspace sidebar rail — sits one step below the content panel */
+  --nav-bg: var(--surface);
+  --content-bg: var(--surface-2);
+  --nav-hover: color-mix(in srgb, var(--text) 6%, transparent);
+  --nav-selected: color-mix(in srgb, var(--text) 10%, transparent);
 }
 
 :root[data-theme='light'] {
@@ -150,6 +159,10 @@ h1, h2, h3, h4, strong, b {
   --nav-pad-y: 6px;
   --nav-gap: 10px;
   --glow-lavender: rgba(95, 68, 216, 0.05);
+
+  /* workspace sidebar rail — in the light ramp the lower step is the darker one */
+  --nav-bg: var(--surface-2);
+  --content-bg: var(--surface);
 }
 
 :root[data-density='compact'] {
@@ -3120,11 +3133,334 @@ button:disabled {
 
 .ws-body {
   display: grid;
-  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr) minmax(220px, 280px);
-  gap: 12px;
+  grid-template-columns: var(--ws-nav-w, 236px) minmax(0, 1fr);
+  gap: 0;
   flex: 1;
   min-height: 0;
   min-width: 0;
+  margin: 0 -18px -14px;
+  border-top: 1px solid var(--border-panel);
+}
+.ws-body.is-collapsed {
+  grid-template-columns: 56px minmax(0, 1fr);
+}
+
+/* ===== Single-sidebar workspace rail ===== */
+.ws-nav {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  background: var(--nav-bg);
+  border-right: 1px solid var(--border-panel);
+  overflow: hidden;
+}
+.ws-nav-collapse {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 10px 2px;
+  flex-shrink: 0;
+}
+.ws-nav-collapse-btn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 14px;
+  cursor: pointer;
+}
+.ws-nav-collapse-btn:hover { color: var(--text); background: var(--surface-2); }
+
+/* Drag handle on the rail's right edge — invisible until hover/drag. */
+.ws-nav-resizer {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 7px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 6;
+  background: transparent;
+  touch-action: none;
+}
+.ws-nav-resizer::after {
+  content: '';
+  position: absolute;
+  inset: 0 2px;
+  border-radius: 2px;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+.ws-nav-resizer:hover::after,
+.ws-nav-resizer:focus-visible::after,
+.ws-nav-resizer.is-dragging::after {
+  background: var(--accent);
+}
+.ws-nav-resizer:focus-visible { outline: none; }
+body.is-resizing-nav { cursor: col-resize; user-select: none; }
+
+.ws-nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 10px 10px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.ws-nav-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px;
+  flex-shrink: 0;
+}
+
+/* One row shape for every selectable line: 32px rail rows, 30px leaves. */
+.ws-nav-item,
+.ws-nav-subitem {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 32px;
+  flex-shrink: 0;
+  padding: 0 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.ws-nav-item:hover,
+.ws-nav-subitem:hover { background: var(--nav-hover); color: var(--text); }
+.ws-nav-item.is-active,
+.ws-nav-subitem.is-active { background: var(--nav-selected); color: var(--text); }
+.ws-nav-item.is-active .ws-nav-icon { color: var(--accent); }
+.ws-nav-item:focus-visible,
+.ws-nav-subitem:focus-visible,
+.ws-nav-section:focus-visible,
+.ws-nav-groupbtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+/* the accent marker: 3 x 14px, flush with the rail's left edge. A closed
+   section or sub-group that owns the active body carries it instead. */
+.ws-nav-item.is-active::before,
+.ws-nav-subitem.is-active::before,
+.ws-nav-section.is-holding::before,
+.ws-nav-groupbtn.is-holding::before {
+  content: '';
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  width: 3px;
+  height: 14px;
+  margin-top: -7px;
+  border-radius: 0 2px 2px 0;
+  background: var(--accent);
+}
+.ws-nav-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--text-faint);
+}
+.ws-nav-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ws-nav-chevron { transform: rotate(-90deg); transition: transform 0.15s ease; }
+.ws-nav-chevron.is-open { transform: rotate(0deg); }
+
+/* section header — a quiet, clickable label with a chevron */
+.ws-nav-section {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  height: 28px;
+  flex-shrink: 0;
+  margin: 12px 0 2px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-faint);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.ws-nav-section:hover { background: var(--nav-hover); color: var(--text-muted); }
+.ws-nav-section.is-open { color: var(--text-muted); }
+.ws-nav-section.is-holding { color: var(--text); }
+
+/* Project info sub-group header */
+.ws-nav-group { display: flex; flex-direction: column; gap: 2px; }
+.ws-nav-groupbtn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 30px;
+  flex-shrink: 0;
+  padding: 0 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 550;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.ws-nav-groupbtn:hover { background: var(--nav-hover); color: var(--text); }
+.ws-nav-groupbtn.is-open { color: var(--text); }
+.ws-nav-groupbtn.is-holding { color: var(--text); }
+.ws-nav-groupbtn.is-holding .ws-nav-icon { color: var(--accent); }
+
+/* leaves under a sub-group: no icon, indented to the group's text column */
+.ws-nav-subitem { height: 30px; padding-left: 26px; }
+.ws-nav-sublabel { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ws-nav-count {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding-left: 8px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+}
+.ws-nav-item.is-empty,
+.ws-nav-subitem.is-empty { color: var(--text-faint); }
+/* Inert rows use aria-disabled, not the disabled attribute: a disabled button
+   swallows its tooltip, and the reason is the whole point of the row. */
+.ws-nav-item[aria-disabled='true'],
+.ws-nav-subitem[aria-disabled='true'] { opacity: 0.55; cursor: not-allowed; }
+.ws-nav-item[aria-disabled='true']:hover,
+.ws-nav-subitem[aria-disabled='true']:hover { background: transparent; color: var(--text-faint); }
+
+/* collapsed 56px icon rail: sections merge into one icon each, and every
+   rail button carries its name as a tooltip */
+.ws-nav-railonly { display: none; }
+.ws-nav.is-collapsed .ws-nav-label,
+.ws-nav.is-collapsed .ws-nav-count,
+.ws-nav.is-collapsed .ws-nav-section,
+.ws-nav.is-collapsed .ws-nav-group,
+.ws-nav.is-collapsed .ws-nav-subitem,
+.ws-nav.is-collapsed .ws-nav-item { display: none; }
+.ws-nav.is-collapsed .ws-nav-item { justify-content: center; padding: 0; }
+.ws-nav.is-collapsed .ws-nav-fixed,
+.ws-nav.is-collapsed .ws-nav-railonly { display: flex; }
+.ws-nav.is-collapsed .ws-nav-collapse { justify-content: center; }
+.ws-nav.is-collapsed .ws-nav-footer { padding: 8px; }
+.ws-nav.is-collapsed .ws-nav-item.is-active::before,
+.ws-nav.is-collapsed .ws-nav-subitem.is-active::before { left: -8px; }
+
+/* ===== Xomni chat panel ===== */
+.ws-agent {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  padding: 18px 22px;
+}
+.ws-agent-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+}
+.ws-agent-empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 4px;
+  border-radius: 12px;
+  background: var(--nav-selected);
+  color: var(--text-faint);
+}
+.ws-agent-empty-title { font-size: 15px; font-weight: 600; color: var(--text); }
+.ws-agent-empty-hint { font-size: 12.5px; color: var(--text-muted); max-width: 380px; }
+
+/* ===== Centre content panel ===== */
+.ws-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  background: var(--content-bg);
+  overflow: hidden;
+}
+.ws-content-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.ws-content-inner {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 40px 48px 48px;
+}
+.ws-content-eyebrow {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.ws-content-title {
+  margin: 0 0 8px;
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--text);
+  overflow-wrap: break-word;
+  min-width: 0;
+}
+.ws-content-desc {
+  margin: 0 0 32px;
+  max-width: 460px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+.ws-content-body { min-width: 0; }
+.ws-content.is-bare { padding: 0; }
+
+@media (max-width: 720px) {
+  .ws-content-inner { padding: 24px 20px 40px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ws-nav-chevron { transition: none; }
 }
 
 .ws-panel {
@@ -3164,6 +3500,7 @@ button:disabled {
 }
 
 /* Quiet scrollbars inside the workspace panels. */
+.ws-nav-list,
 .ws-guide-nav,
 .ws-details-scroll,
 .ws-center-scroll,
@@ -3174,6 +3511,7 @@ button:disabled {
   scrollbar-color: var(--border-btn) transparent;
 }
 
+.ws-nav-list::-webkit-scrollbar,
 .ws-guide-nav::-webkit-scrollbar,
 .ws-details-scroll::-webkit-scrollbar,
 .ws-center-scroll::-webkit-scrollbar,
@@ -3184,6 +3522,7 @@ button:disabled {
   height: 8px;
 }
 
+.ws-nav-list::-webkit-scrollbar-thumb,
 .ws-guide-nav::-webkit-scrollbar-thumb,
 .ws-details-scroll::-webkit-scrollbar-thumb,
 .ws-center-scroll::-webkit-scrollbar-thumb,
@@ -3196,6 +3535,7 @@ button:disabled {
   background-clip: padding-box;
 }
 
+.ws-nav-list::-webkit-scrollbar-track,
 .ws-guide-nav::-webkit-scrollbar-track,
 .ws-details-scroll::-webkit-scrollbar-track,
 .ws-center-scroll::-webkit-scrollbar-track,
@@ -3507,7 +3847,8 @@ button:disabled {
   padding: 0;
 }
 
-/* Summary centre: one flat stack, hairline dividers instead of nested cards. */
+/* Summary centre: one flat stack, generous vertical breathing room instead of
+   dividers or nested cards. The panel already pads horizontally. */
 .centre-stack {
   display: flex;
   flex-direction: column;
@@ -3515,12 +3856,12 @@ button:disabled {
 }
 
 .centre-section {
-  padding: 18px 20px;
+  padding: 0;
   min-width: 0;
 }
 
 .centre-section + .centre-section {
-  border-top: 1px solid var(--border-panel);
+  margin-top: 36px;
 }
 
 .centre-label {
@@ -3683,39 +4024,33 @@ button:disabled {
   }
 }
 
-@container (max-width: 1100px) {
-  .ws-body {
-    grid-template-columns: minmax(200px, 240px) minmax(0, 1fr) minmax(200px, 240px);
+/* Auto-adjust: when the card itself gets narrow, collapse the workspace rail to
+   its icon strip regardless of the user's chosen width. The centre always
+   reflows via minmax(0, 1fr), so the card never overflows horizontally. */
+@container (max-width: 720px) {
+  .ws-body,
+  .ws-body.is-collapsed {
+    grid-template-columns: 56px minmax(0, 1fr) !important;
   }
-}
-
-@container (max-width: 900px) {
-  .ws-body {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
-    grid-template-areas:
-      'guide center'
-      'details center';
+  .ws-nav .ws-nav-item,
+  .ws-nav .ws-nav-subitem,
+  .ws-nav .ws-nav-label,
+  .ws-nav .ws-nav-count,
+  .ws-nav .ws-nav-section,
+  .ws-nav .ws-nav-group,
+  .ws-nav .ws-nav-resizer {
+    display: none !important;
   }
-  .ws-body > .ws-guide { grid-area: guide; max-height: 42vh; }
-  .ws-body > .ws-center { grid-area: center; }
-  .ws-body > .ws-details { grid-area: details; max-height: 42vh; }
-}
-
-@container (max-width: 640px) {
-  .ws-shell {
-    max-height: none;
-    min-height: 0;
+  .ws-nav .ws-nav-fixed,
+  .ws-nav .ws-nav-railonly {
+    display: flex !important;
+    justify-content: center;
+    padding: 0;
   }
-  .ws-body {
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      'guide'
-      'center'
-      'details';
-  }
-  .ws-guide,
-  .ws-details { max-height: 280px; }
-  .ws-center { min-height: 420px; }
+  .ws-nav .ws-nav-fixed.is-active::before,
+  .ws-nav .ws-nav-railonly.is-active::before { left: -8px; }
+  .ws-nav .ws-nav-collapse { justify-content: center; }
+  .ws-nav .ws-nav-footer { padding: 8px; }
 }
 
 /* ===== v2.5 — Summary tab: collapsible sidebars + full-width data tabs ===== */
@@ -3909,6 +4244,47 @@ button:disabled {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
+}
+.ws-settings-token {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ws-settings-token-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text);
+}
+.ws-settings-token-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.ws-settings-token-dot.ok {
+  background: var(--success);
+}
+.ws-settings-token-dot.off {
+  background: var(--text-muted);
+}
+.ws-settings-token-line {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  overflow-wrap: break-word;
+}
+.ws-settings-token-line code {
+  font-family: var(--font);
+  font-size: 11.5px;
+  color: var(--text);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-panel);
+  border-radius: 6px;
+  padding: 1px 6px;
 }
 
 .ai-settings {

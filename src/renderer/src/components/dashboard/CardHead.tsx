@@ -18,6 +18,7 @@ interface CardHeadProps {
   syncing: boolean
   onSync: () => void
   onSettings: () => void
+  onEdit: () => void
   onRemove?: () => void
   onToggle: () => void
 }
@@ -41,6 +42,7 @@ export default function CardHead({
   syncing,
   onSync,
   onSettings,
+  onEdit,
   onRemove,
   onToggle
 }: CardHeadProps): React.ReactElement {
@@ -97,9 +99,6 @@ export default function CardHead({
         >
           {syncing ? 'Syncing…' : 'Sync'}
         </button>
-        <button type="button" className="btn btn-ghost" onClick={onToggle} aria-expanded>
-          Collapse
-        </button>
         <div className="dash-menu-wrap" ref={menuRef}>
           <button
             type="button"
@@ -124,11 +123,31 @@ export default function CardHead({
                 type="button"
                 role="menuitem"
                 onClick={() => {
+                  onEdit()
+                  setMenuOpen(false)
+                }}
+              >
+                Edit project
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
                   onSettings()
                   setMenuOpen(false)
                 }}
               >
                 Project settings
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  onToggle()
+                  setMenuOpen(false)
+                }}
+              >
+                Collapse
               </button>
               {onRemove ? (
                 <button

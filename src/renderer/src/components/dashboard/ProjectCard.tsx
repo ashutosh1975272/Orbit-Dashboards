@@ -4,7 +4,8 @@ import type { DashboardProjectSnapshot } from '../../../../shared/dashboard-cont
 import { useDashboardStore } from '../../hooks/useDashboard'
 import { buildCardView, buildCardSummary } from './card-view'
 import CompactCard from './CompactCard'
-import ExpandedWorkspace, { type WorkspaceTab } from './ExpandedWorkspace'
+import ExpandedWorkspace from './ExpandedWorkspace'
+import type { WorkspaceEntryTab } from './workspace-nav'
 import type { DetailKey } from './guide-model'
 
 interface ProjectCardProps {
@@ -15,7 +16,7 @@ interface ProjectCardProps {
   onDelete: (projectId: string) => void
   onOpenSettings: (projectId: string) => void
   onExpandSection?: (section: number) => void
-  initialTab?: WorkspaceTab
+  initialTab?: WorkspaceEntryTab
   tabNonce?: number
   initialGuideSection?: number
   initialDetailKey?: DetailKey
@@ -36,6 +37,7 @@ function ProjectCardInner({
 }: ProjectCardProps): React.ReactElement {
   const project = snapshot.project
   const syncNow = useDashboardStore((s) => s.syncNow)
+  const openWizard = useDashboardStore((s) => s.openWizard)
   const syncingIds = useDashboardStore((s) => s.syncingProjectIds)
   const syncing = syncingIds.includes(project.id)
 
@@ -65,6 +67,7 @@ function ProjectCardInner({
       syncing={syncing}
       onSync={() => void syncNow(project.id)}
       onSettings={() => onOpenSettings(project.id)}
+      onEdit={() => openWizard(project.id)}
       onRemove={() => onDelete(project.id)}
       onToggle={onToggle}
       initialTab={initialTab}

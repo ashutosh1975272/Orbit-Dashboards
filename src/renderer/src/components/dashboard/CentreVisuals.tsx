@@ -1,8 +1,11 @@
 import type React from 'react'
 import type { CardCentreVisuals } from './card-view'
+import type { VisualKey } from './workspace-nav'
 
 interface CentreVisualsProps {
   visuals: CardCentreVisuals
+  /** Render a single chart large; omit to render the full stacked set. */
+  only?: VisualKey
 }
 
 function formatDateShort(iso: string): string {
@@ -13,21 +16,27 @@ function formatDateShort(iso: string): string {
   }
 }
 
-export default function CentreVisuals({ visuals }: CentreVisualsProps): React.ReactElement {
+export default function CentreVisuals({ visuals, only }: CentreVisualsProps): React.ReactElement {
   const { progressPercent, timeElapsed, sevenDayBars } = visuals
 
   const maxBarCount = Math.max(...sevenDayBars.map(b => b.count), 1)
-  const donutSize = 120
+  const donutSize = only === 'progress' ? 180 : 120
   const strokeWidth = 8
   const radius = (donutSize - strokeWidth) / 2
   const circumference = 2 * Math.PI * radius
   const offset = circumference * (1 - progressPercent / 100)
 
+  const showProgress = !only || only === 'progress'
+  const showTime = !only || only === 'time'
+  const showWeek = !only || only === 'week'
+
   return (
-    <div className="dash-centre-visuals space-y-4 p-4">
+    <div className={`dash-centre-visuals${only ? ' is-single' : ''} space-y-4 p-4`}>
       {/* Row 1: Progress Donut + Time Elapsed */}
+      {(showProgress || showTime) && (
       <div className="dash-at-a-glance">
         {/* Progress Donut */}
+        {showProgress && (
         <div className="dash-panel dash-visuals-panel dash-donut-panel flex items-center justify-center">
           <div className="dash-donut-wrapper relative" style={{ width: donutSize, height: donutSize }}>
             <svg width={donutSize} height={donutSize} className="dash-donut-svg" role="img" aria-label={`Progress ${progressPercent}%`} style={{ transform: 'rotate(-90deg)' }}>
@@ -64,8 +73,10 @@ export default function CentreVisuals({ visuals }: CentreVisualsProps): React.Re
             </div>
           </div>
         </div>
+        )}
 
         {/* Time Elapsed Bars */}
+        {showTime && (
         <div className="dash-panel dash-visuals-panel dash-time-panel">
           <div className="dash-visuals-panel-title text-xs font-semibold text-muted-dark mb-3">Time elapsed</div>
           {timeElapsed.hasDates ? (
@@ -124,15 +135,19 @@ export default function CentreVisuals({ visuals }: CentreVisualsProps): React.Re
             </div>
           )}
         </div>
+        )}
       </div>
+      )}
 
       {/* Row 2: Last 7 Days Activity Bars */}
+      {showWeek && (
       <div className="dash-visuals-row dash-visuals-row-bottom">
         <div className="dash-panel dash-visuals-panel dash-activity-panel">
           <div className="dash-visuals-panel-title text-xs font-semibold text-muted-dark mb-3">Last 7 days</div>
-          <div className="dash-activity-bars flex items-end gap-2 px-1" style={{ height: "70px" }} role="img" aria-label="Messages per day for the last 7 days">
+          <div className="dash-activity-bars flex items-end gap-2 px-1" style={{ height: only === 'week' ? "160px" : "70px" }} role="img" aria-label="Messages per day for the last 7 days">
             {sevenDayBars.map((bar, i) => {
-              const barHeight = `${Math.round((bar.count / Math.max(maxBarCount, 1)) * 34) + 3}px`
+              const scale = only === 'week' ? 120 : 34
+              const barHeight = `${Math.round((bar.count / Math.max(maxBarCount, 1)) * scale) + 3}px`
               const barColor = bar.isToday ? 'var(--accent)' : 'var(--text-muted)'
               return (
                 <div
@@ -152,6 +167,7 @@ export default function CentreVisuals({ visuals }: CentreVisualsProps): React.Re
           </div>
         </div>
       </div>
+      )}
     </div>
   )
 }
