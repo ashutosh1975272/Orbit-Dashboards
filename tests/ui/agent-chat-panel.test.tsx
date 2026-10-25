@@ -410,14 +410,32 @@ describe('AgentChatPanel', () => {
     await waitFor(() => expect(screen.queryByText('Old question')).toBeNull())
   })
 
-  it('prefills and consumes an initial question', async () => {
-    installApi()
+  it('sends an initial question once the key state is known', async () => {
+    const harness = installApi()
     const onConsumeInitial = vi.fn()
     renderPanel({ initialQuestion: 'What is blocked?', onConsumeInitial })
 
+    expect(onConsumeInitial).toHaveBeenCalledTimes(1)
+    await waitFor(() =>
+      expect(harness.projectChat).toHaveBeenCalledWith({
+        projectId: 'p1',
+        message: 'What is blocked?'
+      })
+    )
+  })
+
+  it('keeps an initial question in the composer when no key is set', async () => {
+    const harness = installApi({
+      status: status({ hasKey: false, modelSource: 'default', keySource: 'none' })
+    })
+    renderPanel({ initialQuestion: 'What is blocked?' })
+
     const composer = screen.getByLabelText('Ask about this project') as HTMLTextAreaElement
+    await waitFor(() =>
+      expect(screen.getByText('No AI key is set for this project. Answers are paused.')).toBeTruthy()
+    )
     expect(composer.value).toBe('What is blocked?')
-    await waitFor(() => expect(onConsumeInitial).toHaveBeenCalledTimes(1))
+    expect(harness.projectChat).not.toHaveBeenCalled()
   })
 
   it('shows the AgentWork empty state without a chat composer', () => {

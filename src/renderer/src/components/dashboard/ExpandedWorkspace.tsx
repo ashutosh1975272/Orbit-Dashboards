@@ -213,6 +213,7 @@ export default function ExpandedWorkspace({
           nav={nav}
           channels={channelLists}
           syncing={syncing}
+          onSync={onSync}
           onOpenSettings={onSettings}
           onSelect={select}
           chatDraft={chatDraft}

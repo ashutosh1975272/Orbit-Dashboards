@@ -121,6 +121,7 @@ export default function AgentChatPanel({
 
   const runIdRef = useRef<string | null>(null)
   const completedRef = useRef<Set<string>>(new Set())
+  const pendingInitialRef = useRef<string | null>(null)
   const lastQuestionRef = useRef('')
   const stickRef = useRef(true)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -302,6 +303,7 @@ export default function AgentChatPanel({
 
   useEffect(() => {
     if (!initialQuestion) return
+    pendingInitialRef.current = initialQuestion
     onConsumeInitial?.()
     requestAnimationFrame(() => {
       composerRef.current?.focus()
@@ -359,6 +361,16 @@ export default function AgentChatPanel({
     },
     [draft, streaming, keyMissing, projectId, refreshStatus]
   )
+
+  // A question handed over from the Dashboard sends once the key state is known.
+  // Without a key it stays in the composer so the reader can add one first.
+  useEffect(() => {
+    const question = pendingInitialRef.current
+    if (!question || status === null) return
+    pendingInitialRef.current = null
+    if (!status.hasKey) return
+    void send(question)
+  }, [status, send])
 
   const stop = useCallback(async (): Promise<void> => {
     if (!streaming) return

@@ -42,6 +42,7 @@ interface WorkspaceContentProps {
   nav: WorkspaceNavState
   channels: ConnectorChannelLists
   syncing: boolean
+  onSync: () => void
   onOpenSettings: () => void
   onSelect: (selection: SelectionId) => void
   /** Dashboard overview → chat hand-off. */
@@ -97,6 +98,7 @@ export default function WorkspaceContent({
   nav,
   channels,
   syncing,
+  onSync,
   onOpenSettings,
   onSelect,
   chatDraft,
@@ -118,6 +120,7 @@ export default function WorkspaceContent({
           project={project}
           snapshot={snapshot}
           syncing={syncing}
+          onSync={onSync}
           onOpenSettings={onOpenSettings}
           onSelect={onSelect}
           onAskAgent={onAskAgent}

@@ -17,6 +17,7 @@ interface DashboardPageProps {
   project: DashboardProject
   snapshot: DashboardProjectSnapshot
   syncing: boolean
+  onSync: () => void
   onOpenSettings: () => void
   onSelect: (selection: SelectionId) => void
   /** Hand a question to the project chat. */
@@ -57,6 +58,13 @@ const KIND_LABEL: Record<DashboardAttentionItem['kind'], string> = {
   status: 'Status'
 }
 
+const ASK_SUGGESTIONS = [
+  'Kitna complete hua?',
+  'Kaun se blockers hain?',
+  'Client ne last kya bola?',
+  'Next step kya hai?'
+]
+
 function age(iso: string | null | undefined): string {
   if (!iso) return '—'
   const ms = new Date(iso).getTime()
@@ -67,6 +75,18 @@ function age(iso: string | null | undefined): string {
   const hours = Math.round(mins / 60)
   if (hours < 24) return `${hours}h ago`
   return `${Math.round(hours / 24)}d ago`
+}
+
+/** Short age for the waiting sub-line: "16d", "4h", "12m". */
+function compactAge(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const ms = new Date(iso).getTime()
+  if (!Number.isFinite(ms)) return ''
+  const mins = Math.max(0, Math.round((Date.now() - ms) / 60_000))
+  if (mins < 60) return `${mins}m`
+  const hours = Math.round(mins / 60)
+  if (hours < 24) return `${hours}h`
+  return `${Math.round(hours / 24)}d`
 }
 
 function shortDate(iso: string | null | undefined): string {
@@ -178,12 +198,14 @@ function FreshnessLine({
   lastUpdatedAt,
   syncState,
   busy,
-  onOpen
+  onOpen,
+  onSync
 }: {
   lastUpdatedAt: string | null
   syncState: 'idle' | 'syncing' | 'error'
   busy: boolean
   onOpen: () => void
+  onSync: () => void
 }): React.ReactElement {
   const [nextRunAt, setNextRunAt] = useState<string | null>(null)
   const [enabled, setEnabled] = useState<boolean | null>(null)
@@ -223,32 +245,43 @@ function FreshnessLine({
           : `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`
 
   return (
-    <button
-      type="button"
-      className="dash-fresh"
-      onClick={onOpen}
-      title="Open schedules"
-      data-testid="dash-freshness"
-    >
-      <span className={`dash-fresh-dot${busy ? ' is-live' : ''}`} aria-hidden="true" />
-      {busy ? (
-        <span>Syncing now…</span>
-      ) : lastUpdatedAt ? (
-        <span>Updated {age(lastUpdatedAt)}</span>
-      ) : (
-        <span>No sync yet</span>
-      )}
-      <span className="dash-fresh-sep">·</span>
-      <span className="dash-fresh-muted">
-        {syncState === 'error'
-          ? 'sync needs attention'
-          : enabled === false
-            ? 'sync paused'
-            : countdown
-              ? `next sync in ${countdown}`
-              : 'auto-sync on'}
-      </span>
-    </button>
+    <div className="dash-fresh">
+      <button
+        type="button"
+        className="dash-fresh-main"
+        onClick={onOpen}
+        title="Open schedules"
+        data-testid="dash-freshness"
+      >
+        <span className={`dash-fresh-dot${busy ? ' is-live' : ''}`} aria-hidden="true" />
+        {busy ? (
+          <span>Syncing now…</span>
+        ) : lastUpdatedAt ? (
+          <span>Updated {age(lastUpdatedAt)}</span>
+        ) : (
+          <span>No sync yet</span>
+        )}
+        <span className="dash-fresh-sep">·</span>
+        <span className="dash-fresh-muted">
+          {syncState === 'error'
+            ? 'sync needs attention'
+            : enabled === false
+              ? 'sync paused'
+              : countdown
+                ? `next sync in ${countdown}`
+                : 'auto-sync on'}
+        </span>
+      </button>
+      <button
+        type="button"
+        className="dash-fresh-sync"
+        onClick={onSync}
+        disabled={busy}
+        title="Sync this project now"
+      >
+        {busy ? 'Syncing…' : 'Sync'}
+      </button>
+    </div>
   )
 }
 
@@ -266,16 +299,45 @@ export default function DashboardPage({
   project,
   snapshot,
   syncing,
+  onSync,
   onOpenSettings,
   onSelect,
   onAskAgent
 }: DashboardPageProps): React.ReactElement {
   const { centre, leftSidebar, rightSidebar } = view
   const [askDraft, setAskDraft] = useState('')
+  const [hasKey, setHasKey] = useState<boolean | null>(null)
   const insight = snapshot.insight ?? null
   const hasInsight = Boolean(insight)
   const metrics = snapshot.metrics
   const busy = syncing || snapshot.syncState === 'syncing'
+
+  useEffect(() => {
+    if (!onAskAgent) return
+    let alive = true
+    const refresh = (): void => {
+      window.api.dashboard
+        .getProjectChatStatus(summary.projectId)
+        .then((status) => {
+          if (alive) setHasKey(status.hasKey)
+        })
+        .catch(() => undefined)
+    }
+    refresh()
+    const off = window.api.dashboard.onConfigChanged(refresh)
+    return () => {
+      alive = false
+      off()
+    }
+  }, [onAskAgent, summary.projectId])
+
+  const askDisabled = hasKey === false
+  const submitQuestion = (question: string): void => {
+    const text = question.trim()
+    if (!text || askDisabled) return
+    setAskDraft('')
+    onAskAgent?.(text)
+  }
 
   const manual = typeof project.manualCompletion === 'number'
   const evidence = insight?.progressEvidence?.trim() ?? ''
@@ -285,7 +347,7 @@ export default function DashboardPage({
     ? 'set by you'
     : estimate !== null
       ? 'agent estimate'
-      : 'not enough evidence'
+      : 'not stated in chat'
 
   const time = centre.visuals.timeElapsed
   const waiting = metrics?.waiting
@@ -326,31 +388,56 @@ export default function DashboardPage({
               syncState={snapshot.syncState}
               busy={busy}
               onOpen={() => onSelect('m:schedules')}
+              onSync={onSync}
             />
             {errorLine ? <p className="dash-error">{errorLine}</p> : null}
 
             {onAskAgent ? (
-              <form
-                className="dash-ask-agent"
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  const question = askDraft.trim()
-                  if (!question) return
-                  setAskDraft('')
-                  onAskAgent(question)
-                }}
-              >
-                <input
-                  type="text"
-                  value={askDraft}
-                  onChange={(event) => setAskDraft(event.target.value)}
-                  placeholder="Ask agent…"
-                  aria-label="Ask agent about this project"
-                />
-                <button type="submit" disabled={!askDraft.trim()}>
-                  Ask
-                </button>
-              </form>
+              <div className="dash-ask">
+                <form
+                  className="dash-ask-agent"
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    submitQuestion(askDraft)
+                  }}
+                >
+                  <input
+                    type="text"
+                    value={askDraft}
+                    onChange={(event) => setAskDraft(event.target.value)}
+                    placeholder={
+                      askDisabled ? 'Add an AI key to ask about this project' : 'Ask agent…'
+                    }
+                    aria-label="Ask agent about this project"
+                    disabled={askDisabled}
+                  />
+                  <button type="submit" disabled={askDisabled || !askDraft.trim()}>
+                    Ask
+                  </button>
+                </form>
+                {askDisabled ? (
+                  <p className="dash-muted dash-ask-hint">
+                    No AI key yet.{' '}
+                    <button type="button" className="dash-link" onClick={onOpenSettings}>
+                      Open settings
+                    </button>{' '}
+                    to add one.
+                  </p>
+                ) : (
+                  <div className="dash-ask-chips">
+                    {ASK_SUGGESTIONS.map((question) => (
+                      <button
+                        key={question}
+                        type="button"
+                        className="dash-chip-btn"
+                        onClick={() => submitQuestion(question)}
+                      >
+                        {question}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             ) : null}
           </div>
 
@@ -363,7 +450,7 @@ export default function DashboardPage({
                 <Ring value={progressValue} />
                 <div>
                   <p className={`dash-kpi-value${progressValue === null ? ' is-soft' : ''}`}>
-                    {progressValue === null ? 'Unknown' : `${progressValue}%`}
+                    {progressValue === null ? '—' : `${progressValue}%`}
                   </p>
                   <p className="dash-muted">{progressLabel}</p>
                 </div>
@@ -386,7 +473,10 @@ export default function DashboardPage({
                   </p>
                 </>
               ) : (
-                <p className="dash-muted">Not analysed yet</p>
+                <>
+                  <p className="dash-kpi-value is-soft">—</p>
+                  <p className="dash-muted">Not analysed yet</p>
+                </>
               )}
             </div>
 
@@ -395,14 +485,19 @@ export default function DashboardPage({
                 <span>Waiting on you</span>
               </div>
               {!hasInsight ? (
-                <p className="dash-muted">Not analysed yet</p>
+                <>
+                  <p className="dash-kpi-value is-soft">—</p>
+                  <p className="dash-muted">Not analysed yet</p>
+                </>
               ) : (
                 <>
                   <p className="dash-kpi-value">
                     <CountUp value={waiting?.count ?? 0} />
                   </p>
                   <p className="dash-muted">
-                    {waiting?.oldestIso ? `Oldest: ${age(waiting.oldestIso)}` : 'Age unknown'}
+                    {waiting?.oldestIso
+                      ? `Oldest: ${compactAge(waiting.oldestIso)}`
+                      : 'Age unknown'}
                   </p>
                   {waiting && waiting.blockers + waiting.risks > 0 ? (
                     <p className="dash-muted">
@@ -432,7 +527,10 @@ export default function DashboardPage({
                   <p className="dash-muted dash-clip">{mood.moodReason}</p>
                 </>
               ) : (
-                <p className="dash-muted">Not enough signals</p>
+                <>
+                  <p className="dash-kpi-value is-soft">—</p>
+                  <p className="dash-muted">Not enough signals</p>
+                </>
               )}
             </div>
 
@@ -440,11 +538,13 @@ export default function DashboardPage({
               <div className="dash-tile-head">
                 <span>Our response time</span>
               </div>
-              <p className="dash-kpi-value">{duration(response?.medianSeconds ?? null)}</p>
+              <p className={`dash-kpi-value${response?.medianSeconds == null ? ' is-soft' : ''}`}>
+                {duration(response?.medianSeconds ?? null)}
+              </p>
               <p className="dash-muted">
                 {response && response.medianSeconds !== null
                   ? `median · ${response.pairs} replies / ${response.windowDays}d`
-                  : 'needs 3 replies'}
+                  : 'Needs 3+ replies to measure'}
               </p>
             </div>
 
@@ -452,9 +552,11 @@ export default function DashboardPage({
               <div className="dash-tile-head">
                 <span>Last client contact</span>
               </div>
-              <p className="dash-kpi-value">{lastContact ? age(lastContact) : '—'}</p>
+              <p className={`dash-kpi-value${lastContact ? '' : ' is-soft'}`}>
+                {lastContact ? age(lastContact) : '—'}
+              </p>
               <p className="dash-muted">
-                {lastContact ? shortDate(lastContact) : 'no message yet'}
+                {lastContact ? shortDate(lastContact) : 'No message yet'}
               </p>
             </div>
           </section>
