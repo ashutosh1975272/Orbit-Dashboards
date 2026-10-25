@@ -6,9 +6,8 @@ interface SlackChatTabProps {
   projectId: string
   /** Which workspace to read and post into (defaults to the card's own). */
   source?: DashboardSource
-  channels: Array<{ channelId: string; channelName: string }>
-  /** A channel picked from the sidebar's dropdown: the panel shows that one
-   * channel only, so the filter is replaced by its name. */
+  /** A channel picked from the sidebar's dropdown. The panel shows that one
+   * channel only; with nothing picked it shows every channel in the source. */
   lockedChannel?: { id: string; name: string } | null
 }
 
@@ -39,10 +38,8 @@ function formatChatTime(iso: string): string {
 export default function SlackChatTab({
   projectId,
   source = 'client',
-  channels,
   lockedChannel
 }: SlackChatTabProps): React.ReactElement {
-  const [channelId, setChannelId] = useState<string | null>(null)
   const [messages, setMessages] = useState<DashboardChatMessage[]>([])
   const [nextBeforeTs, setNextBeforeTs] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
@@ -57,13 +54,10 @@ export default function SlackChatTab({
   const stickBottomRef = useRef(true)
 
   const selectedChannel = useMemo(
-    () =>
-      lockedChannel
-        ? { channelId: lockedChannel.id, channelName: lockedChannel.name }
-        : (channels.find((channel) => channel.channelId === channelId) ?? null),
-    [channels, channelId, lockedChannel]
+    () => (lockedChannel ? { channelId: lockedChannel.id, channelName: lockedChannel.name } : null),
+    [lockedChannel]
   )
-  const activeChannelId = lockedChannel?.id ?? channelId
+  const activeChannelId = lockedChannel?.id
 
   useEffect(() => {
     let cancelled = false
@@ -134,14 +128,6 @@ export default function SlackChatTab({
     if (el && el.scrollTop <= 48) loadOlder()
   }
 
-  const changeChannel = (value: string): void => {
-    setLoading(true)
-    setMessages([])
-    setError(null)
-    setScopeError(null)
-    setChannelId(value || null)
-  }
-
   const send = async (): Promise<void> => {
     const text = draft.trim()
     const channel = selectedChannel
@@ -204,26 +190,13 @@ export default function SlackChatTab({
   return (
     <div className="ws-chat">
       <div className="ws-chat-toolbar">
-        {lockedChannel ? (
-          <span className="ws-chat-channel-name">#{lockedChannel.name}</span>
-        ) : (
-          <label className="ws-chat-filter">
-            <span>Channel</span>
-            <select
-              className="ws-chat-select"
-              value={channelId ?? ''}
-              onChange={(e) => changeChannel(e.target.value)}
-              aria-label="Filter messages by channel"
-            >
-              <option value="">All channels</option>
-              {channels.map((channel) => (
-                <option key={channel.channelId} value={channel.channelId}>
-                  #{channel.channelName}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
+        <span className="ws-chat-channel-name">
+          {lockedChannel
+            ? `#${lockedChannel.name}`
+            : source === 'ours'
+              ? 'All Our Slack channels'
+              : 'All Client Slack channels'}
+        </span>
         <span className="ws-chat-count">
           {messages.length} message{messages.length === 1 ? '' : 's'}
         </span>

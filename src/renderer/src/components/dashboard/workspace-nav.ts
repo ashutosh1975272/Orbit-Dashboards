@@ -28,12 +28,7 @@ export type SlackSourceKey = 'client' | 'team'
 /** Every app the Channels section offers a dropdown for. Only the two Slack
  * sides have a body today; the rest are listed so the shape is visible early. */
 export type ConnectorKey =
-  | SlackSourceKey
-  | 'upwork'
-  | 'teams'
-  | 'whatsapp'
-  | 'googlechat'
-  | 'discord'
+  SlackSourceKey | 'upwork' | 'teams' | 'whatsapp' | 'googlechat' | 'discord'
 
 export type InfoGroupKey = 'attention' | 'project' | 'signals'
 
@@ -182,6 +177,8 @@ export function buildConnectorChannelLists(args: {
   watchedChannels: Array<{ id: string; name: string }>
   /** Set once a team workspace exists; empty until then. */
   teamChannels?: Array<{ id: string; name: string }>
+  /** Channels mapped to this project on the Our Slack side. */
+  teamWatched?: Array<{ id: string; name: string }>
   teamLoading?: boolean
   teamError?: string | null
   teamConnected?: boolean
@@ -210,7 +207,7 @@ export function buildConnectorChannelLists(args: {
     team: {
       loading: args.teamLoading ?? false,
       error: args.teamError ?? null,
-      entries: merge(args.teamChannels ?? [], [])
+      entries: merge(args.teamChannels ?? [], args.teamWatched ?? [])
     },
     teamConnected: args.teamConnected ?? false
   }

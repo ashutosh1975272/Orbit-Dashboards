@@ -49,7 +49,10 @@ interface WorkspaceContentProps {
 const GROUP_META: Record<OpenGroup, { title: string; desc: string }> = {
   dash: { title: 'Dashboard', desc: 'Everything about this project at a glance.' },
   xomni: { title: 'Xomni', desc: 'Chat with this project.' },
-  slack: { title: 'Connect channel', desc: 'Messages from Our Slack and the client’s Slack workspace.' },
+  slack: {
+    title: 'Connect channel',
+    desc: 'Messages from Our Slack and the client’s Slack workspace.'
+  },
   info: { title: 'Project info', desc: 'What this card has learned about the project.' },
   viz: { title: 'Visualizations', desc: 'Charts built from this project’s own numbers.' },
   settings: { title: 'Settings', desc: 'Model, key, channels and dates for this card.' }
@@ -152,12 +155,9 @@ export default function WorkspaceContent({
       const listed = channels[connectorOfSelection(sel) === 'team' ? 'team' : 'client']
       body = (
         <SlackChatTab
+          key={`${source}:${sel ?? 'all'}`}
           projectId={summary.projectId}
           source={source}
-          channels={identity.channels.map((c) => ({
-            channelId: c.channelId,
-            channelName: c.channelName
-          }))}
           lockedChannel={
             sel && isChannelId(sel)
               ? (() => {

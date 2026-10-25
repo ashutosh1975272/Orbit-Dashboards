@@ -122,27 +122,30 @@ export default function ExpandedWorkspace({
     }
   }, [])
 
-  const channelLists = useMemo(
-    () =>
-      buildConnectorChannelLists({
-        clientLoading: listing.loading,
-        clientError: listing.error,
-        clientChannels: listing.channels,
-        // The card reads only the channels pinned in Global settings, not every
-        // channel the team token can reach.
-        teamLoading,
-        teamChannels: (teamWorkspace?.channels ?? []).map((c) => ({
-          id: c.channelId,
-          name: c.channelName
-        })),
-        teamConnected: teamWorkspace?.connected ?? false,
-        watchedChannels: identity.channels.map((c) => ({
-          id: c.channelId,
-          name: c.channelName
-        }))
-      }),
-    [listing, teamLoading, teamWorkspace, identity.channels]
-  )
+  const channelLists = useMemo(() => {
+    // The project's mapped Our Slack channels win. The global list is only the
+    // legacy fallback for projects created before ourSlackChannels existed.
+    const projectTeamChannels = project.ourSlackChannels?.map((c) => ({
+      id: c.channelId,
+      name: c.channelName
+    }))
+    const teamListed = projectTeamChannels?.length
+      ? projectTeamChannels
+      : (teamWorkspace?.channels ?? []).map((c) => ({ id: c.channelId, name: c.channelName }))
+    return buildConnectorChannelLists({
+      clientLoading: listing.loading,
+      clientError: listing.error,
+      clientChannels: listing.channels,
+      watchedChannels: identity.channels.map((c) => ({
+        id: c.channelId,
+        name: c.channelName
+      })),
+      teamLoading,
+      teamChannels: teamListed,
+      teamWatched: projectTeamChannels ?? [],
+      teamConnected: Boolean(teamWorkspace?.connected || projectTeamChannels?.length)
+    })
+  }, [listing, teamLoading, teamWorkspace, identity.channels, project.ourSlackChannels])
 
   const statusFlag: CardHeadFlag | null = summary.status
     ? (STATUS_FLAGS[summary.status] ?? { label: summary.status, tone: 'muted' })

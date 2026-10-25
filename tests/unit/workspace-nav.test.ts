@@ -7,6 +7,7 @@ import {
   NAV_SECTIONS,
   NAV_WIDTH_MAX,
   NAV_WIDTH_MIN,
+  buildConnectorChannelLists,
   clampNavWidth,
   infoGroupOf,
   migrateNavState,
@@ -122,6 +123,50 @@ describe('nav model shape (v6)', () => {
     expect(clampNavWidth(50)).toBe(NAV_WIDTH_MIN)
     expect(clampNavWidth(9999)).toBe(NAV_WIDTH_MAX)
     expect(clampNavWidth(Number.NaN)).toBe(236)
+  })
+})
+
+describe('buildConnectorChannelLists', () => {
+  it('keeps Our Slack and Client Slack channels in their own lists', () => {
+    const lists = buildConnectorChannelLists({
+      clientLoading: false,
+      clientError: null,
+      clientChannels: [{ id: 'C1', name: 'client-general' }],
+      watchedChannels: [{ id: 'C1', name: 'client-general' }],
+      teamChannels: [{ id: 'T1', name: 'team-general' }],
+      teamWatched: [{ id: 'T1', name: 'team-general' }],
+      teamConnected: true
+    })
+
+    expect(lists.client?.entries).toEqual([{ id: 'C1', name: 'client-general', watched: true }])
+    expect(lists.team?.entries).toEqual([{ id: 'T1', name: 'team-general', watched: true }])
+  })
+
+  it('keeps a mapped Our Slack channel the token cannot list', () => {
+    const lists = buildConnectorChannelLists({
+      clientLoading: false,
+      clientError: null,
+      clientChannels: [],
+      watchedChannels: [],
+      teamChannels: [],
+      teamWatched: [{ id: 'T9', name: 'archived-project' }]
+    })
+
+    expect(lists.team?.entries).toEqual([{ id: 'T9', name: 'archived-project', watched: true }])
+  })
+
+  it('sorts each connector list by channel name', () => {
+    const lists = buildConnectorChannelLists({
+      clientLoading: false,
+      clientError: null,
+      clientChannels: [
+        { id: 'C2', name: 'zulu' },
+        { id: 'C1', name: 'alpha' }
+      ],
+      watchedChannels: []
+    })
+
+    expect(lists.client?.entries.map((c) => c.name)).toEqual(['alpha', 'zulu'])
   })
 })
 
