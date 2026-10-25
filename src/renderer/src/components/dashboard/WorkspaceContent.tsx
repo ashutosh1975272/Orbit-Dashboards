@@ -12,6 +12,7 @@ import { DetailBody, GuideDetailBody } from './guide-content'
 import SlackChatTab from './SlackChatTab'
 import ProjectSettingsTab from './ProjectSettingsTab'
 import AgentChatPanel from './AgentChatPanel'
+import { requestMessageJump } from './jump-to-message'
 import SchedulesPage from './SchedulesPage'
 import {
   channelIdOf,
@@ -141,11 +142,19 @@ export default function WorkspaceContent({
           initialQuestion={chatDraft}
           onConsumeInitial={onConsumeChatDraft}
           onOpenSettings={onOpenSettings}
-          onOpenSource={(ref) =>
+          onOpenSource={(ref) => {
+            // Always navigate to the channel; the Slack tab consumes this
+            // target and scrolls/flashes when the message is loaded.
+            requestMessageJump({
+              projectId: summary.projectId,
+              source: ref.source,
+              channelId: ref.channelId,
+              ts: ref.ts
+            })
             onSelect(
               `c:${ref.source === 'ours' ? 'team' : 'client'}:${ref.channelId}` as SelectionId
             )
-          }
+          }}
         />
       )
       bare = true

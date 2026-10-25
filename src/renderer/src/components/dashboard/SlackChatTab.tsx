@@ -1,6 +1,7 @@
 import type React from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DashboardChatMessage, DashboardSource } from '../../../../shared/dashboard-contract'
+import { scrollToMessage, takeMessageJump } from './jump-to-message'
 
 interface SlackChatTabProps {
   projectId: string
@@ -66,9 +67,25 @@ export default function SlackChatTab({
       .getMessages({ projectId, source, channelId: activeChannelId ?? undefined, limit: PAGE_SIZE })
       .then((page) => {
         if (cancelled) return
+        // A source chip may have handed us a message to reveal. Only suppress
+        // the bottom pin when that message is actually in this page.
+        const jumpTs = takeMessageJump(projectId, source, activeChannelId)
+        const canJump =
+          Boolean(jumpTs) &&
+          page.messages.some(
+            (message) => message.channelId === activeChannelId && message.ts === jumpTs
+          )
+        if (canJump) stickBottomRef.current = false
         setMessages(page.messages)
         setNextBeforeTs(page.nextBeforeTs)
         setHasMore(page.hasMore)
+        if (canJump && jumpTs) {
+          window.requestAnimationFrame(() =>
+            window.requestAnimationFrame(() => {
+              scrollToMessage(scrollRef.current, jumpTs)
+            })
+          )
+        }
       })
       .catch((err: unknown) => {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Could not load messages.')
@@ -229,6 +246,9 @@ export default function SlackChatTab({
         {messages.map((message) => (
           <div
             key={messageKey(message)}
+            data-ts={message.ts}
+            data-channel-id={message.channelId}
+            tabIndex={-1}
             className={`ws-chat-msg${message.isMine ? ' is-mine' : ''}${message.failed ? ' is-failed' : ''}`}
           >
             <div className="ws-chat-msg-head">

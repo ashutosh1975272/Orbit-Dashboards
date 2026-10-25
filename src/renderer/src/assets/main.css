@@ -3866,6 +3866,14 @@ body.is-resizing-nav { cursor: col-resize; user-select: none; }
   background: var(--accent-soft);
 }
 .ws-chat-msg.is-failed { border-color: var(--danger); }
+.ws-chat-msg.is-jump-flash { animation: ws-jump-flash 1.6s ease-out; }
+@keyframes ws-jump-flash {
+  0%, 30% { box-shadow: 0 0 0 2px var(--accent); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ws-chat-msg.is-jump-flash { animation: none; outline: 2px solid var(--accent); outline-offset: 2px; }
+}
 .ws-chat-msg-head {
   display: flex;
   align-items: baseline;
