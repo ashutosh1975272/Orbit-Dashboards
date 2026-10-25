@@ -1,5 +1,20 @@
 # Status Ledger
 
+## Expanded Dashboard — Phase 0a A5 progress honesty (2026-10-25, commit `baf60fa`)
+- `npm run typecheck` (node + web): PASS (exit 0)
+- `npm test`: PASS — 45 files, **377/377** tests (exit 0)
+- `npm run build`: PASS — renderer 82 modules, client built 2.29s (exit 0)
+- lint (all 4 changed/new files): **0 errors, 0 warnings** (`CompactCard.tsx`, `card-view.ts`, `dashboard-card-view.test.ts`, `compact-card.test.tsx`)
+- production changes:
+  - `CardSummary.progress` is `number | null`; `buildCardSummary` uses manual completion → insight progress only when `progressEvidence` is non-empty → null (`card-view.ts:699-708`). The time-based `snapshot.completion` is no longer used.
+  - `computeTimeElapsed` returns `paceLabel: 'Progress not stated in chat'` and no pace when progress is unknown (`card-view.ts:255-270`).
+  - `CompactCard` renders `—` and `title="Progress not stated in chat"` for null progress (`CompactCard.tsx:146-160`).
+  - typed `normalizeInsight`/`toCardClientMessage` to remove the pre-existing `any` lint errors in the touched file (no behaviour change).
+- tests:
+  - `buildCardSummary — progress honesty` 4: null without evidence, evidenced insight used, manual wins, no completion fallback.
+  - `buildCardSummary — pace` +1: no pace claim without evidence.
+  - `CompactCard progress` 2 (jsdom): dash + honest title for null, real `50%` when present.
+
 ## Chat with project — Phase 4 tests (2026-10-25, commit `eff1222`)
 - `npm run typecheck` (node + web): PASS (exit 0)
 - `npm test`: PASS — 44 files, **370/370** tests (exit 0); **72 new tests in 7 new files**
@@ -76,7 +91,7 @@
 - A2 Encryption: PARTIAL (block implemented; legacy migration not; UI errors not verified)
 - A3 Injection: PARTIAL (prompt lines + progress guard; end-to-end injection test not added)
 - A4 Fabrication: DONE (insights.ts; nullable types)
-- A5 Dashboard honesty: PARTIAL (duplicate banner removed, text changed; compact card not verified)
+- A5 Dashboard honesty: DONE (duplicate banner removed; compact card progress is manual/evidenced or `—`, tested in `baf60fa`)
 - A6 Jump to message: PARTIAL (metadata attached; SourceChip click not implemented)
 - A7 LLM gating: PARTIAL (forced zero-new fixed; digest refresh not gated)
 - A8 Reconnect: NOT DONE
