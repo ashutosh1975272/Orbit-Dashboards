@@ -392,6 +392,10 @@ export interface InsightClientMessage {
   who: string
   whenIso: string
   quote: string
+  source?: DashboardSource
+  channelId?: string
+  ts?: string
+  permalink?: string
 }
 
 /** One thing that happened (evidence-linked). */

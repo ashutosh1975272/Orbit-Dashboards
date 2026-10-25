@@ -1,6 +1,10 @@
 type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
-const TOKEN_PATTERNS = [/xox[a-zA-Z]-[A-Za-z0-9-]+/g, /Bearer\s+[A-Za-z0-9._~+/=-]+/gi]
+const TOKEN_PATTERNS = [
+  /xox[a-zA-Z]-[A-Za-z0-9-]+/g,
+  /nvapi-[A-Za-z0-9-]+/g,
+  /Bearer\s+[A-Za-z0-9._~+/=-]+/gi
+]
 
 function redact(value: unknown): unknown {
   if (typeof value === 'string') {
@@ -18,7 +22,7 @@ function redact(value: unknown): unknown {
   if (value && typeof value === 'object') {
     const out: Record<string, unknown> = {}
     for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
-      if (/token|secret|password|authorization/i.test(key)) {
+      if (/token|secret|password|authorization|key/i.test(key)) {
         out[key] = '[REDACTED]'
       } else {
         out[key] = redact(nested)

@@ -18,6 +18,7 @@ import type {
   InsightMilestone,
   InsightPerson,
   InsightRequirement,
+  DashboardSource,
   InsightStatus,
   InsightUrgency,
   ProjectInsight
@@ -35,6 +36,7 @@ export type {
   InsightMilestone,
   InsightPerson,
   InsightRequirement,
+  DashboardSource,
   InsightStatus,
   InsightUrgency,
   ProjectInsight
@@ -323,12 +325,13 @@ function parseDeliverables(v: unknown): InsightDeliverable[] | undefined {
     const name = asString((item as Record<string, unknown>).name)
     if (!name) continue
     const status = asString((item as Record<string, unknown>).status) as
-      | 'done' | 'in-progress' | 'pending' | 'not-started' | undefined
+      'done' | 'in-progress' | 'pending' | 'not-started' | undefined
     out.push({
       name,
-      status: status && ['done', 'in-progress', 'pending', 'not-started'].includes(status)
-        ? status
-        : 'pending'
+      status:
+        status && ['done', 'in-progress', 'pending', 'not-started'].includes(status)
+          ? status
+          : 'pending'
     })
   }
   return out.length ? out.slice(0, 10) : undefined
@@ -342,7 +345,7 @@ function parseFiles(v: unknown): InsightFile[] | undefined {
     const name = asString((item as Record<string, unknown>).name)
     if (!name) continue
     const type = asString((item as Record<string, unknown>).type) as
-      | 'pdf' | 'docx' | 'link' | 'image' | 'other' | undefined
+      'pdf' | 'docx' | 'link' | 'image' | 'other' | undefined
     out.push({
       name,
       type: type && ['pdf', 'docx', 'link', 'image', 'other'].includes(type) ? type : 'other',
@@ -488,7 +491,15 @@ export function mergeInsight(
           ? {
               who: asString(lastClient?.who) ?? 'client',
               whenIso: asString(lastClient?.whenIso) ?? new Date(0).toISOString(),
-              quote: clientQuote
+              quote: clientQuote,
+              source:
+                (lastClient?.source as DashboardSource | undefined) ??
+                base.clientAsk.lastClientMessage?.source,
+              channelId:
+                asString(lastClient?.channelId) ?? base.clientAsk.lastClientMessage?.channelId,
+              ts: asString(lastClient?.ts) ?? base.clientAsk.lastClientMessage?.ts,
+              permalink:
+                asString(lastClient?.permalink) ?? base.clientAsk.lastClientMessage?.permalink
             }
           : base.clientAsk.lastClientMessage,
       openQuestions: asStringArray(clientAsk.openQuestions, 3) ?? base.clientAsk.openQuestions

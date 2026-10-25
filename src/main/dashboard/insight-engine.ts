@@ -144,8 +144,10 @@ export class InsightEngine {
       // cost is only paid when messages arrived and either enough of them or
       // enough time has passed.
       const due =
-        options?.force === true ||
-        (newCount > 0 && (newCount >= MIN_NEW_FOR_IMMEDIATE || minutesSince >= HEARTBEAT_MINUTES))
+        newCount > 0 &&
+        (options?.force === true ||
+          newCount >= MIN_NEW_FOR_IMMEDIATE ||
+          minutesSince >= HEARTBEAT_MINUTES)
       if (due) {
         try {
           const userNames = await this.fetchUsers(token)

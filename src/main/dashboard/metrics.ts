@@ -8,6 +8,7 @@ import type {
   DashboardActivityDay,
   DashboardAttentionItem,
   DashboardMetrics,
+  DashboardSource,
   DashboardNewSinceCounts,
   DashboardProject,
   InsightMood,
@@ -169,29 +170,54 @@ function truncate(text: string, max = 160): string {
 export function buildWaiting(insight: ProjectInsight | null): DashboardMetrics['waiting'] {
   if (!insight) return { count: 0, oldestIso: null, items: [] }
 
+  const last = insight.clientAsk?.lastClientMessage
+  const anchor = {
+    source: (last?.source ?? 'client') as DashboardSource,
+    channelId: last?.channelId ?? 'unknown',
+    ts: last?.ts ?? last?.whenIso ?? 'unknown'
+  }
+
   const items: DashboardAttentionItem[] = []
   if (insight.clientAsk?.needsReply) {
-    const last = insight.clientAsk.lastClientMessage
     items.push({
       kind: 'needs-reply',
       text: truncate(
         last ? last.quote || `Reply to ${last.who}` : 'The client is waiting on a reply'
       ),
-      ...(last?.whenIso ? { atIso: last.whenIso } : {})
+      ...(last?.whenIso ? { atIso: last.whenIso } : {}),
+      source: (last?.source ?? anchor.source) as DashboardSource,
+      channelId: last?.channelId ?? anchor.channelId,
+      ts: last?.ts ?? last?.whenIso ?? anchor.ts,
+      ...(last?.permalink ? { permalink: last.permalink } : {})
     })
   }
   for (const question of insight.clientAsk?.openQuestions ?? []) {
-    items.push({ kind: 'question', text: truncate(question) })
+    items.push({
+      kind: 'question',
+      text: truncate(question),
+      source: anchor.source as DashboardSource,
+      channelId: anchor.channelId,
+      ts: anchor.ts
+    })
   }
   for (const blocker of insight.blockers ?? []) {
     items.push({
       kind: 'blocker',
       text: truncate(blocker.what),
-      ...(blocker.sinceIso ? { atIso: blocker.sinceIso } : {})
+      ...(blocker.sinceIso ? { atIso: blocker.sinceIso } : {}),
+      source: anchor.source as DashboardSource,
+      channelId: anchor.channelId,
+      ts: blocker.sinceIso ?? anchor.ts
     })
   }
   for (const risk of insight.risks ?? []) {
-    items.push({ kind: 'risk', text: truncate(risk) })
+    items.push({
+      kind: 'risk',
+      text: truncate(risk),
+      source: anchor.source as DashboardSource,
+      channelId: anchor.channelId,
+      ts: anchor.ts
+    })
   }
 
   return {
