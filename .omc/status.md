@@ -1,9 +1,15 @@
 # Status Ledger
 
-## Baseline (2026-10-25)
+## Chat with project — Phase 0 baseline (2026-10-25)
+- `npm run typecheck` (node + web): PASS (exit 0)
+- `npm test`: PASS — 37 files, **298/298** tests (exit 0)
+- `npm run build`: PASS — 80 modules, built in 2.13s (exit 0)
+- lint: not a gate for this work; pre-existing 26 errors remain a separate task
+
+## Earlier baseline (2026-10-25, pre-chat)
 - typecheck: clean
 - lint: 26 errors, 945 warnings
-- tests: 267 passed, 28 failed (9 files)
+- tests: 267 passed, 28 failed (9 files) — superseded by the 298/298 run above
 - commits this session: 5 (4539c37, 2c6114f, d2ed260, da654c7, f46c2d5)
 
 ## Items
