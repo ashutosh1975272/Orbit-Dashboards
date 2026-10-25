@@ -1,5 +1,15 @@
 # Status Ledger
 
+## Chat with project — Phase 2 UI (2026-10-25, commit `7dc01f3`)
+- `npm run typecheck` (node + web): PASS (exit 0)
+- `npm test`: PASS — 37 files, **298/298** tests (exit 0, no regressions)
+- `npm run build`: PASS — preload 18.52 kB, renderer 81 modules, client built 2.12s (exit 0)
+- lint (changed/new files): **0 errors** (prettier autofix applied)
+- live Electron (built bundle, CDP 9222, real project data): Ask agent bar → chat opened with the question prefilled; model chip showed `nvidia/nemotron-3.5-super-vl-120b-a12b` + `GLOBAL`; empty state + suggestion chips rendered
+- live streaming proof: a real NVIDIA reply arrived, was stored in `dashboard/chat/card-mvmbsors-u6ex.json`, and a nonsense question produced exactly `Chat mein ye nahi mila.`; both assistant turns had `sources: []`
+- not exercised live: Stop, key-missing state, Clear chat, source chips (Phase 4 tests cover these; no key/settings were modified)
+- Clear-chat IPC is now exposed through preload (`clearProjectChat`)
+
 ## Chat with project — Phase 1 backend (2026-10-25, commit `0f67b97`)
 - `npm run typecheck` (node + web): PASS (exit 0)
 - `npm test`: PASS — 37 files, **298/298** tests (exit 0, no regressions)
