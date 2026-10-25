@@ -1,5 +1,23 @@
 # Status Ledger
 
+## Expanded Dashboard — Phase 5 tests, demo fixtures and live proof (2026-10-26, commit `f94b587`)
+- `npm run typecheck` (node + web): PASS (exit 0)
+- `npm test`: PASS — 48 files, **411/411** (exit 0); new `tests/ui/dashboard-page.test.tsx` **12/12**: rich (court chip + tooltip rule, Activity totals `Client · 52` / `Ours · 25` / `77 in 14d`, Time/Mood, six latest rows + source chips + `takeMessageJump` targets `200.9`/`100.3`, `View all` → `s:client`, attention 5 rows + `2 open` + source jump, new-since 6 rows, latest-3 asks order, people/channels, setup hidden, chip hand-off) and sparse (`—` fallbacks, no Activity/duo/Latest/People/attention/new-since regions, `1 of 5` setup, disabled ask + Open settings)
+- `npm run build` (production, no env): PASS — renderer **90 modules**, CSS 148.82 kB, JS 1,059.40 kB, assets exactly `index-05b_cbG_.js`, `index-BenAVDrG.css`, `app-icon-CPttgIyR.png` (client 1.80s)
+- demo switch proof: `ORBIT_DEMO_DATA=rich npm run build` emitted `mount-demo-Bxty1iWg.js` 12.02 kB + `mount-demo-Byus5-cS.css` 0.65 kB; production rebuild contains **none** — `grep -rIl "Demo data\|demo-rich\|demo-sparse\|Aurora storefront\|demo-watermark\|mount-demo\|ORBIT_DEMO" out/` → `NONE`
+- lint (changed TS/TSX files): **0 errors, 0 warnings**, exit 0; `prettier --check` on the same set: all matched
+- renderer-only demo: `ORBIT_DEMO_DATA` is a build-time `define`; `mount-demo` dynamically imports fixtures only in the dead demo branch; fixtures override `dashboardApi()` and no-op every action — no delta-store, project-store, disk or Slack write. `Demo data` watermark rendered in both modes. Sparse and rich fixtures live in `src/renderer/src/demo/`.
+- six screenshots in `.omc/screenshots/` (committed):
+  - `dashboard-sparse-1100.png` 1100x761, `dashboard-sparse-1500.png` 1500x700, `dashboard-sparse-1900.png` 1900x700
+  - `dashboard-rich-1100.png` 1100x2072, `dashboard-rich-1500.png` 1500x1449, `dashboard-rich-1900.png` 1900x1449
+- live Electron (built bundle, isolated CDP **9240**, temp profiles `/tmp/orbit-demo-sparse` and `/tmp/orbit-demo-rich`; real `~/.config/Electron` and the pre-existing 9222 instance untouched; PIDs 202320/204182 verified via `ps` before `kill`, both stopped):
+  - no horizontal overflow at 1100/1500/1900 — `scrollWidth == clientWidth` at every width; `.dash-inner` measures full viewport below 1480 and exactly 1480 above
+  - no clipped text: zero `.dash-inner` descendants with `scrollWidth > clientWidth + 1` under hidden/clip overflow at all three widths
+  - internal scroll under the app-shell constraint: `.dash-scroll` 2055px content in a 700px viewport, `scrollTop` moved 0 → 240, `.dash-page` stayed within the window
+  - responsive shapes: 1100 → KPI 3x2, main full width, rail below in 2 columns; 1500/1900 → KPI 6, main 8 / rail 4
+  - sparse shows `1 of 5` setup, disabled ask, `—` KPIs, no empty centre/rail panels; rich shows attention `2 open` + `1 blocker · 2 risks`, 6 new-since rows, deliverables bar and people/channels
+  - toast: not rendered in demo mode (every action no-ops); root cause and rect proof stand from Phase 0 (`7b8e78e`), and `tests/unit/shortcut-label.test.ts` (5 tests) proves the toast copy fires only on visible→hidden
+
 ## Expanded Dashboard — Phase 4 rail widgets (2026-10-26, commit `3eeb314`)
 - `npm run typecheck` (node + web): PASS (exit 0)
 - `npm test`: PASS — 47 files, **399/399** (exit 0; UI coverage for these widgets lands in Phase 5)
