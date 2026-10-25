@@ -432,7 +432,9 @@ describe('AgentChatPanel', () => {
 
     const composer = screen.getByLabelText('Ask about this project') as HTMLTextAreaElement
     await waitFor(() =>
-      expect(screen.getByText('No AI key is set for this project. Answers are paused.')).toBeTruthy()
+      expect(
+        screen.getByText('No AI key is set for this project. Answers are paused.')
+      ).toBeTruthy()
     )
     expect(composer.value).toBe('What is blocked?')
     expect(harness.projectChat).not.toHaveBeenCalled()

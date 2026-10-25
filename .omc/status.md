@@ -1,5 +1,30 @@
 # Status Ledger
 
+## Expanded Dashboard — Phase 3 centre widgets (2026-10-26, commit `4ac71bb`)
+- `npm run typecheck` (node + web): PASS (exit 0)
+- `npm test`: PASS — 47 files, **399/399** tests (exit 0); new: activity-summary 8, chat-service activity 5
+- `npm run build`: PASS — main 409.32 kB, preload 18.71 kB, renderer 85 modules, CSS 147.26 kB, JS 1,054.51 kB, client 2.32s (exit 0); only the pre-existing `chrome-cookie-probe` import warning
+- lint (changed TS/TSX files): **0 errors, 0 warnings** after Prettier on the two test files; `main.css` is outside eslint's configured extensions
+- data path (no LLM, no new token reads):
+  - `dashboard:project-activity` validates a non-blank `projectId` (invalid → empty shape) and returns `DashboardProjectActivity`
+  - `DashboardChatService.projectActivity` reads only the last **14 days** per delta, caps each channel at **200** rows, caches per project for **60s**, and takes our-side rows only from `project.ourSlackChannels`
+  - `buildProjectActivity` (pure) drops `message_changed`, `message_deleted`, `channel_join`, `channel_leave` and empty text; sorts newest-first; returns recent 6, top-3 participants/channels (ties alphabetical), 14d counts
+  - ball-in-court rule: no client message → null; no ours message or client ts newer → `you`; otherwise `client`
+- UI (`DashboardPage.tsx`, Dashboard-only CSS):
+  - hero gained a court chip; its tooltip states the exact rule
+  - Activity chart is 160px tall with legend + 14d totals and is not rendered when the last 14 days are empty
+  - Latest messages merges both sources (newest 6): initials avatar, name, age, `#channel`, source chip, 2-line text; click calls `requestMessageJump` then opens `c:client:<id>` / `c:team:<id>`; `View all` opens `s:client`
+  - Time and pace / Mood trend render only when `time.hasDates` / `trend.length >= 3`, side by side at >=760px; no placeholder panels remain
+- not exercised live in this phase: no Electron run; screenshots and live overflow checks are Phase 5 gates.
+
+## Expanded Dashboard — Phase 2 ask bar and KPI honesty (2026-10-25, commit `74f87af`)
+- gates re-run at the commit: `npm run typecheck` PASS (exit 0); `npm test` PASS — 46 files, **386/386**; `npm run build` PASS — renderer 84 modules, CSS 145.02 kB, JS 1,050.37 kB, client 2.70s. Lint: 0 errors; one Prettier warning in `agent-chat-panel.test.tsx` was formatted afterwards.
+- slim freshness bar with a separate `Sync` action next to the schedules link; no duplicated sync control
+- Ask is full width with four suggestion chips; the input is disabled without a key and the muted hint links to Settings. Chips call the same `onAskAgent` path as Enter.
+- Ask hand-off is key-aware: when a key exists the chat opens and **auto-sends** the question once status is known; without a key it opens with the question in the composer and does not send (`AgentChatPanel` pending-initial ref).
+- KPI changes: 32px/500 values, 12px sentence-case labels, `—` + a concrete reason instead of a fake zero, `Oldest: 16d` / `Age unknown`, separate `N blockers · N risks` sub-line, `Needs 3+ replies to measure`.
+- tests: `agent-chat-panel` 14 — auto-send when keyed (exact `{projectId, message}`), no send + composer keeps the question when keyless.
+
 ## Expanded Dashboard — Phase 1 layout shell (2026-10-25, commit `ca69a78`)
 - `npm run typecheck` (node + web): PASS (exit 0)
 - `npm test`: PASS — 46 files, **385/385** tests (exit 0)
