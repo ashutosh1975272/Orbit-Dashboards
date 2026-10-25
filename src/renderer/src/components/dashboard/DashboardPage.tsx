@@ -99,6 +99,13 @@ function shortDate(iso: string | null | undefined): string {
   return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
 }
 
+/** Sort timestamp; missing or invalid dates sink to the bottom. */
+function isoMs(iso: string | null | undefined): number {
+  if (!iso) return 0
+  const ms = new Date(iso).getTime()
+  return Number.isFinite(ms) ? ms : 0
+}
+
 function initials(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean)
   if (words.length === 0) return '?'
@@ -334,7 +341,6 @@ export default function DashboardPage({
   const busy = syncing || snapshot.syncState === 'syncing'
 
   useEffect(() => {
-    if (!onAskAgent) return
     let alive = true
     const refresh = (): void => {
       window.api.dashboard
@@ -350,7 +356,7 @@ export default function DashboardPage({
       alive = false
       off()
     }
-  }, [onAskAgent, summary.projectId])
+  }, [summary.projectId])
 
   const askDisabled = hasKey === false
   const submitQuestion = (question: string): void => {
@@ -384,7 +390,9 @@ export default function DashboardPage({
   const newTotal = newSince ? Object.values(newSince.counts).reduce((sum, n) => sum + n, 0) : 0
 
   const requirements = leftSidebar.requirements
-  const latestRequirements = requirements.slice(-3)
+  const latestRequirements = [...requirements]
+    .sort((a, b) => isoMs(b.whenIso) - isoMs(a.whenIso))
+    .slice(0, 3)
   const deliverables = leftSidebar.scopeDeliverables.deliverables
   const deliverableCounts = {
     done: deliverables.filter((d) => d.status === 'done').length,
@@ -424,6 +432,64 @@ export default function DashboardPage({
         : `c:client:${message.channelId}`) as SelectionId
     )
   }
+
+  const attentionRows = attention.slice(0, 5)
+  const newSinceRows = newSince?.items.slice(0, 6) ?? []
+
+  const openAttention = (item: DashboardAttentionItem): void => {
+    if (!item.channelId) return
+    const source = item.source ?? 'client'
+    if (item.ts) {
+      requestMessageJump({
+        projectId: summary.projectId,
+        source,
+        channelId: item.channelId,
+        ts: item.ts
+      })
+    }
+    onSelect(
+      (source === 'ours' ? `c:team:${item.channelId}` : `c:client:${item.channelId}`) as SelectionId
+    )
+  }
+
+  const setupRows = [
+    {
+      key: 'sync',
+      label: 'Client sync',
+      done: snapshot.lastUpdatedAt !== null,
+      action: 'Sync now',
+      run: onSync
+    },
+    {
+      key: 'channels',
+      label: 'Client channels',
+      done: project.monitors.length > 0,
+      action: 'Set up',
+      run: onOpenSettings
+    },
+    {
+      key: 'ours',
+      label: 'Our Slack channels',
+      done: (project.ourSlackChannels?.length ?? 0) > 0,
+      action: 'Set up',
+      run: onOpenSettings
+    },
+    {
+      key: 'dates',
+      label: 'Project dates',
+      done: Boolean(snapshot.effectiveDates.startDate && snapshot.effectiveDates.endDate),
+      action: 'Add dates',
+      run: onOpenSettings
+    },
+    {
+      key: 'key',
+      label: 'AI key',
+      done: hasKey === true,
+      action: 'Add key',
+      run: onOpenSettings
+    }
+  ]
+  const setupDone = setupRows.filter((row) => row.done).length
 
   return (
     <div className="dash-page">
@@ -773,91 +839,113 @@ export default function DashboardPage({
             </div>
 
             <div className="dash-rail">
-              <section className="dash-block" aria-label="Needs your attention">
-                <div className="dash-block-head">
-                  <h5>Needs your attention</h5>
-                  {waiting && waiting.count > 0 ? (
-                    <span className="dash-muted">{waiting.count} open</span>
-                  ) : null}
-                </div>
-                {!hasInsight ? (
-                  <p className="dash-muted">Not analysed yet.</p>
-                ) : attention.length === 0 ? (
-                  <p className="dash-muted">Not enough info to tell.</p>
-                ) : (
-                  <ul className="dash-list">
-                    {attention.map((item, index) => (
-                      <li className="dash-row" key={`${item.kind}-${index}`}>
-                        <span className={`dash-kind is-${item.kind}`}>
-                          {KIND_LABEL[item.kind] ?? item.kind}
-                        </span>
-                        <span className="dash-row-text">{item.text}</span>
-                        {item.source ? <SourceChip source={item.source} /> : null}
-                        <span className="dash-row-age">{item.atIso ? age(item.atIso) : '—'}</span>
-                        {item.channelId ? (
-                          <button
-                            type="button"
-                            className="dash-link"
-                            onClick={() => onSelect(`c:client:${item.channelId}` as SelectionId)}
-                          >
-                            Open
-                          </button>
-                        ) : null}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
-
-              <section className="dash-block" aria-label="New since your last visit">
-                <div className="dash-block-head">
-                  <h5>New since your last visit</h5>
-                </div>
-                {!newSince?.lastViewedAt ? (
-                  <p className="dash-muted">
-                    First visit — new requirements, decisions and questions will show here next
-                    time.
-                  </p>
-                ) : newTotal === 0 ? (
-                  <p className="dash-muted">Nothing new since your last visit.</p>
-                ) : (
-                  <>
-                    <div className="dash-counts">
-                      {newSince.counts.requirements > 0 ? (
-                        <span>{newSince.counts.requirements} requirements</span>
-                      ) : null}
-                      {newSince.counts.decisions > 0 ? (
-                        <span>{newSince.counts.decisions} decisions</span>
-                      ) : null}
-                      {newSince.counts.commitments > 0 ? (
-                        <span>{newSince.counts.commitments} commitments</span>
-                      ) : null}
-                      {newSince.counts.files > 0 ? (
-                        <span>{newSince.counts.files} files</span>
-                      ) : null}
-                      {newSince.counts.questions > 0 ? (
-                        <span>{newSince.counts.questions} questions</span>
-                      ) : null}
-                      {newSince.counts.statusChanges > 0 ? (
-                        <span>{newSince.counts.statusChanges} status changes</span>
-                      ) : null}
-                    </div>
+              {metrics ? (
+                <section className="dash-block" aria-label="Needs your attention">
+                  <div className="dash-block-head">
+                    <h5>Needs your attention</h5>
+                    {waiting && waiting.count > 0 ? (
+                      <span className="dash-muted">{waiting.count} open</span>
+                    ) : null}
+                  </div>
+                  {attentionRows.length === 0 ? (
+                    <p className="dash-muted">
+                      {hasInsight ? 'Nothing needs you right now.' : 'Not analysed yet.'}
+                    </p>
+                  ) : (
                     <ul className="dash-list">
-                      {newSince.items.map((item, index) => (
+                      {attentionRows.map((item, index) => (
                         <li className="dash-row" key={`${item.kind}-${index}`}>
                           <span className={`dash-kind is-${item.kind}`}>
                             {KIND_LABEL[item.kind] ?? item.kind}
                           </span>
                           <span className="dash-row-text">{item.text}</span>
-                          {item.atIso ? (
-                            <span className="dash-row-age">{age(item.atIso)}</span>
+                          {item.source ? <SourceChip source={item.source} /> : null}
+                          <span className="dash-row-age">{item.atIso ? age(item.atIso) : '—'}</span>
+                          {item.channelId ? (
+                            <button
+                              type="button"
+                              className="dash-link"
+                              onClick={() => openAttention(item)}
+                            >
+                              Open
+                            </button>
                           ) : null}
                         </li>
                       ))}
                     </ul>
-                  </>
-                )}
-              </section>
+                  )}
+                </section>
+              ) : null}
+
+              {newSince && newTotal > 0 ? (
+                <section className="dash-block" aria-label="New since your last visit">
+                  <div className="dash-block-head">
+                    <h5>New since your last visit</h5>
+                  </div>
+                  <div className="dash-counts">
+                    {newSince.counts.requirements > 0 ? (
+                      <span>{newSince.counts.requirements} requirements</span>
+                    ) : null}
+                    {newSince.counts.decisions > 0 ? (
+                      <span>{newSince.counts.decisions} decisions</span>
+                    ) : null}
+                    {newSince.counts.commitments > 0 ? (
+                      <span>{newSince.counts.commitments} commitments</span>
+                    ) : null}
+                    {newSince.counts.files > 0 ? <span>{newSince.counts.files} files</span> : null}
+                    {newSince.counts.questions > 0 ? (
+                      <span>{newSince.counts.questions} questions</span>
+                    ) : null}
+                    {newSince.counts.statusChanges > 0 ? (
+                      <span>{newSince.counts.statusChanges} status changes</span>
+                    ) : null}
+                  </div>
+                  <ul className="dash-list">
+                    {newSinceRows.map((item, index) => (
+                      <li className="dash-row" key={`${item.kind}-${index}`}>
+                        <span className={`dash-kind is-${item.kind}`}>
+                          {KIND_LABEL[item.kind] ?? item.kind}
+                        </span>
+                        <span className="dash-row-text">{item.text}</span>
+                        {item.atIso ? (
+                          <span className="dash-row-age">{age(item.atIso)}</span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
+
+              {setupDone < setupRows.length ? (
+                <section className="dash-block" aria-label="Finish project setup">
+                  <div className="dash-block-head">
+                    <h5>Finish setup</h5>
+                    <span className="dash-muted">
+                      {setupDone} of {setupRows.length}
+                    </span>
+                  </div>
+                  <ul className="dash-check">
+                    {setupRows.map((row) => (
+                      <li key={row.key} className={row.done ? 'is-done' : ''}>
+                        <span className="dash-check-mark" aria-hidden="true">
+                          {row.done ? '✓' : '○'}
+                        </span>
+                        <span className="dash-check-label">{row.label}</span>
+                        {!row.done ? (
+                          <button
+                            type="button"
+                            className="dash-link"
+                            onClick={row.run}
+                            disabled={row.key === 'sync' && busy}
+                          >
+                            {row.action}
+                          </button>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
 
               <section className="dash-block" aria-label="Client ask">
                 <div className="dash-block-head">
@@ -871,7 +959,12 @@ export default function DashboardPage({
                 ) : (
                   <ul className="dash-asks">
                     {latestRequirements.map((requirement, index) => (
-                      <li key={index}>{requirement.text}</li>
+                      <li key={`${requirement.text}-${index}`}>
+                        <span className="dash-ask-text">{requirement.text}</span>
+                        {requirement.whenIso && isoMs(requirement.whenIso) > 0 ? (
+                          <span className="dash-row-age">{age(requirement.whenIso)}</span>
+                        ) : null}
+                      </li>
                     ))}
                   </ul>
                 )}
@@ -899,6 +992,45 @@ export default function DashboardPage({
                   <p className="dash-muted">No deliverables stated yet.</p>
                 )}
               </section>
+
+              {activity && (activity.participants.length > 0 || activity.channels.length > 0) ? (
+                <section className="dash-block" aria-label="People and channels">
+                  <div className="dash-block-head">
+                    <h5>People and channels</h5>
+                    <span className="dash-muted">14 days</span>
+                  </div>
+                  <div className="dash-mini-cols">
+                    {activity.participants.length > 0 ? (
+                      <div>
+                        <p className="dash-mini-label">People</p>
+                        <ul className="dash-mini">
+                          {activity.participants.map((person) => (
+                            <li key={`${person.source}-${person.userId}`}>
+                              <span>{person.name}</span>
+                              <span className="dash-mini-count">{person.count}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                    {activity.channels.length > 0 ? (
+                      <div>
+                        <p className="dash-mini-label">Channels</p>
+                        <ul className="dash-mini">
+                          {activity.channels.map((channel) => (
+                            <li key={`${channel.source}-${channel.channelId}`}>
+                              <span className="dash-mini-name">
+                                #{channel.channelName || channel.channelId}
+                              </span>
+                              <span className="dash-mini-count">{channel.count}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </div>
+                </section>
+              ) : null}
             </div>
           </div>
         </div>
