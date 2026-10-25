@@ -114,3 +114,33 @@ Out of ticket 01's scope, disclosed: the `⋯` menu change (Edit project, Collap
 menu) came from the earlier compact-header phase, and `dashboard-contract.ts` gained
 `DashboardChatTokenStatus` in the separate Slack-token commit — the ticket's "not touched" line
 holds for the sidebar work itself, which adds no store, contract or IPC path.
+
+## Fixed-footprint round (2026-10-25)
+
+Reported: opening **Settings** from the sidebar made the card grow, and **Client Slack** grew it
+differently again — the same card occupied a different box per row, so the rows beside it jumped.
+
+Measured first (1920×1052, one card, one project): shell height `821 → 904 → 932` and its top edge
+moving `170 → 99` across Dashboard → Client Slack → Settings. Cause: `.ws-shell` was
+`min-height: min(78vh, 920px); max-height: calc(100vh - 120px)`, so any body taller than 78vh pushed
+the card outward instead of scrolling.
+
+- `.ws-shell` now pins one footprint (`height: min(78vh, 920px)`) and clips at the border radius.
+- Fixing that exposed a latent gap: the Slack body rendered **outside** the card by 29px, because
+  the card had been growing to fit it. `SlackChatTab.tsx` emits `.ws-chat`, `.ws-chat-toolbar`,
+  `.ws-chat-messages`, `.ws-chat-composer` and `.ws-chat-hint` — none of which had any CSS in
+  `main.css` at all (only the unrelated `.ws-chat-scroll` existed). They now carry the same flex
+  contract the Xomni body already used: pinned strip, `flex: 1; min-height: 0; overflow-y: auto`
+  message list, pinned composer and hint, plus bubble/channel/time styling for the messages.
+
+Verified live over every row (Dashboard, Chat with project, Talk to AgentWork, Client Slack, Our
+Slack, Progress, Settings) at 1920×1052 and at 1280×600: `shellH` 821 / `shellTop` 170 constant,
+zero elements painted past the card's inner edge, Settings scrolling internally
+(`ws-content-scroll` +586, +1081 at the short viewport) and Client Slack scrolling internally
+(`ws-chat-messages` +46, +456) with the composer 36px inside the bottom edge.
+`/tmp/fit2-*.png` holds the per-row shots.
+
+Gates: typecheck clean, 213/213 tests, `pnpm build` clean, sloplint on `main.css` back to the
+pre-change baseline (73 FAIL / 214 REFLEX — the new rules' off-scale paddings were snapped to the
+4px grid rather than waived). `docs/dashboard-ui.md` §4.4 gains the footprint rule and the Slack
+body's flex contract in the same commit.
