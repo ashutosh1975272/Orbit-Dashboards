@@ -1,5 +1,17 @@
 # Status Ledger
 
+## Chat with project — Phase 2b jump-to-message (2026-10-25, commit `dfaa8e6`)
+- `npm run typecheck` (node + web): PASS (exit 0)
+- `npm test`: PASS — 37 files, **298/298** tests (exit 0, no regressions)
+- `npm run build`: PASS — main 401.84 kB, preload 18.52 kB, renderer 82 modules, client built 2.62s (exit 0)
+- lint (changed/new files): **0 errors** (main.css is outside eslint's configured extensions)
+- live Electron (isolated CDP 9223, temp `--user-data-dir` copied from real dashboard with `ai-settings.json` excluded; real `~/.config/Electron` untouched, temp profile deleted afterwards):
+  - chat showed the key-missing state (`No AI key`, answers paused) and the stored history with a `#new-channel` source chip
+  - clicking the chip → Slack tab opened `#new-channel` (sidebar item active) and the row with `data-ts="1791546403.167629"` received `is-jump-flash` and programmatic focus
+  - fallback: navigation to the channel still occurs when the message is not in the loaded page (helper consumes only on a matching page; otherwise it lands in the channel)
+  - crafted source ref existed only in the temp copy; the real chat history was not modified
+- helper is reusable by the Dashboard attention SourceChip (A6) later
+
 ## Chat with project — Phase 2 UI (2026-10-25, commit `7dc01f3`)
 - `npm run typecheck` (node + web): PASS (exit 0)
 - `npm test`: PASS — 37 files, **298/298** tests (exit 0, no regressions)
