@@ -1,3 +1,4 @@
+const fakeVault = { encrypt: (p: string) => Buffer.from(p).toString('base64'), decrypt: (b: string) => Buffer.from(b, 'base64').toString('utf8') }
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -10,7 +11,7 @@ const dirs: string[] = []
 async function tmpStore(): Promise<AiSettingsStore> {
   const dir = await mkdtemp(join(tmpdir(), 'dash-ai-settings-'))
   dirs.push(dir)
-  return new AiSettingsStore({ rootDir: dir, encryptionAvailable: false })
+  return new AiSettingsStore({ rootDir: dir, encryptionAvailable: true, vault: fakeVault })
 }
 
 function makeService(store: AiSettingsStore): AiSettingsService {
@@ -223,7 +224,7 @@ describe('AiSettingsService.save — the Global Settings seam', () => {
     }).save({
       apiKey: 'k'.repeat(512)
     })
-    expect((await store.readGlobal()).apiKeyPlain).toBe('k'.repeat(512))
+    expect(await store.readKey(await store.readGlobal())).toBe('k'.repeat(512))
   })
 
   it('answers a global save with masks only', async () => {

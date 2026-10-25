@@ -1,3 +1,4 @@
+const fakeVault = { encrypt: (p: string) => Buffer.from(p).toString('base64'), decrypt: (b: string) => Buffer.from(b, 'base64').toString('utf8') }
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -22,13 +23,13 @@ async function harness(): Promise<{
 }> {
   const root = await mkdtemp(join(tmpdir(), 'dash-config-service-'))
   dirs.push(root)
-  const aiStore = new AiSettingsStore({ rootDir: root, encryptionAvailable: false })
+  const aiStore = new AiSettingsStore({ rootDir: root, encryptionAvailable: true, vault: fakeVault })
   const ai = new AiSettingsService({
     store: aiStore,
     defaults: { chatModel: 'default/chat', embeddingModel: 'default/embed' }
   })
-  const monitor = new MonitorStore({ rootDir: root, encryptionAvailable: false })
-  const team = new TeamWorkspaceStore({ rootDir: root, encryptionAvailable: false })
+  const monitor = new MonitorStore({ rootDir: root, encryptionAvailable: true, vault: fakeVault })
+  const team = new TeamWorkspaceStore({ rootDir: root, encryptionAvailable: true, vault: fakeVault })
   const config = new ConfigService({
     aiSettings: ai,
     teamWorkspace: team,

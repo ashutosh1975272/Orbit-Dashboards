@@ -1,3 +1,4 @@
+const fakeVault = { encrypt: (p: string) => Buffer.from(p).toString('base64'), decrypt: (b: string) => Buffer.from(b, 'base64').toString('utf8') }
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -135,7 +136,7 @@ describe('importance scoring', () => {
 describe('recent feed', () => {
   it('builds one item per workspace, ranked, with the workspace attached', async () => {
     const dir = await tmpDir()
-    const monitorStore = new MonitorStore({ rootDir: dir, encryptionAvailable: false })
+    const monitorStore = new MonitorStore({ rootDir: dir, encryptionAvailable: true, vault: fakeVault })
     const deltaStore = new DashboardDeltaStore({ rootDir: dir })
 
     await monitorStore.upsertProject({ project: project() })
@@ -204,7 +205,7 @@ describe('recent feed', () => {
 
   it('never shows greeting noise as the recent line', async () => {
     const dir = await tmpDir()
-    const monitorStore = new MonitorStore({ rootDir: dir, encryptionAvailable: false })
+    const monitorStore = new MonitorStore({ rootDir: dir, encryptionAvailable: true, vault: fakeVault })
     const deltaStore = new DashboardDeltaStore({ rootDir: dir })
     await monitorStore.upsertProject({ project: project() })
     await deltaStore.appendMessages({

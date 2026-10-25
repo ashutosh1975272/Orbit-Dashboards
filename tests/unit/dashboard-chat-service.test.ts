@@ -1,3 +1,4 @@
+const fakeVault = { encrypt: (p: string) => Buffer.from(p).toString('base64'), decrypt: (b: string) => Buffer.from(b, 'base64').toString('utf8') }
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -45,7 +46,7 @@ describe('DashboardChatService', () => {
   beforeEach(async () => {
     dir = await mkdtemp(join(tmpdir(), 'dash-chat-'))
     dirs.push(dir)
-    monitorStore = new MonitorStore({ rootDir: dir, encryptionAvailable: false })
+    monitorStore = new MonitorStore({ rootDir: dir, encryptionAvailable: true, vault: fakeVault })
     deltaStore = new DashboardDeltaStore({ rootDir: join(dir, 'dashboard') })
     project = await monitorStore.upsertProject({
       project: {

@@ -92,9 +92,14 @@ export class AiSettingsStore {
   private readonly encryptionAvailable: boolean
   private queue: Promise<void> = Promise.resolve()
 
-  constructor(options: { rootDir: string; encryptionAvailable: boolean }) {
+  private vaultOverride: EncryptedVault | null = null
+  constructor(options: { rootDir: string; encryptionAvailable: boolean; vault?: EncryptedVault }) {
     this.filePath = join(options.rootDir, 'ai-settings.json')
     this.encryptionAvailable = options.encryptionAvailable
+    this.vaultOverride = options.vault ?? null
+  }
+  private async activeVault(): Promise<EncryptedVault> {
+    return this.vaultOverride ?? getVault()
   }
 
   async readGlobal(): Promise<StoredAiSettings> {

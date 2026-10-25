@@ -1,3 +1,4 @@
+const fakeVault = { encrypt: (p: string) => Buffer.from(p).toString('base64'), decrypt: (b: string) => Buffer.from(b, 'base64').toString('utf8') }
 import { afterEach, describe, expect, it } from 'vitest'
 import { DashboardDeltaStore } from '../../src/main/dashboard/delta-store'
 import { DashboardSyncEngine } from '../../src/main/dashboard/sync-engine'
@@ -60,7 +61,7 @@ function makeEngine(
 async function stores(): Promise<{ monitors: MonitorStore; delta: DashboardDeltaStore }> {
   const dir = await mkdtemp(join(tmpdir(), 'dash-sync-'))
   dirs.push(dir)
-  const monitors = new MonitorStore({ rootDir: dir, encryptionAvailable: false })
+  const monitors = new MonitorStore({ rootDir: dir, encryptionAvailable: true, vault: fakeVault })
   const delta = new DashboardDeltaStore({ rootDir: dir })
   return { monitors, delta }
 }

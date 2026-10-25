@@ -1,3 +1,4 @@
+const fakeVault = { encrypt: (p: string) => Buffer.from(p).toString('base64'), decrypt: (b: string) => Buffer.from(b, 'base64').toString('utf8') }
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -241,7 +242,7 @@ describe('insight merge — evidence rules', () => {
 describe('cold start snapshot', () => {
   it('summarizes stored messages before the first network sync', async () => {
     const dir = await tmpDir()
-    const monitorStore = new MonitorStore({ rootDir: dir, encryptionAvailable: false })
+    const monitorStore = new MonitorStore({ rootDir: dir, encryptionAvailable: true, vault: fakeVault })
     const deltaStore = new DashboardDeltaStore({ rootDir: dir })
     const project: DashboardProject = {
       id: 'p1',
@@ -408,7 +409,7 @@ describe('cold start — the AI insight is shown without a sync', () => {
     const { DashboardSyncEngine: SE } = await import('../../src/main/dashboard/sync-engine')
     const dir = await mk(joinPath(tmp(), 'dash-cold-'))
     try {
-      const monitorStore = new MS({ rootDir: dir, encryptionAvailable: false })
+      const monitorStore = new MS({ rootDir: dir, encryptionAvailable: true, vault: fakeVault })
       const deltaStore = new DS({ rootDir: dir })
       await monitorStore.upsertProject({
         project: {
@@ -492,7 +493,7 @@ describe('cached snapshot also carries the latest insight', () => {
     const { DashboardSyncEngine: SE } = await import('../../src/main/dashboard/sync-engine')
     const dir = await mk(joinPath(tmp(), 'dash-cached-'))
     try {
-      const monitorStore = new MS({ rootDir: dir, encryptionAvailable: false })
+      const monitorStore = new MS({ rootDir: dir, encryptionAvailable: true, vault: fakeVault })
       const deltaStore = new DS({ rootDir: dir })
       await monitorStore.upsertProject({
         project: {

@@ -1,3 +1,4 @@
+const fakeVault = { encrypt: (p: string) => Buffer.from(p).toString('base64'), decrypt: (b: string) => Buffer.from(b, 'base64').toString('utf8') }
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -72,7 +73,7 @@ async function setup(): Promise<{
 }> {
   const dir = await mkdtemp(join(tmpdir(), 'dash-two-'))
   dirs.push(dir)
-  const monitors = new MonitorStore({ rootDir: dir, encryptionAvailable: false })
+  const monitors = new MonitorStore({ rootDir: dir, encryptionAvailable: true, vault: fakeVault })
   const delta = new DashboardDeltaStore({ rootDir: dir })
   await monitors.upsertProject({ project: fakeProject() })
   return { monitors, delta }

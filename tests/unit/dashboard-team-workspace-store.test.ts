@@ -1,3 +1,4 @@
+const fakeVault = { encrypt: (p: string) => Buffer.from(p).toString('base64'), decrypt: (b: string) => Buffer.from(b, 'base64').toString('utf8') }
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -13,7 +14,7 @@ afterEach(async () => {
 async function makeStore(): Promise<{ store: TeamWorkspaceStore; dir: string }> {
   const dir = await mkdtemp(join(tmpdir(), 'dash-team-'))
   dirs.push(dir)
-  return { store: new TeamWorkspaceStore({ rootDir: dir, encryptionAvailable: false }), dir }
+  return { store: new TeamWorkspaceStore({ rootDir: dir, encryptionAvailable: true, vault: fakeVault }), dir }
 }
 
 async function makeEncryptedStore(): Promise<{ store: TeamWorkspaceStore; dir: string }> {
@@ -64,10 +65,9 @@ describe('TeamWorkspaceStore', () => {
     expect(connection?.token).toBe('xoxp-secret-abcd')
     expect(connection?.profileId).toBe('manual:T_TEAM')
 
-    // With no OS encryption (the test environment) the fallback is plaintext,
-    // exactly like MonitorStore; the renderer still never receives it.
+    // With OS encryption available the secret is stored as ciphertext.
     const onDisk = await readFile(join(dir, 'team-workspace.json'), 'utf8')
-    expect(onDisk).toContain('tokenPlain')
+    expect(onDisk).toContain('tokenEnc')
   })
 
   it('encrypts the manual token when OS encryption is available', async () => {

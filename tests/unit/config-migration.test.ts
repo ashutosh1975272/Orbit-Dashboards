@@ -1,3 +1,4 @@
+const fakeVault = { encrypt: (p: string) => Buffer.from(p).toString('base64'), decrypt: (b: string) => Buffer.from(b, 'base64').toString('utf8') }
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -21,7 +22,7 @@ describe('migrateConfigV1', () => {
   it('seeds the global key/model from env once and backs up old files', async () => {
     const root = await tmpRoot()
     await writeFile(join(root, 'ai-settings.json'), JSON.stringify({ global: {}, projects: {} }))
-    const store = new AiSettingsStore({ rootDir: root, encryptionAvailable: false })
+    const store = new AiSettingsStore({ rootDir: root, encryptionAvailable: true, vault: fakeVault })
 
     const result = await migrateConfigV1({
       rootDir: root,
@@ -49,7 +50,7 @@ describe('migrateConfigV1', () => {
 
   it('is idempotent and never overwrites a saved global key', async () => {
     const root = await tmpRoot()
-    const store = new AiSettingsStore({ rootDir: root, encryptionAvailable: false })
+    const store = new AiSettingsStore({ rootDir: root, encryptionAvailable: true, vault: fakeVault })
     await store.saveGlobal({ apiKey: 'saved-key-1111', model: 'saved/chat' })
 
     const first = await migrateConfigV1({
