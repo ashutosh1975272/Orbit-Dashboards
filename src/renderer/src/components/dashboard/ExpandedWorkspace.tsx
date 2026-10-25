@@ -75,6 +75,17 @@ export default function ExpandedWorkspace({
   const listing = useSlackChannels(project, 'client')
   const [teamWorkspace, setTeamWorkspace] = useState<DashboardTeamWorkspace | null>(null)
   const [teamLoading, setTeamLoading] = useState(true)
+  const [chatDraft, setChatDraft] = useState<string | null>(null)
+
+  const askAgent = useCallback(
+    (question: string): void => {
+      if (!question.trim()) return
+      setChatDraft(question.trim())
+      select('m:project')
+    },
+    [select]
+  )
+  const consumeChatDraft = useCallback((): void => setChatDraft(null), [])
 
   // "New since your last visit" is measured from the moment the reader stops
   // looking at the Dashboard (leaving the dash panel or closing the card), not
@@ -204,6 +215,9 @@ export default function ExpandedWorkspace({
           syncing={syncing}
           onOpenSettings={onSettings}
           onSelect={select}
+          chatDraft={chatDraft}
+          onConsumeChatDraft={consumeChatDraft}
+          onAskAgent={askAgent}
         />
       </div>
     </article>

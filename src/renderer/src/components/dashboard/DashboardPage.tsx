@@ -19,6 +19,8 @@ interface DashboardPageProps {
   syncing: boolean
   onOpenSettings: () => void
   onSelect: (selection: SelectionId) => void
+  /** Hand a question to the project chat. */
+  onAskAgent?: (question: string) => void
 }
 
 const STATUS_LABEL: Record<InsightStatus, string> = {
@@ -265,9 +267,11 @@ export default function DashboardPage({
   snapshot,
   syncing,
   onOpenSettings,
-  onSelect
+  onSelect,
+  onAskAgent
 }: DashboardPageProps): React.ReactElement {
   const { centre, leftSidebar, rightSidebar } = view
+  const [askDraft, setAskDraft] = useState('')
   const insight = snapshot.insight ?? null
   const hasInsight = Boolean(insight)
   const metrics = snapshot.metrics
@@ -323,6 +327,30 @@ export default function DashboardPage({
             onOpen={() => onSelect('m:schedules')}
           />
           {errorLine ? <p className="dash-error">{errorLine}</p> : null}
+
+          {onAskAgent ? (
+            <form
+              className="dash-ask-agent"
+              onSubmit={(event) => {
+                event.preventDefault()
+                const question = askDraft.trim()
+                if (!question) return
+                setAskDraft('')
+                onAskAgent(question)
+              }}
+            >
+              <input
+                type="text"
+                value={askDraft}
+                onChange={(event) => setAskDraft(event.target.value)}
+                placeholder="Ask agent…"
+                aria-label="Ask agent about this project"
+              />
+              <button type="submit" disabled={!askDraft.trim()}>
+                Ask
+              </button>
+            </form>
+          ) : null}
 
           <section className="dash-kpis" aria-label="Key numbers">
             <div className="dash-tile">

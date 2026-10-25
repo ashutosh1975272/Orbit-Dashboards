@@ -269,6 +269,10 @@ const api: IpcApi = {
         IpcChannels.DashboardProjectChatHistory,
         projectId
       ) as Promise<DashboardProjectChatHistoryResult>,
+    clearProjectChat: (projectId: string) =>
+      ipcRenderer.invoke(IpcChannels.DashboardProjectChatClear, projectId) as Promise<{
+        ok: boolean
+      }>,
     getProjectChatStatus: (projectId: string) =>
       ipcRenderer.invoke(
         IpcChannels.DashboardProjectChatStatus,

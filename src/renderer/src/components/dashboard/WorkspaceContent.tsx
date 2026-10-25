@@ -43,6 +43,10 @@ interface WorkspaceContentProps {
   syncing: boolean
   onOpenSettings: () => void
   onSelect: (selection: SelectionId) => void
+  /** Dashboard overview → chat hand-off. */
+  chatDraft?: string | null
+  onConsumeChatDraft?: () => void
+  onAskAgent?: (question: string) => void
 }
 
 /** Headings for the bodies no row owns. */
@@ -93,7 +97,10 @@ export default function WorkspaceContent({
   channels,
   syncing,
   onOpenSettings,
-  onSelect
+  onSelect,
+  chatDraft,
+  onConsumeChatDraft,
+  onAskAgent
 }: WorkspaceContentProps): React.ReactElement {
   const { centre, leftSidebar, rightSidebar, identity } = view
   const { title, desc } = panelMeta(nav, channels)
@@ -112,6 +119,7 @@ export default function WorkspaceContent({
           syncing={syncing}
           onOpenSettings={onOpenSettings}
           onSelect={onSelect}
+          onAskAgent={onAskAgent}
         />
       </section>
     )
@@ -126,9 +134,18 @@ export default function WorkspaceContent({
     } else {
       body = (
         <AgentChatPanel
+          key={summary.projectId}
           projectName={identity.name}
           projectId={summary.projectId}
           mode={xomniModeOf(nav)}
+          initialQuestion={chatDraft}
+          onConsumeInitial={onConsumeChatDraft}
+          onOpenSettings={onOpenSettings}
+          onOpenSource={(ref) =>
+            onSelect(
+              `c:${ref.source === 'ours' ? 'team' : 'client'}:${ref.channelId}` as SelectionId
+            )
+          }
         />
       )
       bare = true

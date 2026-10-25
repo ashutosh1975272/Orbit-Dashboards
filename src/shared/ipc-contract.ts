@@ -337,6 +337,7 @@ export interface IpcApi {
     projectChat: (payload: DashboardProjectChatPayload) => Promise<DashboardProjectChatStartResult>
     cancelProjectChat: (payload: { projectId: string; runId?: string }) => Promise<{ ok: boolean }>
     getProjectChatHistory: (projectId: string) => Promise<DashboardProjectChatHistoryResult>
+    clearProjectChat: (projectId: string) => Promise<{ ok: boolean }>
     getProjectChatStatus: (projectId: string) => Promise<DashboardProjectChatStatus>
     onProjectChatChunk: (callback: (event: DashboardProjectChatChunkEvent) => void) => () => void
     onProjectChatDone: (callback: (event: DashboardProjectChatDoneEvent) => void) => () => void
