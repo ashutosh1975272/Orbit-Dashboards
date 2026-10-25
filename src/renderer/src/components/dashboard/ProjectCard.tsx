@@ -3,6 +3,7 @@ import { memo, useMemo } from 'react'
 import type { DashboardProjectSnapshot } from '../../../../shared/dashboard-contract'
 import { useDashboardStore } from '../../hooks/useDashboard'
 import { buildCardView, buildCardSummary } from './card-view'
+import { sameProjectForCard } from './project-card-compare'
 import CompactCard from './CompactCard'
 import ExpandedWorkspace from './ExpandedWorkspace'
 import type { WorkspaceEntryTab } from './workspace-nav'
@@ -78,30 +79,10 @@ function ProjectCardInner({
   )
 }
 
-function sameProject(
-  a: ProjectCardProps['snapshot']['project'],
-  b: ProjectCardProps['snapshot']['project']
-): boolean {
-  return (
-    a.name === b.name &&
-    a.clientName === b.clientName &&
-    a.teamName === b.teamName &&
-    a.startDate === b.startDate &&
-    a.endDate === b.endDate &&
-    a.manualCompletion === b.manualCompletion &&
-    a.monitors.length === b.monitors.length &&
-    a.monitors.every(
-      (monitor, i) =>
-        monitor.channelId === b.monitors[i].channelId &&
-        monitor.channelName === b.monitors[i].channelName
-    )
-  )
-}
-
 export default memo(ProjectCardInner, (prev, next) => {
   return (
     prev.snapshot.project.id === next.snapshot.project.id &&
-    sameProject(prev.snapshot.project, next.snapshot.project) &&
+    sameProjectForCard(prev.snapshot.project, next.snapshot.project) &&
     prev.snapshot.lastUpdatedAt === next.snapshot.lastUpdatedAt &&
     prev.snapshot.insightUpdatedAt === next.snapshot.insightUpdatedAt &&
     prev.snapshot.syncState === next.snapshot.syncState &&

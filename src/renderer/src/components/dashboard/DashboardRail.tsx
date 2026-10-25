@@ -2,11 +2,11 @@ import { useDashboardStore } from '../../hooks/useDashboard'
 
 /**
  * Native sidebar row rendered after the Recents strip (via dashboardSlot).
- * One simple "Dashboard" row; clicking it expands an inline "Projects" item
+ * One simple "Dashboard" row; clicking it expands an inline "Project" item
  * (same pattern as the profile app sections — no absolute positioning,
  * so it can never be clipped by the rail's overflow rules).
  * Expansion lives in the dashboard store so sidebar re-renders never
- * collapse the dropdown, and clicking Projects keeps it open.
+ * collapse the dropdown, and clicking Project keeps it open.
  */
 export default function DashboardRail(): React.JSX.Element {
   const openDashboard = useDashboardStore((s) => s.openDashboard)

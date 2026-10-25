@@ -397,7 +397,10 @@ export function buildCardView(snapshot: DashboardProjectSnapshot, index = 0): Ca
       }
 
   const perChannel = Array.isArray(snapshot.perChannel) ? snapshot.perChannel : []
-  const channels = perChannel.map((c) => ({
+  // identity.channels backs the Client Slack picker. Our Slack rows have their
+  // own connector list, so never let them bleed into the client side.
+  const clientPerChannel = perChannel.filter((c) => c.source !== 'ours')
+  const channels = clientPerChannel.map((c) => ({
     channelId: c.channelId,
     channelName: c.channelName,
     newCount: c.newMessageCount ?? 0,

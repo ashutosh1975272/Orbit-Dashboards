@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { DashboardProjectSnapshot } from '../../src/shared/dashboard-contract'
-import { buildCardSummary, plural } from '../../src/renderer/src/components/dashboard/card-view'
+import {
+  buildCardSummary,
+  buildCardView,
+  plural
+} from '../../src/renderer/src/components/dashboard/card-view'
 
 const baseProject = (id: string, name: string, teamName: string): DashboardProjectSnapshot['project'] => ({
   id,
@@ -77,6 +81,38 @@ describe('plural helper', () => {
     expect(plural(2, 'file')).toBe('files')
     expect(plural(5, 'requirement')).toBe('requirements')
     expect(plural(10, 'question')).toBe('questions')
+  })
+})
+
+describe('buildCardView — source separation', () => {
+  it('keeps Our Slack channels out of the client channel list', () => {
+    const snapshot = baseSnapshot({
+      insight: null,
+      perChannel: [
+        {
+          channelId: 'C1',
+          channelName: 'client-general',
+          source: 'client',
+          messageCount: 4,
+          latestMessageAt: '2026-10-25T10:00:00Z',
+          cursor: '1',
+          lastSyncAt: '2026-10-25T10:00:00Z'
+        },
+        {
+          channelId: 'T1',
+          channelName: 'our-general',
+          source: 'ours',
+          messageCount: 9,
+          latestMessageAt: '2026-10-25T11:00:00Z',
+          cursor: '2',
+          lastSyncAt: '2026-10-25T11:00:00Z'
+        }
+      ]
+    })
+
+    const view = buildCardView(snapshot, 0)
+
+    expect(view.identity.channels.map((c) => c.channelId)).toEqual(['C1'])
   })
 })
 
