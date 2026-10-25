@@ -1,5 +1,19 @@
 # Status Ledger
 
+## Expanded Dashboard — Phase 0b waiting semantics (2026-10-25, commit `c0bc123`)
+- `npm run typecheck` (node + web): PASS (exit 0)
+- `npm test`: PASS — 45 files, **380/380** tests (exit 0)
+- `npm run build`: PASS — renderer 82 modules, client built 2.09s (exit 0)
+- lint (all 4 changed files): **0 errors, 0 warnings**
+- contract: `DashboardMetrics.waiting` now carries `blockers` and `risks` separately (`dashboard-contract.ts:154-162`)
+- `buildWaiting` (`metrics.ts:165-254`):
+  - dedupe key = trim, collapse whitespace, lowercase, strip trailing `?.!` (`waitingKey`, `metrics.ts:171-178`); the needs-reply row wins, a matching question is dropped
+  - `count` = needs-reply + deduped open questions (blockers/risks excluded)
+  - `oldestIso` = oldest real `atIso` among items (`needs-reply.whenIso`, `blocker.sinceIso`); untimed items ignored, none timed → null
+  - `blockers`/`risks` counts exposed for the sub-line
+- KPI tile: copy `Oldest: …` / `Age unknown` plus a separate `N blockers · N risks` line (`DashboardPage.tsx:402-420`)
+- tests: dedupe (count 1 for one question that is also the needs-reply message), blockers/risks excluded from count, all-untimed → null, oldest real timestamp, cap 5 still holds.
+
 ## Expanded Dashboard — Phase 0a A5 progress honesty (2026-10-25, commit `baf60fa`)
 - `npm run typecheck` (node + web): PASS (exit 0)
 - `npm test`: PASS — 45 files, **377/377** tests (exit 0)
@@ -7,7 +21,7 @@
 - lint (all 4 changed/new files): **0 errors, 0 warnings** (`CompactCard.tsx`, `card-view.ts`, `dashboard-card-view.test.ts`, `compact-card.test.tsx`)
 - production changes:
   - `CardSummary.progress` is `number | null`; `buildCardSummary` uses manual completion → insight progress only when `progressEvidence` is non-empty → null (`card-view.ts:699-708`). The time-based `snapshot.completion` is no longer used.
-  - `computeTimeElapsed` returns `paceLabel: 'Progress not stated in chat'` and no pace when progress is unknown (`card-view.ts:255-270`).
+  - `computeTimeElapsed` returns `paceLabel: 'Progress not stated in chat'` and no pace when progress is unknown (`card-view.ts:274-284`).
   - `CompactCard` renders `—` and `title="Progress not stated in chat"` for null progress (`CompactCard.tsx:146-160`).
   - typed `normalizeInsight`/`toCardClientMessage` to remove the pre-existing `any` lint errors in the touched file (no behaviour change).
 - tests:
