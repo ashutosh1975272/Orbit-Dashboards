@@ -241,7 +241,7 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     key: 'slack',
-    label: 'Connect channel',
+    label: 'Slack',
     icon: 'inbox',
     rows: [
       {
