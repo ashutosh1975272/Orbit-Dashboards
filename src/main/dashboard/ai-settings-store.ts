@@ -183,8 +183,10 @@ export class AiSettingsStore {
       delete next.apiKeyEnc
       delete next.apiKeyPlain
       const key = cleanKey(patch.apiKey)
-      // write() encrypts this before it reaches disk when safeStorage exists
-      if (key) next.apiKeyPlain = key
+      if (key) {
+        if (!this.encryptionAvailable) throw new Error('OS encryption unavailable')
+        next.apiKeyPlain = key
+      }
     }
     return next
   }

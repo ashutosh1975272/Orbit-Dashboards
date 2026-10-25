@@ -323,7 +323,6 @@ export default function DashboardPage({
             onOpen={() => onSelect('m:schedules')}
           />
           {errorLine ? <p className="dash-error">{errorLine}</p> : null}
-          {errorLine ? <p className="dash-error">{errorLine}</p> : null}
 
           <section className="dash-kpis" aria-label="Key numbers">
             <div className="dash-tile">
@@ -545,7 +544,7 @@ export default function DashboardPage({
             {!hasInsight ? (
               <p className="dash-muted">Not analysed yet.</p>
             ) : attention.length === 0 ? (
-              <p className="dash-muted">Nothing needs your attention right now.</p>
+              <p className="dash-muted">Not enough info to tell.</p>
             ) : (
               <ul className="dash-list">
                 {attention.map((item, index) => (

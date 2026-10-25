@@ -148,7 +148,7 @@ export class MonitorStore {
       await this.write(data)
     }
     if (!this.encryptionAvailable) {
-      return { plaintext: await this.savePlain(key, token) }
+      throw new Error('OS encryption unavailable')
     }
     const data = await this.read()
     data.manualTokens = {
@@ -157,13 +157,6 @@ export class MonitorStore {
     }
     await this.write(data)
     return { plaintext: false }
-  }
-
-  private async savePlain(key: string, token: string): Promise<boolean> {
-    const data = await this.read()
-    data.manualTokens = { ...data.manualTokens, [key]: token }
-    await this.write(data)
-    return true
   }
 
   async getManualToken(key: string): Promise<string | null> {

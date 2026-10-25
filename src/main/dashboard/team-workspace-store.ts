@@ -153,6 +153,9 @@ export class TeamWorkspaceStore {
     status?: 'connected' | 'needs-reconnect'
     now?: string
   }): Promise<DashboardTeamWorkspace> {
+    if (input.token && !this.encryptionAvailable) {
+      throw new Error('OS encryption unavailable')
+    }
     const encrypted = input.token ? await this.encrypt(input.token) : null
     const now = input.now ?? new Date().toISOString()
     const record: StoredTeamWorkspace = {
@@ -228,7 +231,7 @@ export class TeamWorkspaceStore {
   }
 
   private async encrypt(token: string): Promise<{ enc?: string; plain?: string }> {
-    if (!this.encryptionAvailable) return { plain: token }
+    if (!this.encryptionAvailable) throw new Error('OS encryption unavailable')
     return { enc: (await this.activeVault()).encrypt(token) }
   }
 

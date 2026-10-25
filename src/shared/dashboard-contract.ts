@@ -390,7 +390,7 @@ export type InsightUrgency = 'low' | 'normal' | 'high'
 
 export interface InsightClientMessage {
   who: string
-  whenIso: string
+  whenIso: string | null
   quote: string
   source?: DashboardSource
   channelId?: string
@@ -507,7 +507,7 @@ export interface InsightPerson {
 
 export interface InsightMilestone {
   label: string
-  dateIso: string
+  dateIso: string | null
   done: boolean
 }
 
