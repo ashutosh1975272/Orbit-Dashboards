@@ -51,8 +51,13 @@ both places. The overflow-menu route to AI settings is gone, so there is exactly
   covered by four new tests in `tests/unit/ai-settings.test.ts`: the global seam writes only the global record,
   rejects an unsupported provider, rejects over-long key/model and accepts the 512 boundary, and answers with masks
   only. `vitest run` → 24 files / **213** tests (was 209), typecheck and build clean.
+- **Label case.** Promoting this form to the app's primary settings surface put its tracked-capital field labels
+  (`Provider`, `Model`, `API key` and the box head, all rendered as caps) next to sentence-case everything else, so
+  the uppercase transform and the tracking are gone and the head reads `Effective now` — measured
+  `text-transform: none` at 12px/600 on all four.
 - Screenshots: `v7-01` panel open, `v7-02` after the live save, `v7-03` the trimmed `⋯` menu, `v7-04` the card on
-  the environment-default line, `v7-05` the panel reloading a stored global model, `v7-06` the card inheriting it.
+  the environment-default line, `v7-05` the panel reloading a stored global model, `v7-06` the card inheriting it,
+  `v7-07`/`v7-08` both surfaces after the label pass.
 - Docs updated in the same commit: `docs/dashboard-ui.md` (§2 header table + ASCII, §4.4.1's card AI row and the
   Global-settings paragraph, §7 component map, §8 surface list) and `GLOSSARY.md` (**Global Settings**, **Inheritance**).
 - Not in this ticket: the remaining sections (sync, dates, prompt defaults in ticket 03; the team Slack connection

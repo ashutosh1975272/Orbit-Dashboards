@@ -291,7 +291,7 @@ export default function AiSettingsForm({ projectId }: AiSettingsFormProps): Reac
       </label>
 
       <div className="ai-settings-effective" data-testid="ai-effective">
-        <span className="ai-settings-label">EFFECTIVE NOW</span>
+        <span className="ai-settings-label">Effective now</span>
         <b>{effectiveLine}</b>
         <span className="ai-settings-hint">
           {KEY_SOURCE_LABEL[view?.effective.keySource ?? 'none']}
