@@ -228,6 +228,7 @@ describe('navFromEntryProps', () => {
     width: 310,
     openSections: ['xomni'],
     openInfoGroups: [],
+    openConnectors: [],
     sectionSelections: {}
   }
 
