@@ -19,6 +19,7 @@ import type {
   DashboardChatPage,
   DashboardChatTokenStatus,
   DashboardGlobalConfig,
+  DashboardProjectActivity,
   DashboardProjectChatChunkEvent,
   DashboardProjectChatDoneEvent,
   DashboardProjectChatErrorEvent,
@@ -255,6 +256,11 @@ const api: IpcApi = {
         IpcChannels.DashboardChatTokenStatus,
         projectId
       ) as Promise<DashboardChatTokenStatus>,
+    getProjectActivity: (projectId: string) =>
+      ipcRenderer.invoke(
+        IpcChannels.DashboardProjectActivity,
+        projectId
+      ) as Promise<DashboardProjectActivity>,
     projectChat: (payload: DashboardProjectChatPayload) =>
       ipcRenderer.invoke(
         IpcChannels.DashboardProjectChat,

@@ -4,6 +4,7 @@ import type {
   DashboardChatQueryPayload,
   DashboardChatTokenStatus,
   DashboardProject,
+  DashboardProjectActivity,
   DashboardSendMessagePayload,
   DashboardSendMessageResult,
   DashboardSource
@@ -13,6 +14,7 @@ import { compareTs } from './delta-store'
 import type { MonitorStore } from './monitor-store'
 import { maskKey } from './ai-settings-store'
 import { SlackPoller } from './slack-poller'
+import { buildProjectActivity, type ActivityInputRow } from './activity-summary'
 
 /** Minimal poller surface the chat service needs (fakeable in tests). */
 export interface ChatPoller {
@@ -76,6 +78,21 @@ const DEFAULT_LIMIT = 50
 const MAX_LIMIT = 200
 const MAX_TEXT_LENGTH = 4000
 const CONTEXT_TTL_MS = 5 * 60_000
+const ACTIVITY_WINDOW_DAYS = 14
+const ACTIVITY_CHANNEL_CAP = 200
+const ACTIVITY_CACHE_TTL_MS = 60_000
+
+function emptyActivity(): DashboardProjectActivity {
+  return {
+    recent: [],
+    latestClientAt: null,
+    latestOursAt: null,
+    ballInCourt: null,
+    participants: [],
+    channels: [],
+    counts14d: { client: 0, ours: 0 }
+  }
+}
 
 export const MISSING_SCOPE_MESSAGE =
   "This Slack token is missing the chat:write scope, so Orbit cannot post replies. Add chat:write to the Slack app's User Token Scopes (OAuth & Permissions), reinstall or reconnect the workspace, then try again."
@@ -130,6 +147,7 @@ export class DashboardChatService {
   private readonly log: (msg: string) => void
   private readonly now: () => number
   private readonly contextCache = new Map<string, ChatWorkspaceContext>()
+  private readonly activityCache = new Map<string, { at: number; value: DashboardProjectActivity }>()
 
   constructor(deps: ChatServiceDeps) {
     this.monitorStore = deps.monitorStore
@@ -357,6 +375,90 @@ export class DashboardChatService {
       nextBeforeTs,
       hasMore
     }
+  }
+
+  /**
+   * Deterministic 14-day activity for the Dashboard centre. Reads stored deltas
+   * only: bounded to the window, capped per channel, and cached for 60 seconds.
+   * Our-Slack rows are restricted to the channels mapped on this project.
+   */
+  async projectActivity(projectId: string): Promise<DashboardProjectActivity> {
+    if (typeof projectId !== 'string' || !projectId.trim()) return emptyActivity()
+
+    const now = this.now()
+    const cached = this.activityCache.get(projectId)
+    if (cached && now - cached.at < ACTIVITY_CACHE_TTL_MS) return cached.value
+
+    const project = await this.projectFor(projectId)
+    if (!project) return emptyActivity()
+
+    const rows: ActivityInputRow[] = []
+    const cutoff = now - ACTIVITY_WINDOW_DAYS * 24 * 60 * 60_000
+
+    for (const source of ['client', 'ours'] as const) {
+      const workspace = await this.workspaceFor(project, source)
+      if (!workspace) continue
+
+      const monitors =
+        source === 'ours'
+          ? workspace.monitors.filter((monitor) =>
+              project.ourSlackChannels?.some((mapped) => mapped.channelId === monitor.channelId)
+            )
+          : workspace.monitors
+      if (monitors.length === 0) continue
+
+      let context: ChatWorkspaceContext | null = null
+      if (workspace.token) {
+        try {
+          context = await this.workspaceContext(project, workspace.token, {
+            profileId: workspace.profileId,
+            teamId: workspace.teamId
+          })
+        } catch {
+          // names fall back to Slack ids
+        }
+      }
+      const selfUserId =
+        source === 'client'
+          ? (project.selfUserId ?? context?.selfUserId ?? null)
+          : (context?.selfUserId ?? null)
+
+      for (const monitor of monitors) {
+        const delta = await this.deltaStore.load(
+          workspace.profileId,
+          workspace.teamId,
+          monitor.channelId
+        )
+        const messages = (delta?.messages ?? [])
+          .filter((msg) => {
+            const ms = Number(msg.ts) * 1000
+            return Number.isFinite(ms) && ms >= cutoff
+          })
+          .slice(-ACTIVITY_CHANNEL_CAP)
+
+        for (const msg of messages) {
+          const userId = msg.user ?? ''
+          const resolved = userId ? context?.names.get(userId) : undefined
+          rows.push({
+            source,
+            channelId: monitor.channelId,
+            channelName: monitor.channelName,
+            ts: msg.ts,
+            userId,
+            userName:
+              resolved || (selfUserId && userId === selfUserId ? 'You' : userId || 'Unknown'),
+            isMine: Boolean(selfUserId && userId === selfUserId),
+            text: msg.text ?? '',
+            permalink: msg.permalink,
+            subtype: msg.subtype
+          })
+        }
+      }
+    }
+
+    const value = buildProjectActivity({ rows, now })
+    this.activityCache.set(projectId, { at: now, value })
+    return value
   }
 
   async sendMessage(payload: DashboardSendMessagePayload): Promise<DashboardSendMessageResult> {

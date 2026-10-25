@@ -19,6 +19,7 @@ import type {
   DashboardProjectChatPayload,
   DashboardProjectChatStartResult,
   DashboardProjectChatStatus,
+  DashboardProjectActivity,
   DashboardSendErrorCode,
   DashboardSendMessagePayload,
   DashboardSendMessageResult,
@@ -151,6 +152,7 @@ export const IpcChannels = {
   DashboardGetMessages: 'dashboard:get-messages',
   DashboardSendMessage: 'dashboard:send-message',
   DashboardChatTokenStatus: 'dashboard:chat-token-status',
+  DashboardProjectActivity: 'dashboard:project-activity',
   DashboardProjectChat: 'dashboard:project-chat',
   DashboardProjectChatClear: 'dashboard:project-chat-clear',
   DashboardProjectChatCancel: 'dashboard:project-chat-cancel',
@@ -334,6 +336,7 @@ export interface IpcApi {
     getMessages: (payload: DashboardChatQueryPayload) => Promise<DashboardChatPage>
     sendMessage: (payload: DashboardSendMessagePayload) => Promise<DashboardSendMessageResult>
     getChatTokenStatus: (projectId: string) => Promise<DashboardChatTokenStatus>
+    getProjectActivity: (projectId: string) => Promise<DashboardProjectActivity>
     projectChat: (payload: DashboardProjectChatPayload) => Promise<DashboardProjectChatStartResult>
     cancelProjectChat: (payload: { projectId: string; runId?: string }) => Promise<{ ok: boolean }>
     getProjectChatHistory: (projectId: string) => Promise<DashboardProjectChatHistoryResult>
@@ -385,6 +388,7 @@ export type {
   DashboardProjectChatPayload,
   DashboardProjectChatStartResult,
   DashboardProjectChatStatus,
+  DashboardProjectActivity,
   DashboardManualToken,
   DashboardSendErrorCode,
   DashboardSendMessagePayload,

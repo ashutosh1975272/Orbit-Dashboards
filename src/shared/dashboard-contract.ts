@@ -830,3 +830,46 @@ export interface DashboardAiTestResult {
   error?: string
   models?: number
 }
+
+/* ===== Project activity (Dashboard centre, last 14 days) ===== */
+
+/** One stored Slack message, ready to render. Names are resolved or the id. */
+export interface DashboardActivityMessage {
+  source: DashboardSource
+  channelId: string
+  channelName: string
+  ts: string
+  atIso: string
+  userId: string
+  userName: string
+  isMine: boolean
+  text: string
+  permalink: string | null
+}
+
+export interface DashboardActivityParticipant {
+  userId: string
+  name: string
+  source: DashboardSource
+  count: number
+}
+
+export interface DashboardActivityChannel {
+  channelId: string
+  channelName: string
+  source: DashboardSource
+  count: number
+}
+
+export interface DashboardProjectActivity {
+  /** Newest displayable messages across both workspaces. */
+  recent: DashboardActivityMessage[]
+  /** Latest client message and our latest reply, client workspace only. */
+  latestClientAt: string | null
+  latestOursAt: string | null
+  /** null when the client has never written. */
+  ballInCourt: 'you' | 'client' | null
+  participants: DashboardActivityParticipant[]
+  channels: DashboardActivityChannel[]
+  counts14d: { client: number; ours: number }
+}

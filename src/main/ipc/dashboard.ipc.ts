@@ -13,6 +13,7 @@ import type {
   DashboardChatQueryPayload,
   DashboardChatTokenStatus,
   DashboardProjectChatPayload,
+  DashboardProjectActivity,
   DashboardListChannelsPayload,
   DashboardMarkViewedPayload,
   DashboardRunSchedulePayload,
@@ -320,6 +321,23 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
       IpcChannels.DashboardChatTokenStatus,
       async (projectId: string): Promise<DashboardChatTokenStatus> =>
         deps.chatService!.chatTokenStatus(projectId)
+    )
+    handleInvoke(
+      IpcChannels.DashboardProjectActivity,
+      async (projectId: string): Promise<DashboardProjectActivity> => {
+        if (typeof projectId !== 'string' || !projectId.trim()) {
+          return {
+            recent: [],
+            latestClientAt: null,
+            latestOursAt: null,
+            ballInCourt: null,
+            participants: [],
+            channels: [],
+            counts14d: { client: 0, ours: 0 }
+          }
+        }
+        return deps.chatService!.projectActivity(projectId)
+      }
     )
   }
   if (deps.projectChatService) {

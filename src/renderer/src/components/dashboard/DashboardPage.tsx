@@ -1,6 +1,7 @@
 import type React from 'react'
 import { useEffect, useState } from 'react'
 import type {
+  DashboardActivityMessage,
   DashboardAttentionItem,
   DashboardProject,
   DashboardProjectSnapshot,
@@ -8,7 +9,9 @@ import type {
   InsightMood,
   InsightStatus
 } from '../../../../shared/dashboard-contract'
+import { useProjectActivity } from '../../hooks/useProjectActivity'
 import type { CardSummary, CardView } from './card-view'
+import { requestMessageJump } from './jump-to-message'
 import type { SelectionId } from './workspace-nav'
 
 interface DashboardPageProps {
@@ -95,6 +98,24 @@ function shortDate(iso: string | null | undefined): string {
   if (!Number.isFinite(date.getTime())) return '—'
   return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
 }
+
+function initials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return '?'
+  return words
+    .slice(0, 2)
+    .map((word) => word[0]?.toUpperCase() ?? '')
+    .join('')
+}
+
+const COURT_LABEL = {
+  you: 'Ball in your court',
+  client: 'Ball in client’s court'
+} as const
+const COURT_RULE = {
+  you: 'Rule: the client sent the newest message in the last 14 days.',
+  client: 'Rule: our team replied after the client’s newest message.'
+} as const
 
 function duration(seconds: number | null): string {
   if (seconds === null || !Number.isFinite(seconds)) return '—'
@@ -350,6 +371,8 @@ export default function DashboardPage({
       : 'not stated in chat'
 
   const time = centre.visuals.timeElapsed
+  const activityState = useProjectActivity(summary.projectId, snapshot.lastUpdatedAt)
+  const activity = activityState.activity
   const waiting = metrics?.waiting
   const response = metrics?.ourResponse
   const lastContact = metrics?.lastClientContactAt ?? summary.lastClientAt
@@ -377,6 +400,30 @@ export default function DashboardPage({
       : null)
 
   const maxDay = Math.max(1, ...(metrics?.daily.map((d) => d.client + d.ours) ?? [0]))
+  const daily = metrics?.daily ?? []
+  const hasDaily = daily.some((day) => day.client + day.ours > 0)
+  const totals14d = daily.reduce(
+    (sum, day) => ({ client: sum.client + day.client, ours: sum.ours + day.ours }),
+    { client: 0, ours: 0 }
+  )
+  const recentMessages = activity?.recent ?? []
+  const ballInCourt = activity?.ballInCourt ?? null
+  const showPace = time.hasDates
+  const showMood = trend.length >= 3
+
+  const jumpToMessage = (message: DashboardActivityMessage): void => {
+    requestMessageJump({
+      projectId: summary.projectId,
+      source: message.source,
+      channelId: message.channelId,
+      ts: message.ts
+    })
+    onSelect(
+      (message.source === 'ours'
+        ? `c:team:${message.channelId}`
+        : `c:client:${message.channelId}`) as SelectionId
+    )
+  }
 
   return (
     <div className="dash-page">
@@ -564,7 +611,18 @@ export default function DashboardPage({
           <div className="dash-columns">
             <div className="dash-main">
               <section className="dash-hero" aria-label="Situation">
-                <p className="dash-hero-eyebrow">Where it stands</p>
+                <div className="dash-hero-top">
+                  <p className="dash-hero-eyebrow">Where it stands</p>
+                  {ballInCourt ? (
+                    <span
+                      className={`dash-court is-${ballInCourt}`}
+                      title={COURT_RULE[ballInCourt]}
+                      data-testid="dash-court"
+                    >
+                      {COURT_LABEL[ballInCourt]}
+                    </span>
+                  ) : null}
+                </div>
                 <p className={`dash-hero-line${centre.situationLine ? '' : ' is-soft'}`}>
                   {centre.situationLine ||
                     (hasInsight ? 'No situation line yet.' : 'Not analysed yet.')}
@@ -581,65 +639,64 @@ export default function DashboardPage({
                 ) : null}
               </section>
 
-              <section className="dash-visuals" aria-label="Activity, pace and mood">
-                <div className="dash-panel">
+              {hasDaily ? (
+                <section className="dash-panel" aria-label="Activity">
                   <div className="dash-panel-head">
                     <h5>Activity</h5>
-                    <span className="dash-muted">14 days</span>
+                    <span className="dash-muted">Last 14 days</span>
                   </div>
-                  {metrics && metrics.daily.some((d) => d.client + d.ours > 0) ? (
-                    <>
-                      <div className="dash-bars" aria-hidden="true">
-                        {metrics.daily.map((day) => {
-                          const total = day.client + day.ours
-                          const height =
-                            total === 0 ? 2 : Math.max(4, Math.round((total / maxDay) * 56))
-                          return (
-                            <div
-                              key={day.date}
-                              className={`dash-bar${day.isToday ? ' is-today' : ''}${total === 0 ? ' is-empty' : ''}`}
-                              title={`${day.date}: ${day.client} client, ${day.ours} ours`}
-                            >
-                              <div style={{ height }} className="dash-bar-stack">
-                                {total > 0 ? (
-                                  <>
-                                    <div
-                                      className="dash-bar-ours"
-                                      style={{ flexGrow: day.ours || 0 }}
-                                    />
-                                    <div
-                                      className="dash-bar-client"
-                                      style={{ flexGrow: day.client || 0 }}
-                                    />
-                                  </>
-                                ) : null}
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                      <div className="dash-legend">
-                        <span className="dash-legend-client">Client</span>
-                        <span className="dash-legend-ours">Ours</span>
-                        <span className="dash-legend-total">
-                          {metrics.messages24h.client + metrics.messages24h.ours} in 24h
-                        </span>
-                      </div>
-                    </>
-                  ) : (
-                    <p className="dash-muted">No messages in the last 14 days.</p>
-                  )}
-                </div>
+                  <div className="dash-bars" aria-hidden="true">
+                    {daily.map((day) => {
+                      const total = day.client + day.ours
+                      const height =
+                        total === 0 ? 2 : Math.max(6, Math.round((total / maxDay) * 156))
+                      return (
+                        <div
+                          key={day.date}
+                          className={`dash-bar${day.isToday ? ' is-today' : ''}${total === 0 ? ' is-empty' : ''}`}
+                          title={`${day.date}: ${day.client} client, ${day.ours} ours`}
+                        >
+                          <div style={{ height }} className="dash-bar-stack">
+                            {total > 0 ? (
+                              <>
+                                <div
+                                  className="dash-bar-ours"
+                                  style={{ flexGrow: day.ours || 0 }}
+                                />
+                                <div
+                                  className="dash-bar-client"
+                                  style={{ flexGrow: day.client || 0 }}
+                                />
+                              </>
+                            ) : null}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <div className="dash-legend">
+                    <span className="dash-legend-client">Client · {totals14d.client}</span>
+                    <span className="dash-legend-ours">Ours · {totals14d.ours}</span>
+                    <span className="dash-legend-total">
+                      {totals14d.client + totals14d.ours} in 14d
+                    </span>
+                  </div>
+                </section>
+              ) : null}
 
-                <div className="dash-panel">
-                  <div className="dash-panel-head">
-                    <h5>Time and pace</h5>
-                    {time.hasDates && time.daysLeft !== undefined ? (
-                      <span className="dash-muted">{time.daysLeft}d left</span>
-                    ) : null}
-                  </div>
-                  {time.hasDates ? (
-                    <>
+              {showPace || showMood ? (
+                <section
+                  className={`dash-duo${showPace && showMood ? '' : ' is-single'}`}
+                  aria-label="Time, pace and mood"
+                >
+                  {showPace ? (
+                    <div className="dash-panel">
+                      <div className="dash-panel-head">
+                        <h5>Time and pace</h5>
+                        {time.daysLeft !== undefined ? (
+                          <span className="dash-muted">{time.daysLeft}d left</span>
+                        ) : null}
+                      </div>
                       <p className="dash-pace-line">
                         <b>{time.daysUsed}</b> of <b>{time.totalDays}</b> days used
                       </p>
@@ -653,34 +710,66 @@ export default function DashboardPage({
                       <p className="dash-muted">
                         {shortDate(time.startDate)} → {shortDate(time.endDate)}
                       </p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="dash-muted">No dates on this project yet.</p>
-                      <button type="button" className="dash-link" onClick={onOpenSettings}>
-                        Add dates
-                      </button>
-                    </>
-                  )}
-                </div>
+                    </div>
+                  ) : null}
 
-                <div className="dash-panel">
-                  <div className="dash-panel-head">
-                    <h5>Mood trend</h5>
-                    <span className="dash-muted">
-                      {trend.length >= 3 ? `${trend.length} runs` : ''}
-                    </span>
-                  </div>
-                  {trend.length >= 3 ? (
-                    <>
+                  {showMood ? (
+                    <div className="dash-panel">
+                      <div className="dash-panel-head">
+                        <h5>Mood trend</h5>
+                        <span className="dash-muted">{trend.length} runs</span>
+                      </div>
                       <MoodSpark points={trend} />
                       <p className="dash-muted">since {shortDate(trend[0]?.atIso)}</p>
-                    </>
-                  ) : (
-                    <p className="dash-muted">Needs 3+ agent runs.</p>
-                  )}
-                </div>
-              </section>
+                    </div>
+                  ) : null}
+                </section>
+              ) : null}
+
+              {recentMessages.length > 0 ? (
+                <section className="dash-panel" aria-label="Latest messages">
+                  <div className="dash-panel-head">
+                    <h5>Latest messages</h5>
+                    <span className="dash-muted">Client + our Slack</span>
+                  </div>
+                  <ul className="dash-msgs">
+                    {recentMessages.map((message) => (
+                      <li key={`${message.source}-${message.channelId}-${message.ts}`}>
+                        <button
+                          type="button"
+                          className="dash-msg"
+                          onClick={() => jumpToMessage(message)}
+                          title={`Open in #${message.channelName || message.channelId}`}
+                        >
+                          <span className="dash-avatar" aria-hidden="true">
+                            {initials(message.userName)}
+                          </span>
+                          <span className="dash-msg-body">
+                            <span className="dash-msg-meta">
+                              <span className="dash-msg-name">{message.userName}</span>
+                              <span>{age(message.atIso)}</span>
+                              <span className="dash-msg-channel">
+                                #{message.channelName || message.channelId}
+                              </span>
+                              <SourceChip source={message.source} />
+                            </span>
+                            <span className="dash-msg-text">{message.text}</span>
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="dash-msg-foot">
+                    <button
+                      type="button"
+                      className="dash-link"
+                      onClick={() => onSelect('s:client')}
+                    >
+                      View all
+                    </button>
+                  </div>
+                </section>
+              ) : null}
             </div>
 
             <div className="dash-rail">

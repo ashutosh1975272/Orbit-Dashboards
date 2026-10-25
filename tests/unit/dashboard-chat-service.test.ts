@@ -1,4 +1,7 @@
-const fakeVault = { encrypt: (p: string) => Buffer.from(p).toString('base64'), decrypt: (b: string) => Buffer.from(b, 'base64').toString('utf8') }
+const fakeVault = {
+  encrypt: (p: string) => Buffer.from(p).toString('base64'),
+  decrypt: (b: string) => Buffer.from(b, 'base64').toString('utf8')
+}
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -96,6 +99,15 @@ describe('DashboardChatService', () => {
       token?: string | null
       scopes?: string[] | null
       poller?: ChatPoller
+      now?: () => number
+      teamWorkspace?: {
+        getConnection(): Promise<{
+          profileId: string
+          teamId: string
+          token: string | null
+          channels: Array<{ channelId: string; channelName: string }>
+        } | null>
+      }
     } = {}
   ): DashboardChatService {
     return new DashboardChatService({
@@ -107,6 +119,8 @@ describe('DashboardChatService', () => {
       oauthScopesProvider: async () =>
         options.scopes === undefined ? ['channels:read', 'chat:write'] : options.scopes,
       pollerFactory: () => options.poller ?? fakePoller(),
+      now: options.now,
+      teamWorkspace: options.teamWorkspace,
       log: () => undefined
     })
   }
@@ -324,6 +338,117 @@ describe('DashboardChatService', () => {
     it('defaults to source none for an unknown project', async () => {
       const status = await service().chatTokenStatus('nope')
       expect(status).toMatchObject({ connected: false, source: 'none', canSend: null })
+    })
+  })
+
+  describe('projectActivity', () => {
+    const ACTIVITY_NOW = 1_700_000_300_000
+
+    it('reads the last 14 days and computes the ball in court', async () => {
+      const activity = await service({ now: () => ACTIVITY_NOW }).projectActivity(project.id)
+
+      expect(activity.recent.map((m) => m.text)).toEqual(['Hi there', 'From dev', 'Hello'])
+      expect(activity.latestClientAt).toBe(new Date(1_700_000_050_000).toISOString())
+      expect(activity.latestOursAt).toBe(new Date(1_700_000_100_000).toISOString())
+      expect(activity.ballInCourt).toBe('client')
+      expect(activity.channels[0]).toMatchObject({ channelName: 'general', count: 2 })
+      expect(activity.counts14d).toEqual({ client: 3, ours: 0 })
+      expect(activity.recent[0]).toMatchObject({
+        source: 'client',
+        userName: 'Me',
+        isMine: true,
+        channelName: 'general'
+      })
+    })
+
+    it('ignores rows older than the 14-day window', async () => {
+      await deltaStore.appendMessages({
+        profileId: 'pf1',
+        teamId: 'T1',
+        channelId: 'C1',
+        channelName: 'general',
+        messages: [{ ts: '1600000000.000100', user: 'U_CLIENT', text: 'Ancient' }]
+      })
+
+      const activity = await service({ now: () => ACTIVITY_NOW }).projectActivity(project.id)
+      expect(activity.recent.map((m) => m.text)).not.toContain('Ancient')
+      expect(activity.counts14d).toEqual({ client: 3, ours: 0 })
+    })
+
+    it('restricts Our Slack rows to the channels mapped on the project', async () => {
+      project = await monitorStore.upsertProject({
+        project: {
+          ...project,
+          ourSlackChannels: [{ channelId: 'T1', channelName: 'team-one' }]
+        }
+      })
+      for (const [channelId, channelName, text] of [
+        ['T1', 'team-one', 'Mapped team note'],
+        ['T2', 'team-other', 'Unmapped team note']
+      ] as const) {
+        await deltaStore.appendMessages({
+          profileId: 'pf-team',
+          teamId: 'TT',
+          channelId,
+          channelName,
+          messages: [{ ts: '1700000250.000100', user: 'U_SELF', text }]
+        })
+      }
+
+      const activity = await service({
+        now: () => ACTIVITY_NOW,
+        teamWorkspace: {
+          getConnection: async () => ({
+            profileId: 'pf-team',
+            teamId: 'TT',
+            token: 'xoxp-team',
+            channels: [
+              { channelId: 'T1', channelName: 'team-one' },
+              { channelId: 'T2', channelName: 'team-other' }
+            ]
+          })
+        }
+      }).projectActivity(project.id)
+
+      expect(activity.recent.map((m) => m.text)).toContain('Mapped team note')
+      expect(activity.recent.map((m) => m.text)).not.toContain('Unmapped team note')
+      expect(activity.counts14d.ours).toBe(1)
+    })
+
+    it('caches for 60 seconds and then re-reads', async () => {
+      let now = ACTIVITY_NOW
+      const svc = service({ now: () => now })
+      const first = await svc.projectActivity(project.id)
+      await deltaStore.appendMessages({
+        profileId: 'pf1',
+        teamId: 'T1',
+        channelId: 'C2',
+        channelName: 'dev',
+        messages: [{ ts: '1700000280.000100', user: 'U_CLIENT2', text: 'Brand new' }]
+      })
+
+      const cached = await svc.projectActivity(project.id)
+      expect(cached.recent.map((m) => m.text)).toEqual(first.recent.map((m) => m.text))
+
+      now += 61_000
+      const refreshed = await svc.projectActivity(project.id)
+      expect(refreshed.recent[0].text).toBe('Brand new')
+    })
+
+    it('returns an empty activity for invalid or unknown projects', async () => {
+      const svc = service({ now: () => ACTIVITY_NOW })
+      for (const id of ['', '   ', 'nope']) {
+        const activity = await svc.projectActivity(id)
+        expect(activity).toEqual({
+          recent: [],
+          latestClientAt: null,
+          latestOursAt: null,
+          ballInCourt: null,
+          participants: [],
+          channels: [],
+          counts14d: { client: 0, ours: 0 }
+        })
+      }
     })
   })
 })
