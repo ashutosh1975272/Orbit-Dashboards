@@ -1,5 +1,21 @@
 # Status Ledger
 
+## Expanded Dashboard — Phase 0c toast root cause + fix (2026-10-25, commit `5bb01ed`)
+- root cause (measured in a real Electron window, isolated profile/CDP 9230, real profile untouched):
+  - fire condition was `if (collapsed)` after `setSettings` resolved, with no visible→hidden guard (`App.tsx:382-400` before the fix)
+  - the direct `setToast` call bypassed the IPC toast timer, so it was still present after 8s
+  - nothing cleared it on expand: it was still present 1s after clicking “Show sidebar”
+  - copy hardcoded `⌘B` while the key handler accepts `metaKey || ctrlKey`
+  - clipping was **not** reproduced: `.app-toast` is `position: fixed`, rect `top 716 / bottom 776` in an 800px viewport (24px margin), and no ancestor has transform/filter/perspective/contain. The screenshot's half-cut toast was a capture crop (dashboard content is cut at the same edge).
+- fix:
+  - `sidebarToastFor(previous, next)` returns copy only for visible→hidden (`sidebar-toast.ts`)
+  - `sidebarCollapsedRef` tracks the real previous state; toast clears on expand and auto-dismisses after 6s (`App.tsx:400-428`)
+  - `showToast()` centralises the timer, also used by the existing main-process toast IPC
+  - platform labels via `modKeyFor`/`modShiftFor` (`shortcut-label.ts`) in the toast, both sidebar titles, Settings hint and the shortcut line
+- live proof after the fix (same isolated window, Linux): hide → `Sidebar hidden — press Ctrl+B…`, rect `716-776/800`, gone at 8s; hide → show within 1s → toast cleared; titles show `Ctrl+B`
+- `npm run typecheck`: PASS; `npm test`: **385/385** (46 files); `npm run build`: PASS; lint on all changed/new files: **0 errors**
+- tests: `shortcut-label` 5 — Mac/other labels, toast only on visible→hidden, no fire when already hidden, no fire on expand.
+
 ## Expanded Dashboard — Phase 0b waiting semantics (2026-10-25, commit `c0bc123`)
 - `npm run typecheck` (node + web): PASS (exit 0)
 - `npm test`: PASS — 45 files, **380/380** tests (exit 0)
