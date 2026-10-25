@@ -3,9 +3,9 @@ import { APP_DISPLAY_NAME } from '../../../shared/brand'
 import type { AppId, AppSession, AppSessionStatus, Profile } from '../../../shared/types'
 import {
   APP_IDS,
-  appLabel,
   appSupportsWorkspaces,
-  profileDisplayLabel
+  profileDisplayLabel,
+  sidebarAppLabel
 } from '../../../shared/types'
 import { formatUnreadBadge, unreadKey } from '../lib/unread-badge'
 import { AppIcon } from './AppIcon'
@@ -389,7 +389,7 @@ export const ProfileSidebar = memo(function ProfileSidebar({
                       <span className="ws-title">{title}</span>
                       <span className="ws-sub">
                         {profileName}
-                        {app ? ` · ${appLabel(app)}` : ''}
+                        {app ? ` · ${sidebarAppLabel(app)}` : ''}
                       </span>
                     </span>
                   </button>
@@ -567,7 +567,7 @@ export const ProfileSidebar = memo(function ProfileSidebar({
                             title="Right-click: open in split"
                           >
                             <AppIcon appId={appId} className="nav-app-icon" size={12} />
-                            <span className="nav-app-label">{appLabel(appId)}</span>
+                            <span className="nav-app-label">{sidebarAppLabel(appId)}</span>
                             <AppStatusMark status={session.sessionStatus} />
                             {formatUnreadBadge(unreadCounts[unreadKey(profile.id, appId)] ?? 0) ? (
                               <span className="unread-badge" aria-label="Unread">
