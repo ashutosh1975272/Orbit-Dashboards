@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import type { DashboardProjectSnapshot } from '../../src/shared/dashboard-contract'
+import type { DashboardProjectSnapshot, ProjectInsight } from '../../src/shared/dashboard-contract'
 import {
   buildCardSummary,
   buildCardView,
   plural
 } from '../../src/renderer/src/components/dashboard/card-view'
 
-const baseProject = (id: string, name: string, teamName: string): DashboardProjectSnapshot['project'] => ({
+const baseProject = (
+  id: string,
+  name: string,
+  teamName: string
+): DashboardProjectSnapshot['project'] => ({
   id,
   name,
   clientName: 'Acme Corp',
@@ -19,7 +23,9 @@ const baseProject = (id: string, name: string, teamName: string): DashboardProje
   createdAt: '2026-01-01T00:00:00Z'
 })
 
-const baseSnapshot = (overrides: Partial<DashboardProjectSnapshot> = {}): DashboardProjectSnapshot => ({
+const baseSnapshot = (
+  overrides: Partial<DashboardProjectSnapshot> = {}
+): DashboardProjectSnapshot => ({
   project: baseProject('p1', 'Test Project', 'Workspace A'),
   summary: 'Weekly sync notes.',
   newMessageCount: 0,
@@ -35,7 +41,11 @@ const baseSnapshot = (overrides: Partial<DashboardProjectSnapshot> = {}): Dashbo
   ...overrides
 })
 
-const baseInsight = (overrides: Record<string, unknown> = {}): any => ({
+type InsightOverrides = Partial<Omit<ProjectInsight, 'clientAsk'>> & {
+  clientAsk?: Partial<ProjectInsight['clientAsk']>
+}
+
+const baseInsight = (overrides: InsightOverrides = {}): ProjectInsight => ({
   status: 'on-track',
   statusReason: '',
   statusChange: '',
@@ -50,12 +60,6 @@ const baseInsight = (overrides: Record<string, unknown> = {}): any => ({
   blockers: [],
   nextStep: 'Reply to the client email.',
   dates: {},
-  clientAsk: {
-    needsReply: false,
-    urgency: 'normal',
-    lastClientMessage: null,
-    openQuestions: []
-  },
   commitments: [],
   decisions: [],
   risks: [],
@@ -66,7 +70,14 @@ const baseInsight = (overrides: Record<string, unknown> = {}): any => ({
   files: [],
   people: [],
   milestones: [],
-  ...overrides
+  ...overrides,
+  clientAsk: {
+    needsReply: false,
+    urgency: 'normal',
+    lastClientMessage: null,
+    openQuestions: [],
+    ...(overrides.clientAsk ?? {})
+  }
 })
 
 describe('plural helper', () => {
@@ -169,16 +180,58 @@ describe('buildCardSummary — data contract', () => {
   })
 })
 
+describe('buildCardSummary — progress honesty', () => {
+  it('reports null instead of the time-based completion when no evidence exists', () => {
+    const snapshot = baseSnapshot({
+      completion: 60,
+      insight: baseInsight({ progress: 60, progressEvidence: '' })
+    })
+    expect(buildCardSummary(snapshot, 0).progress).toBeNull()
+  })
+
+  it('uses the insight progress only when evidence text exists', () => {
+    const snapshot = baseSnapshot({
+      completion: 20,
+      insight: baseInsight({ progress: 42, progressEvidence: 'mockups sent' })
+    })
+    expect(buildCardSummary(snapshot, 0).progress).toBe(42)
+  })
+
+  it('prefers manual completion over an evidenced insight estimate', () => {
+    const snapshot = baseSnapshot({
+      project: {
+        ...baseProject('p1', 'Test Project', 'Workspace A'),
+        manualCompletion: 75
+      },
+      insight: baseInsight({ progress: 42, progressEvidence: 'mockups sent' })
+    })
+    expect(buildCardSummary(snapshot, 0).progress).toBe(75)
+  })
+
+  it('never falls back to the time-based completion without an insight', () => {
+    const snapshot = baseSnapshot({ completion: 60, insight: null })
+    expect(buildCardSummary(snapshot, 0).progress).toBeNull()
+  })
+})
+
 describe('buildCardSummary — score formula', () => {
   it('scores needsReply +35', () => {
-    const a = baseSnapshot({ insight: baseInsight({ clientAsk: { needsReply: true, urgency: 'normal' } }) })
-    const b = baseSnapshot({ insight: baseInsight({ clientAsk: { needsReply: false, urgency: 'normal' } }) })
+    const a = baseSnapshot({
+      insight: baseInsight({ clientAsk: { needsReply: true, urgency: 'normal' } })
+    })
+    const b = baseSnapshot({
+      insight: baseInsight({ clientAsk: { needsReply: false, urgency: 'normal' } })
+    })
     expect(buildCardSummary(a, 0).score).toBeGreaterThan(buildCardSummary(b, 0).score)
   })
 
   it('scores high urgency +15', () => {
-    const a = baseSnapshot({ insight: baseInsight({ clientAsk: { needsReply: false, urgency: 'high' } }) })
-    const b = baseSnapshot({ insight: baseInsight({ clientAsk: { needsReply: false, urgency: 'normal' } }) })
+    const a = baseSnapshot({
+      insight: baseInsight({ clientAsk: { needsReply: false, urgency: 'high' } })
+    })
+    const b = baseSnapshot({
+      insight: baseInsight({ clientAsk: { needsReply: false, urgency: 'normal' } })
+    })
     expect(buildCardSummary(a, 0).score).toBeGreaterThan(buildCardSummary(b, 0).score)
   })
 
@@ -199,7 +252,12 @@ describe('buildCardSummary — score formula', () => {
     })
     const fresh = baseSnapshot({
       lastUpdatedAt: new Date().toISOString(),
-      insight: baseInsight({ clientAsk: { needsReply: false, lastClientMessage: { who: 'c', whenIso: new Date().toISOString(), quote: 'hi' } } })
+      insight: baseInsight({
+        clientAsk: {
+          needsReply: false,
+          lastClientMessage: { who: 'c', whenIso: new Date().toISOString(), quote: 'hi' }
+        }
+      })
     })
     expect(buildCardSummary(stale, 0).score).toBeLessThan(buildCardSummary(fresh, 0).score)
   })
@@ -262,11 +320,11 @@ describe('buildCardSummary — pace', () => {
   const dateOnly = (offsetDays: number): string =>
     new Date(Date.now() + offsetDays * day).toISOString().slice(0, 10)
 
-  it('marks a project behind when progress trails elapsed time', () => {
+  it('marks a project behind when evidenced progress trails elapsed time', () => {
     const summary = buildCardSummary(
       baseSnapshot({
         effectiveDates: { startDate: dateOnly(-9), endDate: dateOnly(1) },
-        completion: 10
+        insight: baseInsight({ progress: 10, progressEvidence: 'kickoff done' })
       }),
       0
     )
@@ -274,11 +332,11 @@ describe('buildCardSummary — pace', () => {
     expect(summary.paceLabel).toBe('Behind schedule')
   })
 
-  it('marks a project ahead when progress leads elapsed time', () => {
+  it('marks a project ahead when evidenced progress leads elapsed time', () => {
     const summary = buildCardSummary(
       baseSnapshot({
         effectiveDates: { startDate: dateOnly(-1), endDate: dateOnly(10) },
-        completion: 50
+        insight: baseInsight({ progress: 50, progressEvidence: 'mockups approved' })
       }),
       0
     )
@@ -287,11 +345,20 @@ describe('buildCardSummary — pace', () => {
   })
 
   it('keeps pace neutral when no dates are stated', () => {
+    const summary = buildCardSummary(baseSnapshot({ effectiveDates: {}, completion: 50 }), 0)
+    expect(summary.pace).toBe('on-pace')
+    expect(summary.paceLabel).toBe('Dates not stated in chat')
+  })
+
+  it('does not claim a pace when progress has no evidence', () => {
     const summary = buildCardSummary(
-      baseSnapshot({ effectiveDates: {}, completion: 50 }),
+      baseSnapshot({
+        effectiveDates: { startDate: dateOnly(-9), endDate: dateOnly(1) },
+        insight: baseInsight({ progress: 10, progressEvidence: '' })
+      }),
       0
     )
     expect(summary.pace).toBe('on-pace')
-    expect(summary.paceLabel).toBe('Dates not stated in chat')
+    expect(summary.paceLabel).toBe('Progress not stated in chat')
   })
 })

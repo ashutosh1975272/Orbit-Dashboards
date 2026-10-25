@@ -11,7 +11,8 @@ import type {
   InsightHighlight,
   InsightMood,
   InsightStatus,
-  InsightUrgency
+  InsightUrgency,
+  ProjectInsight
 } from '../../../../shared/dashboard-contract'
 
 export interface CardDates {
@@ -190,6 +191,17 @@ export interface CardView {
   syncedLabel: string
 }
 
+function toCardClientMessage(
+  message: { who?: string; whenIso?: string | null; quote?: string } | null | undefined
+): { who: string; whenIso: string; quote: string } | null {
+  if (!message) return null
+  return {
+    who: message.who ?? '',
+    whenIso: message.whenIso ?? '',
+    quote: message.quote ?? ''
+  }
+}
+
 /** Correct English plurals: plural(1, 'file') → 'file', plural(2, 'file') → 'files'. */
 export function plural(n: number, word: string): string {
   return n === 1 ? word : `${word}s`
@@ -209,7 +221,8 @@ export interface CardSummary {
   /** The single most important thing that just changed (maps to insight.recentLine). */
   justChanged: string
   nextStep: string
-  progress: number
+  /** Real progress only: manual completion or an insight backed by evidence. */
+  progress: number | null
   dates: CardDates
   daysUsed?: number
   daysTotal?: number
@@ -218,13 +231,17 @@ export interface CardSummary {
   week: Array<{ date: string; count: number; isToday: boolean }>
   lastClientAt: string | null
   myLastReplyAt: string | null
-  counts: { questions: number; blockers: number; risks: number; files: number; requirements: number }
+  counts: {
+    questions: number
+    blockers: number
+    risks: number
+    files: number
+    requirements: number
+  }
   score: number
   aiBadge: string
   syncedLabel: string
 }
-
-
 
 function fmtAge(iso: string | null): string {
   if (!iso) return 'never'
@@ -254,8 +271,20 @@ function computeTimeElapsed(
   const totalDays = Math.max(1, Math.ceil((endMs - startMs) / (1000 * 60 * 60 * 24)))
   const daysUsed = Math.max(0, Math.ceil((now - startMs) / (1000 * 60 * 60 * 24)))
   const daysLeft = Math.max(0, Math.ceil((endMs - now) / (1000 * 60 * 60 * 24)))
+  if (typeof progressPercent !== 'number' || !Number.isFinite(progressPercent)) {
+    return {
+      hasDates: true,
+      startDate,
+      endDate,
+      daysUsed,
+      daysLeft,
+      totalDays,
+      pace: 'on-pace',
+      paceLabel: 'Progress not stated in chat'
+    }
+  }
   const timePercent = totalDays > 0 ? Math.min(100, Math.round((daysUsed / totalDays) * 100)) : 0
-  const progress = progressPercent ?? 0
+  const progress = progressPercent
   const diff = progress - timePercent
   let pace: 'behind' | 'on-pace' | 'ahead' = 'on-pace'
   let paceLabel = 'On pace'
@@ -330,16 +359,20 @@ function computeActivityCounts(
 }
 
 /** Normalize an insight so every v2.4 field exists (handles old saved insights). */
-function normalizeInsight(insight: any): any {
+function normalizeInsight(insight: ProjectInsight | null | undefined): ProjectInsight | null {
   if (!insight) return null
   return {
     ...insight,
     statusChange: insight.statusChange ?? '',
     recentLine: insight.recentLine ?? '',
     requirements: Array.isArray(insight.requirements) ? insight.requirements : [],
-    scope: insight.scope && typeof insight.scope === 'object'
-      ? { in: Array.isArray(insight.scope.in) ? insight.scope.in : [], out: Array.isArray(insight.scope.out) ? insight.scope.out : [] }
-      : { in: [], out: [] },
+    scope:
+      insight.scope && typeof insight.scope === 'object'
+        ? {
+            in: Array.isArray(insight.scope.in) ? insight.scope.in : [],
+            out: Array.isArray(insight.scope.out) ? insight.scope.out : []
+          }
+        : { in: [], out: [] },
     deliverables: Array.isArray(insight.deliverables) ? insight.deliverables : [],
     files: Array.isArray(insight.files) ? insight.files : [],
     people: Array.isArray(insight.people) ? insight.people : [],
@@ -351,14 +384,17 @@ function normalizeInsight(insight: any): any {
     risks: Array.isArray(insight.risks) ? insight.risks : [],
     keywords: Array.isArray(insight.keywords) ? insight.keywords : [],
     dates: insight.dates && typeof insight.dates === 'object' ? insight.dates : {},
-    clientAsk: insight.clientAsk && typeof insight.clientAsk === 'object'
-      ? {
-          needsReply: !!insight.clientAsk.needsReply,
-          urgency: insight.clientAsk.urgency ?? 'normal',
-          lastClientMessage: insight.clientAsk.lastClientMessage ?? null,
-          openQuestions: Array.isArray(insight.clientAsk.openQuestions) ? insight.clientAsk.openQuestions : []
-        }
-      : { needsReply: false, urgency: 'normal', lastClientMessage: null, openQuestions: [] }
+    clientAsk:
+      insight.clientAsk && typeof insight.clientAsk === 'object'
+        ? {
+            needsReply: !!insight.clientAsk.needsReply,
+            urgency: insight.clientAsk.urgency ?? 'normal',
+            lastClientMessage: insight.clientAsk.lastClientMessage ?? null,
+            openQuestions: Array.isArray(insight.clientAsk.openQuestions)
+              ? insight.clientAsk.openQuestions
+              : []
+          }
+        : { needsReply: false, urgency: 'normal', lastClientMessage: null, openQuestions: [] }
   }
 }
 
@@ -366,11 +402,73 @@ export function buildCardView(snapshot: DashboardProjectSnapshot, index = 0): Ca
   if (!snapshot || !snapshot.project) {
     // Return a minimal safe card view
     return {
-      identity: { index, name: 'Unknown', clientName: '—', teamName: '—', progress: 0, progressEvidence: '', mood: 'neutral', moodReason: '', moodQuote: '', dates: { badge: 'not stated in chat' }, channels: [] },
-      leftSidebar: { startTimeline: { startDate: undefined, endDate: undefined, dateBadge: 'not stated in chat', milestones: [] }, requirements: [], scopeDeliverables: { inScope: [], outOfScope: [], deliverables: [] }, decisions: [], commitments: [], files: [], peopleChannels: { people: [], channels: [], quietChannelCount: 0 } },
-      centre: { status: null, statusReason: '', statusChange: '', situationLine: '', recentLine: '', highlights: [], lastClientMessage: null, needsReply: false, urgency: 'normal', openQuestions: [], nextStep: '', visuals: { progressPercent: 0, timeElapsed: { hasDates: false, pace: 'on-pace', paceLabel: 'Dates not stated in chat' }, sevenDayBars: [] } },
-      rightSidebar: { needsReplyOpenQuestions: { needsReply: false, urgency: 'normal', openQuestions: [], lastClientMessage: null }, blockers: [], risks: [], nextSteps: [], moodSignals: { mood: 'neutral', moodReason: '', moodQuote: '' }, activity: { messages24h: 0, messages7d: 0, lastClientMessage: null, myLastReply: null }, history: [] },
-      detail: { blockers: [], commitments: [], decisions: [], risks: [], keywords: [], hasMoreDetail: false },
+      identity: {
+        index,
+        name: 'Unknown',
+        clientName: '—',
+        teamName: '—',
+        progress: 0,
+        progressEvidence: '',
+        mood: 'neutral',
+        moodReason: '',
+        moodQuote: '',
+        dates: { badge: 'not stated in chat' },
+        channels: []
+      },
+      leftSidebar: {
+        startTimeline: {
+          startDate: undefined,
+          endDate: undefined,
+          dateBadge: 'not stated in chat',
+          milestones: []
+        },
+        requirements: [],
+        scopeDeliverables: { inScope: [], outOfScope: [], deliverables: [] },
+        decisions: [],
+        commitments: [],
+        files: [],
+        peopleChannels: { people: [], channels: [], quietChannelCount: 0 }
+      },
+      centre: {
+        status: null,
+        statusReason: '',
+        statusChange: '',
+        situationLine: '',
+        recentLine: '',
+        highlights: [],
+        lastClientMessage: null,
+        needsReply: false,
+        urgency: 'normal',
+        openQuestions: [],
+        nextStep: '',
+        visuals: {
+          progressPercent: 0,
+          timeElapsed: { hasDates: false, pace: 'on-pace', paceLabel: 'Dates not stated in chat' },
+          sevenDayBars: []
+        }
+      },
+      rightSidebar: {
+        needsReplyOpenQuestions: {
+          needsReply: false,
+          urgency: 'normal',
+          openQuestions: [],
+          lastClientMessage: null
+        },
+        blockers: [],
+        risks: [],
+        nextSteps: [],
+        moodSignals: { mood: 'neutral', moodReason: '', moodQuote: '' },
+        activity: { messages24h: 0, messages7d: 0, lastClientMessage: null, myLastReply: null },
+        history: []
+      },
+      detail: {
+        blockers: [],
+        commitments: [],
+        decisions: [],
+        risks: [],
+        keywords: [],
+        hasMoreDetail: false
+      },
       aiBadge: 'no insight yet',
       syncedLabel: 'never'
     }
@@ -419,7 +517,12 @@ export function buildCardView(snapshot: DashboardProjectSnapshot, index = 0): Ca
   )
 
   // Progress for visuals
-  const progressPercent = Number.isFinite(insight?.progress) ? insight.progress : (Number.isFinite(snapshot.completion) ? snapshot.completion : 0)
+  const progressPercent =
+    typeof insight?.progress === 'number' && Number.isFinite(insight.progress)
+      ? insight.progress
+      : Number.isFinite(snapshot.completion)
+        ? snapshot.completion
+        : 0
 
   // Time elapsed visual
   const timeElapsed = computeTimeElapsed(dates.startDate, dates.endDate, progressPercent)
@@ -442,41 +545,46 @@ export function buildCardView(snapshot: DashboardProjectSnapshot, index = 0): Ca
       startDate: dates.startDate,
       endDate: dates.endDate,
       dateBadge: dates.badge,
-      milestones: insight?.milestones.map((m: any) => ({
-        label: m.label,
-        dateIso: m.dateIso,
-        done: m.done
-      })) ?? []
+      milestones:
+        insight?.milestones.map((m) => ({
+          label: m.label,
+          dateIso: m.dateIso ?? '',
+          done: m.done
+        })) ?? []
     },
-    requirements: insight?.requirements.map((r: any) => ({
-      text: r.text,
-      sourceFile: r.sourceFile,
-      who: r.who,
-      whenIso: r.whenIso
-    })) ?? [],
+    requirements:
+      insight?.requirements.map((r) => ({
+        text: r.text,
+        sourceFile: r.sourceFile,
+        who: r.who,
+        whenIso: r.whenIso
+      })) ?? [],
     scopeDeliverables: {
       inScope: insight?.scope.in ?? [],
       outOfScope: insight?.scope.out ?? [],
-      deliverables: insight?.deliverables.map((d: any) => ({
-        name: d.name,
-        status: d.status
-      })) ?? []
+      deliverables:
+        insight?.deliverables.map((d) => ({
+          name: d.name,
+          status: d.status
+        })) ?? []
     },
     decisions: insight?.decisions ?? [],
     commitments: insight?.commitments ?? [],
-    files: insight?.files.map((f: any) => ({
-      name: f.name,
-      type: f.type,
-      who: f.who,
-      whenIso: f.whenIso,
-      url: f.url
-    })) ?? [],
-    peopleChannels: {
-      people: insight?.people.map((p: any) => ({
-        name: p.name,
-        role: p.role,
-        side: p.side
+    files:
+      insight?.files.map((f) => ({
+        name: f.name,
+        type: f.type,
+        who: f.who,
+        whenIso: f.whenIso,
+        url: f.url
       })) ?? [],
+    peopleChannels: {
+      people:
+        insight?.people.map((p) => ({
+          name: p.name,
+          role: p.role,
+          side: p.side
+        })) ?? [],
       channels: channels
         .filter((c) => c.total > 0)
         .sort((a, b) => b.newCount - a.newCount)
@@ -499,7 +607,7 @@ export function buildCardView(snapshot: DashboardProjectSnapshot, index = 0): Ca
       : (snapshot.summary.split('\n').find((l) => l.trim()) ?? ''),
     recentLine: insight ? insight.recentLine : '',
     highlights: insight ? insight.highlights : [],
-    lastClientMessage: insight ? insight.clientAsk.lastClientMessage : null,
+    lastClientMessage: toCardClientMessage(insight?.clientAsk.lastClientMessage),
     needsReply: insight ? insight.clientAsk.needsReply : false,
     urgency: insight ? insight.clientAsk.urgency : 'normal',
     openQuestions: insight ? insight.clientAsk.openQuestions : [],
@@ -517,7 +625,7 @@ export function buildCardView(snapshot: DashboardProjectSnapshot, index = 0): Ca
       needsReply: insight ? insight.clientAsk.needsReply : false,
       urgency: insight ? insight.clientAsk.urgency : 'normal',
       openQuestions: insight ? insight.clientAsk.openQuestions : [],
-      lastClientMessage: insight ? insight.clientAsk.lastClientMessage : null
+      lastClientMessage: toCardClientMessage(insight?.clientAsk.lastClientMessage)
     },
     blockers: insight ? insight.blockers : [],
     risks: insight ? insight.risks : [],
@@ -530,7 +638,7 @@ export function buildCardView(snapshot: DashboardProjectSnapshot, index = 0): Ca
     activity: {
       messages24h,
       messages7d,
-      lastClientMessage: insight ? insight.clientAsk.lastClientMessage : null,
+      lastClientMessage: toCardClientMessage(insight?.clientAsk.lastClientMessage),
       myLastReply: null
     },
     history: []
@@ -572,19 +680,42 @@ export function buildCardSummary(snapshot: DashboardProjectSnapshot, index = 0):
 
   const dates: CardDates = insight
     ? insight.dates.startDate || insight.dates.endDate
-      ? { startDate: insight.dates.startDate ?? snapshot.effectiveDates.startDate, endDate: insight.dates.endDate ?? snapshot.effectiveDates.endDate, badge: 'from chat' }
-      : { startDate: snapshot.effectiveDates.startDate, endDate: snapshot.effectiveDates.endDate, badge: project.startDate || project.endDate ? 'manual' : 'not stated in chat' }
-    : { startDate: snapshot.effectiveDates.startDate, endDate: snapshot.effectiveDates.endDate, badge: project.startDate || project.endDate ? 'manual' : 'not stated in chat' }
+      ? {
+          startDate: insight.dates.startDate ?? snapshot.effectiveDates.startDate,
+          endDate: insight.dates.endDate ?? snapshot.effectiveDates.endDate,
+          badge: 'from chat'
+        }
+      : {
+          startDate: snapshot.effectiveDates.startDate,
+          endDate: snapshot.effectiveDates.endDate,
+          badge: project.startDate || project.endDate ? 'manual' : 'not stated in chat'
+        }
+    : {
+        startDate: snapshot.effectiveDates.startDate,
+        endDate: snapshot.effectiveDates.endDate,
+        badge: project.startDate || project.endDate ? 'manual' : 'not stated in chat'
+      }
 
-  const progress = insight ? insight.progress : snapshot.completion
-  const timeElapsed = computeTimeElapsed(dates.startDate, dates.endDate, progress)
+  const manualCompletion =
+    typeof project.manualCompletion === 'number' && Number.isFinite(project.manualCompletion)
+      ? project.manualCompletion
+      : null
+  const evidencedProgress =
+    insight && insight.progressEvidence.trim() && Number.isFinite(insight.progress)
+      ? insight.progress
+      : null
+  // The time-based snapshot.completion is an estimate, never proof of progress.
+  const progress = manualCompletion ?? evidencedProgress
+  const timeElapsed = computeTimeElapsed(dates.startDate, dates.endDate, progress ?? undefined)
   const sevenDayBars = computeSevenDayBars(perChannel)
   const { messages24h: _unused } = computeActivityCounts(perChannel)
   void _unused
 
   const needsReply = insight ? insight.clientAsk.needsReply : false
   const urgency: InsightUrgency = insight ? insight.clientAsk.urgency : 'normal'
-  const inactive = !insight?.clientAsk?.lastClientMessage && (Date.now() - new Date(snapshot.lastUpdatedAt ?? Date.now()).getTime()) > 24 * 60 * 60 * 1000
+  const inactive =
+    !insight?.clientAsk?.lastClientMessage &&
+    Date.now() - new Date(snapshot.lastUpdatedAt ?? Date.now()).getTime() > 24 * 60 * 60 * 1000
 
   const lastClientAt = insight?.clientAsk?.lastClientMessage?.whenIso ?? null
   const myLastReplyAt = null
@@ -606,8 +737,13 @@ export function buildCardSummary(snapshot: DashboardProjectSnapshot, index = 0):
     ? Math.max(0, (Date.now() - new Date(lastActivityIso).getTime()) / 3_600_000)
     : 48
   const noMessageFor48h = hoursSinceLastMessage >= 48
-  const statusWeight = { blocked: 30, 'at-risk': 24, 'waiting-on-client': 20, 'on-track': 8 } as Record<string, number>
-  const statusScore = insight ? statusWeight[insight.status] ?? 0 : 0
+  const statusWeight = {
+    blocked: 30,
+    'at-risk': 24,
+    'waiting-on-client': 20,
+    'on-track': 8
+  } as Record<string, number>
+  const statusScore = insight ? (statusWeight[insight.status] ?? 0) : 0
   let score = 0
   score += needsReply ? 35 : 0
   score += urgency === 'high' ? 15 : 0
@@ -630,7 +766,9 @@ export function buildCardSummary(snapshot: DashboardProjectSnapshot, index = 0):
     needsReply,
     inactive,
     urgency,
-    situationLine: insight ? insight.situationLine : (snapshot.summary.split('\n').find((l) => l.trim()) ?? ''),
+    situationLine: insight
+      ? insight.situationLine
+      : (snapshot.summary.split('\n').find((l) => l.trim()) ?? ''),
     justChanged: insight ? insight.recentLine : '',
     nextStep: insight ? insight.nextStep : '',
     progress,

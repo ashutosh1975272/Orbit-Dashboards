@@ -51,8 +51,18 @@ export default function CompactCard({
   syncing
 }: CompactCardProps): React.ReactElement {
   const {
-    projectId, index, name, workspaceName, clientName, status, needsReply,
-    situationLine, progress, paceLabel, lastClientAt, counts
+    projectId,
+    index,
+    name,
+    workspaceName,
+    clientName,
+    status,
+    needsReply,
+    situationLine,
+    progress,
+    paceLabel,
+    lastClientAt,
+    counts
   } = summary
 
   const [menuOpen, setMenuOpen] = useState(false)
@@ -73,12 +83,10 @@ export default function CompactCard({
     else onToggle()
   }
 
-  const statusLabel = status ? STATUS_LABEL[status] ?? status : null
+  const statusLabel = status ? (STATUS_LABEL[status] ?? status) : null
   const age = lastClientAt ? fmtAge(lastClientAt) : null
   const ageLabel = age ? (age === 'now' ? 'now' : `${age} ago`) : '—'
-  const activityTitle = age
-    ? `Last client message ${age} ago`
-    : 'No client messages yet'
+  const activityTitle = age ? `Last client message ${age} ago` : 'No client messages yet'
 
   return (
     <article
@@ -102,9 +110,7 @@ export default function CompactCard({
             {clientName && clientName !== workspaceName ? (
               <span className="proj-row-client">{clientName}</span>
             ) : null}
-            {statusLabel ? (
-              <span className="proj-row-status">{statusLabel}</span>
-            ) : null}
+            {statusLabel ? <span className="proj-row-status">{statusLabel}</span> : null}
           </span>
           <span className="proj-row-line">{situationLine || 'No summary yet'}</span>
         </button>
@@ -117,7 +123,11 @@ export default function CompactCard({
               </button>
             ) : null}
             {counts.blockers > 0 ? (
-              <button type="button" className="proj-chip is-danger" onClick={() => openSection(102)}>
+              <button
+                type="button"
+                className="proj-chip is-danger"
+                onClick={() => openSection(102)}
+              >
                 {counts.blockers} {counts.blockers === 1 ? 'blocker' : 'blockers'}
               </button>
             ) : null}
@@ -132,11 +142,22 @@ export default function CompactCard({
 
       <div className="proj-row-side">
         {needsReply ? <span className="proj-flag">Needs reply</span> : null}
-        <span className="proj-meter" title={`${progress}% complete. ${paceLabel}`}>
+        <span
+          className={`proj-meter${progress === null ? ' is-unknown' : ''}`}
+          title={
+            progress === null
+              ? 'Progress not stated in chat'
+              : `${progress}% complete. ${paceLabel}`
+          }
+        >
           <span className="proj-meter-bar">
-            <span style={{ width: `${Math.min(100, Math.max(0, progress))}%` }} />
+            <span
+              style={{
+                width: progress === null ? '0%' : `${Math.min(100, Math.max(0, progress))}%`
+              }}
+            />
           </span>
-          <span className="proj-meter-num">{progress}%</span>
+          <span className="proj-meter-num">{progress === null ? '—' : `${progress}%`}</span>
         </span>
         <span className="proj-age" title={activityTitle}>
           {ageLabel}
