@@ -1,5 +1,14 @@
 # Status Ledger
 
+## Chat with project — Phase 1 backend (2026-10-25, commit `0f67b97`)
+- `npm run typecheck` (node + web): PASS (exit 0)
+- `npm test`: PASS — 37 files, **298/298** tests (exit 0, no regressions)
+- `npm run build`: PASS — main 401.75 kB, preload 18.34 kB, renderer 80 modules, client built 1.95s (exit 0)
+- lint (all changed/new files): **0 errors, 0 warnings** (prettier autofix); repo-wide 26 pre-existing errors untouched
+- shipped: `dashboard:project-chat` + clear/cancel/history/status; sender-scoped chunk/done/error events; preload bridges with unsubscribe; Nim SSE streaming + fallback; host-owned short-id source refs; BM25 + recency retrieval; atomic 200-message per-project history; one run per project; typed error mapping; empty `ProjectTool` seam
+- not yet: chat UI (Phase 2), jump-to-message (Phase 2b), model chip/source badge (Phase 3), tests (Phase 4)
+- Electron not launched in this phase — backend only, no UI success claimed
+
 ## Chat with project — Phase 0 baseline (2026-10-25)
 - `npm run typecheck` (node + web): PASS (exit 0)
 - `npm test`: PASS — 37 files, **298/298** tests (exit 0)
