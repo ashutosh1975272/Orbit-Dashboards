@@ -7,7 +7,7 @@ import type { DashboardProjectChatSourceRef } from '../../shared/dashboard-contr
  * The marker may be split across stream chunks, so the filter holds back the
  * last few characters until it knows they are not the start of a marker.
  */
-const MARKER_RE = /(?:^|\n)\s*(?:\*\*)?SOURCES(?:\*\*)?\s*:?\s*\[/i
+const MARKER_RE = /(?:^|\n)\s*(?:\*\*)?SOURCES(?:\*\*)?\s*:?\s*(?:\*\*)?\s*\[/i
 const HOLD_BACK = 28
 
 const ID_RE = /^m\d+$/
