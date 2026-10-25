@@ -167,8 +167,17 @@ function truncate(text: string, max = 160): string {
   return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean
 }
 
+/** Same question asked once is one item, however its punctuation/case is stored. */
+function waitingKey(text: string): string {
+  return text
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
+    .replace(/[?.!]+$/, '')
+}
+
 export function buildWaiting(insight: ProjectInsight | null): DashboardMetrics['waiting'] {
-  if (!insight) return { count: 0, oldestIso: null, items: [] }
+  if (!insight) return { count: 0, oldestIso: null, blockers: 0, risks: 0, items: [] }
 
   const last = insight.clientAsk?.lastClientMessage
   const anchor = {
@@ -178,12 +187,17 @@ export function buildWaiting(insight: ProjectInsight | null): DashboardMetrics['
   }
 
   const items: DashboardAttentionItem[] = []
+  const seen = new Set<string>()
+  let count = 0
   if (insight.clientAsk?.needsReply) {
+    const replyText = last
+      ? last.quote || `Reply to ${last.who}`
+      : 'The client is waiting on a reply'
+    seen.add(waitingKey(replyText))
+    count += 1
     items.push({
       kind: 'needs-reply',
-      text: truncate(
-        last ? last.quote || `Reply to ${last.who}` : 'The client is waiting on a reply'
-      ),
+      text: truncate(replyText),
       ...(last?.whenIso ? { atIso: last.whenIso } : {}),
       source: (last?.source ?? anchor.source) as DashboardSource,
       channelId: last?.channelId ?? anchor.channelId,
@@ -192,6 +206,10 @@ export function buildWaiting(insight: ProjectInsight | null): DashboardMetrics['
     })
   }
   for (const question of insight.clientAsk?.openQuestions ?? []) {
+    const key = waitingKey(question)
+    if (seen.has(key)) continue
+    seen.add(key)
+    count += 1
     items.push({
       kind: 'question',
       text: truncate(question),
@@ -220,9 +238,18 @@ export function buildWaiting(insight: ProjectInsight | null): DashboardMetrics['
     })
   }
 
+  let oldestMs: number | null = null
+  for (const item of items) {
+    const ms = item.atIso ? new Date(item.atIso).getTime() : NaN
+    if (!Number.isFinite(ms)) continue
+    if (oldestMs === null || ms < oldestMs) oldestMs = ms
+  }
+
   return {
-    count: insight.clientAsk?.openQuestions?.length ?? 0,
-    oldestIso: null,
+    count,
+    oldestIso: oldestMs === null ? null : new Date(oldestMs).toISOString(),
+    blockers: insight.blockers?.length ?? 0,
+    risks: insight.risks?.length ?? 0,
     items: items.slice(0, MAX_ATTENTION_ITEMS)
   }
 }

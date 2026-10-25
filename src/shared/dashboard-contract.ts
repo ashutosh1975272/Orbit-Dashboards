@@ -151,7 +151,16 @@ export interface DashboardMetrics {
   messages24h: { client: number; ours: number }
   lastClientContactAt: string | null
   ourResponse: DashboardResponseStats
-  waiting: { count: number; oldestIso: string | null; items: DashboardAttentionItem[] }
+  waiting: {
+    /** needs-reply + open questions, deduped. */
+    count: number
+    /** Oldest real timestamp among the attention items; null when none is timed. */
+    oldestIso: string | null
+    /** Reported separately; never added to `count`. */
+    blockers: number
+    risks: number
+    items: DashboardAttentionItem[]
+  }
   statusSince: string | null
   /** Empty until at least 3 runs have been recorded. */
   moodTrend: Array<{ atIso: string; mood: InsightMood }>

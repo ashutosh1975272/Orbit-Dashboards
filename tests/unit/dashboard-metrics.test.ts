@@ -167,7 +167,7 @@ describe('dashboard metrics — response time', () => {
 })
 
 describe('dashboard metrics — attention and waiting', () => {
-  it('lists reply, questions and blockers but reports age only when known', () => {
+  it('counts the reply and open questions, and ages from real timestamps only', () => {
     const waiting = buildWaiting(
       insight({
         clientAsk: {
@@ -183,14 +183,74 @@ describe('dashboard metrics — attention and waiting', () => {
         blockers: [{ what: 'Waiting on API key', sinceIso: iso(-2 * 24 * 60 * 60 * 1000) }]
       })
     )
-    expect(waiting.count).toBe(2)
-    expect(waiting.oldestIso).toBeNull()
+    expect(waiting.count).toBe(3)
+    expect(waiting.oldestIso).toBe(iso(-2 * 24 * 60 * 60 * 1000))
     expect(waiting.items.map((item) => item.kind)).toEqual([
       'needs-reply',
       'question',
       'question',
       'blocker'
     ])
+    expect(waiting.blockers).toBe(1)
+    expect(waiting.risks).toBe(0)
+  })
+
+  it('dedupes a question that is also the needs-reply message', () => {
+    const waiting = buildWaiting(
+      insight({
+        clientAsk: {
+          needsReply: true,
+          urgency: 'high',
+          lastClientMessage: {
+            who: 'Dana',
+            whenIso: iso(-60 * 60 * 1000),
+            quote: '  When is the LAUNCH?  '
+          },
+          openQuestions: ['when is the launch']
+        }
+      })
+    )
+    expect(waiting.count).toBe(1)
+    expect(waiting.items.map((item) => item.kind)).toEqual(['needs-reply'])
+  })
+
+  it('keeps blockers and risks out of the count but reports them separately', () => {
+    const waiting = buildWaiting(
+      insight({
+        clientAsk: {
+          needsReply: false,
+          urgency: 'normal',
+          lastClientMessage: null,
+          openQuestions: ['Who signs off?']
+        },
+        blockers: [{ what: 'No API key' }, { what: 'No staging access' }],
+        risks: ['Budget approval slips']
+      })
+    )
+    expect(waiting.count).toBe(1)
+    expect(waiting.blockers).toBe(2)
+    expect(waiting.risks).toBe(1)
+    expect(waiting.items.map((item) => item.kind)).toEqual([
+      'question',
+      'blocker',
+      'blocker',
+      'risk'
+    ])
+  })
+
+  it('leaves age unknown when no item has a real timestamp', () => {
+    const waiting = buildWaiting(
+      insight({
+        clientAsk: {
+          needsReply: true,
+          urgency: 'normal',
+          lastClientMessage: null,
+          openQuestions: ['q1']
+        }
+      })
+    )
+    expect(waiting.count).toBe(2)
+    expect(waiting.oldestIso).toBeNull()
   })
 
   it('caps the list at five rows', () => {

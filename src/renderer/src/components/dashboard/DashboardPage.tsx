@@ -400,8 +400,22 @@ export default function DashboardPage({
                     <CountUp value={waiting?.count ?? 0} />
                   </p>
                   <p className="dash-muted">
-                    {waiting?.oldestIso ? `oldest ${age(waiting.oldestIso)}` : 'age needs evidence'}
+                    {waiting?.oldestIso ? `Oldest: ${age(waiting.oldestIso)}` : 'Age unknown'}
                   </p>
+                  {waiting && waiting.blockers + waiting.risks > 0 ? (
+                    <p className="dash-muted">
+                      {[
+                        waiting.blockers
+                          ? `${waiting.blockers} blocker${waiting.blockers === 1 ? '' : 's'}`
+                          : '',
+                        waiting.risks
+                          ? `${waiting.risks} risk${waiting.risks === 1 ? '' : 's'}`
+                          : ''
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </p>
+                  ) : null}
                 </>
               )}
             </div>
