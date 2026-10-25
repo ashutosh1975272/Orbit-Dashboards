@@ -1,5 +1,17 @@
 # Status Ledger
 
+## Chat with project — Phase 3 model selection (2026-10-25, commit `972b3df`)
+- `npm run typecheck` (node + web): PASS (exit 0)
+- `npm test`: PASS — 37 files, **298/298** tests (exit 0, no regressions)
+- `npm run build`: PASS — renderer 82 modules, client built 2.27s (exit 0)
+- lint (changed files): **0 errors, 0 warnings** (prettier autofix applied; removed a pre-existing `set-state-in-effect` error in `ProjectSettingsTab`)
+- live Electron (isolated CDP 9224, temp `--user-data-dir`; real `~/.config/Electron` untouched and temp profile deleted):
+  - seeded global `global-model-a` + project override `project-model-b` with a fake key (no network used)
+  - chat chip rendered `project-model-b` + `CUSTOM` (`data-model-source="project"`); `getProjectChatStatus` returned exactly `{hasKey, model, modelSource, keySource}` — no key or mask
+  - clicking the chip opened the card's Settings tab, focused `#project-ai-settings`, and consumed the one-shot hash
+  - Settings showed `Project override is active — chat uses project-model-b` + `Reset to global`; reset switched effective chat to `global-model-a`, removed the banner, and the chat chip became `global-model-a` + `GLOBAL` via the config-changed broadcast (no reload)
+  - model list from the provider stays in `AiSettingsForm` (refreshed on demand); provider-backed listing was not exercised live because the temp profile used a fake key
+
 ## Chat with project — Phase 2b jump-to-message (2026-10-25, commit `dfaa8e6`)
 - `npm run typecheck` (node + web): PASS (exit 0)
 - `npm test`: PASS — 37 files, **298/298** tests (exit 0, no regressions)
