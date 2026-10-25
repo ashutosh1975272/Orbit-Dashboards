@@ -1,5 +1,17 @@
 # Status Ledger
 
+## Expanded Dashboard — Phase 4 rail widgets (2026-10-26, commit `3eeb314`)
+- `npm run typecheck` (node + web): PASS (exit 0)
+- `npm test`: PASS — 47 files, **399/399** (exit 0; UI coverage for these widgets lands in Phase 5)
+- `npm run build`: PASS — renderer 85 modules, CSS 148.82 kB, JS 1,059.47 kB, client 2.20s (exit 0); only the pre-existing `chrome-cookie-probe` warning
+- lint (`DashboardPage.tsx`): **0 errors, 0 warnings** after Prettier; `main.css` is outside eslint's configured extensions
+- attention: block renders only once metrics exist; rows are capped at **5**; `N open` uses the deduped waiting count; each row keeps kind, text, source chip, real age and an `Open` that jumps to `c:client:<id>` / `c:team:<id>` (only when a channel exists); the empty line is `Nothing needs you right now.` (analysed) or `Not analysed yet.`
+- new since: hidden entirely when the total is 0 (including first visit); count chips unchanged; rows capped at **6**
+- setup checklist (rail only, single copy): five rows — Client sync, Client channels, Our Slack channels, Project dates, AI key — with `n of 5`, a per-row action (`Sync now` → sync; the rest open Settings), and the whole block hidden at 5/5. The AI-key probe now runs even when the ask bar is absent.
+- client ask: requirements sorted by real `whenIso` (missing/invalid last) and capped at 3; total count and the deliverable bar kept
+- people and channels: top 3 each over 14 days from the activity payload (`name`/`#channel` + count); block hidden when both lists are empty
+- no live Electron run this phase; layout/overflow proofs remain Phase 5 gates.
+
 ## Expanded Dashboard — Phase 3 centre widgets (2026-10-26, commit `4ac71bb`)
 - `npm run typecheck` (node + web): PASS (exit 0)
 - `npm test`: PASS — 47 files, **399/399** tests (exit 0); new: activity-summary 8, chat-service activity 5
