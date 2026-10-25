@@ -239,16 +239,23 @@ export class DashboardSyncEngine {
         monitors: project.monitors
       }
     ]
+    // project-level override channels take precedence over global pinned channels
     const { connection, error } = await this.ourWorkspace()
-    if (connection && connection.channels.length > 0) {
+    const oursChannels =
+      project.ourSlackChannels && project.ourSlackChannels.length > 0
+        ? project.ourSlackChannels
+        : (connection?.channels ?? [])
+    if (oursChannels.length > 0) {
       workspaces.push({
         source: 'ours',
-        profileId: connection.profileId,
-        teamId: connection.teamId,
-        monitors: connection.channels
+        profileId: connection?.profileId ?? project.profileId,
+        teamId: connection?.teamId ?? project.teamId,
+        monitors: oursChannels
       })
     }
-    return { workspaces, error }
+    // token resolution handled in tokenFor via override; keep connection for error
+    if (error) return { workspaces, error }
+    return { workspaces, error: null }
   }
 
   private perChannelDelta(
