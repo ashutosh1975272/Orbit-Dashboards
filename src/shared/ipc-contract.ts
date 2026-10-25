@@ -9,6 +9,7 @@ import type {
   DashboardChatMessage,
   DashboardChatPage,
   DashboardChatQueryPayload,
+  DashboardChatTokenStatus,
   DashboardSendErrorCode,
   DashboardSendMessagePayload,
   DashboardSendMessageResult,
@@ -127,6 +128,7 @@ export const IpcChannels = {
   DashboardSidebarUpdate: 'dashboard:sidebar-update',
   DashboardGetMessages: 'dashboard:get-messages',
   DashboardSendMessage: 'dashboard:send-message',
+  DashboardChatTokenStatus: 'dashboard:chat-token-status',
 
   DashboardGetAiSettings: 'dashboard:get-ai-settings',
   DashboardSaveAiSettings: 'dashboard:save-ai-settings',
@@ -283,6 +285,7 @@ export interface IpcApi {
     updateSidebarState: (projectId: string, sidebar: 'left' | 'right', patch: Partial<SidebarState>) => Promise<SidebarState>
     getMessages: (payload: DashboardChatQueryPayload) => Promise<DashboardChatPage>
     sendMessage: (payload: DashboardSendMessagePayload) => Promise<DashboardSendMessageResult>
+    getChatTokenStatus: (projectId: string) => Promise<DashboardChatTokenStatus>
     getAiSettings: (payload?: DashboardAiSettingsQueryPayload) => Promise<DashboardAiSettingsView>
     saveAiSettings: (payload: DashboardAiSettingsSavePayload) => Promise<DashboardAiSettingsView>
     listAiModels: (payload?: DashboardAiModelsQueryPayload) => Promise<DashboardAiModelsResult>
@@ -305,6 +308,7 @@ export type {
   DashboardChatMessage,
   DashboardChatPage,
   DashboardChatQueryPayload,
+  DashboardChatTokenStatus,
   DashboardManualToken,
   DashboardSendErrorCode,
   DashboardSendMessagePayload,

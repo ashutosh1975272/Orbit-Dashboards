@@ -9,6 +9,7 @@ import type {
   DashboardManualToken,
   DashboardChatPage,
   DashboardChatQueryPayload,
+  DashboardChatTokenStatus,
   DashboardSendMessagePayload,
   DashboardSendMessageResult,
   DashboardSnapshot,
@@ -256,6 +257,11 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
       IpcChannels.DashboardSendMessage,
       async (payload: DashboardSendMessagePayload): Promise<DashboardSendMessageResult> =>
         deps.chatService!.sendMessage(payload)
+    )
+    handleInvoke(
+      IpcChannels.DashboardChatTokenStatus,
+      async (projectId: string): Promise<DashboardChatTokenStatus> =>
+        deps.chatService!.chatTokenStatus(projectId)
     )
   }
 

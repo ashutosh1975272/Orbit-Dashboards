@@ -274,4 +274,55 @@ describe('DashboardChatService', () => {
     ).toMatchObject({ ok: false, code: 'invalid_text' })
     expect(postMessage).not.toHaveBeenCalled()
   })
+
+  describe('chatTokenStatus', () => {
+    it('reports connected + canSend and a masked token when chat:write is granted', async () => {
+      const status = await service().chatTokenStatus(project.id)
+      expect(status).toMatchObject({
+        connected: true,
+        source: 'oauth',
+        teamName: 'Acme Team',
+        maskedToken: '••••test',
+        canSend: true,
+        missingWriteScope: false
+      })
+      expect(status.scopes).toContain('chat:write')
+      expect(JSON.stringify(status)).not.toContain('xoxp-test')
+    })
+
+    it('flags missingWriteScope when stored OAuth scopes lack chat:write', async () => {
+      const status = await service({ scopes: ['channels:read'] }).chatTokenStatus(project.id)
+      expect(status).toMatchObject({
+        connected: true,
+        canSend: false,
+        missingWriteScope: true
+      })
+    })
+
+    it('leaves canSend null when no scope source reports scopes (manual tokens)', async () => {
+      const status = await service({ scopes: null }).chatTokenStatus(project.id)
+      expect(status).toMatchObject({
+        connected: true,
+        scopes: null,
+        canSend: null,
+        missingWriteScope: false
+      })
+    })
+
+    it('reports not connected when no token exists', async () => {
+      const status = await service({ token: null }).chatTokenStatus(project.id)
+      expect(status).toMatchObject({
+        connected: false,
+        source: 'oauth',
+        teamName: 'Acme Team',
+        maskedToken: null,
+        canSend: false
+      })
+    })
+
+    it('defaults to source none for an unknown project', async () => {
+      const status = await service().chatTokenStatus('nope')
+      expect(status).toMatchObject({ connected: false, source: 'none', canSend: null })
+    })
+  })
 })

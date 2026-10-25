@@ -2,6 +2,7 @@ import type {
   DashboardChatMessage,
   DashboardChatPage,
   DashboardChatQueryPayload,
+  DashboardChatTokenStatus,
   DashboardProject,
   DashboardSendMessagePayload,
   DashboardSendMessageResult
@@ -9,6 +10,7 @@ import type {
 import type { DashboardDeltaStore, DashboardStoredMessage } from './delta-store'
 import { compareTs } from './delta-store'
 import type { MonitorStore } from './monitor-store'
+import { maskKey } from './ai-settings-store'
 import { SlackPoller } from './slack-poller'
 
 /** Minimal poller surface the chat service needs (fakeable in tests). */
@@ -184,6 +186,51 @@ export class DashboardChatService {
       return context.scopes
     } catch {
       return null
+    }
+  }
+
+  /**
+   * Slack token health for the Settings section: connection, granted scopes
+   * (best effort — auth.test omits them for some token types) and whether
+   * chat.postMessage replies are possible.
+   */
+  async chatTokenStatus(projectId: string): Promise<DashboardChatTokenStatus> {
+    const project = await this.projectFor(projectId)
+    if (!project) {
+      return {
+        connected: false,
+        source: 'none',
+        teamName: null,
+        maskedToken: null,
+        scopes: null,
+        canSend: null,
+        missingWriteScope: false
+      }
+    }
+    const source = project.tokenSource === 'manual' ? 'manual' : 'oauth'
+    const teamName = project.teamName ?? project.teamId ?? null
+    const token = await this.tokenFor(project)
+    if (!token) {
+      return {
+        connected: false,
+        source,
+        teamName,
+        maskedToken: null,
+        scopes: null,
+        canSend: false,
+        missingWriteScope: false
+      }
+    }
+    const scopes = await this.scopesFor(project, token)
+    const canSend = scopes === null ? null : scopes.includes('chat:write')
+    return {
+      connected: true,
+      source,
+      teamName,
+      maskedToken: maskKey(token),
+      scopes,
+      canSend,
+      missingWriteScope: canSend === false
     }
   }
 

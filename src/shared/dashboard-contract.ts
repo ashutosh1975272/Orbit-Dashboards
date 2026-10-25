@@ -426,6 +426,20 @@ export interface DashboardSendMessageResult {
   missingScope?: string
 }
 
+/** Slack token health for the Settings section — scopes + send capability. */
+export interface DashboardChatTokenStatus {
+  connected: boolean
+  source: 'oauth' | 'manual' | 'none'
+  teamName: string | null
+  /** Masked token ("••••abcd") so the user can identify it; never the raw token. */
+  maskedToken: string | null
+  /** Granted scopes, or null when Slack's auth.test didn't report them. */
+  scopes: string[] | null
+  /** True when chat:write is present; false when known-missing; null when unknown. */
+  canSend: boolean | null
+  missingWriteScope: boolean
+}
+
 /* ===== v2.7 — AI provider settings (global + per project) ===== */
 
 export type AiProviderId = 'nvidia-nim'

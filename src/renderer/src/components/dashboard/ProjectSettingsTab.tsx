@@ -1,6 +1,6 @@
 import type React from 'react'
-import { useState } from 'react'
-import type { DashboardProject } from '../../../../shared/dashboard-contract'
+import { useEffect, useState } from 'react'
+import type { DashboardChatTokenStatus, DashboardProject } from '../../../../shared/dashboard-contract'
 import { useDashboardStore } from '../../hooks/useDashboard'
 import AiSettingsForm from './AiSettingsForm'
 import DashboardWizard from './DashboardWizard'
@@ -21,6 +21,23 @@ export default function ProjectSettingsTab({
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [tokenStatus, setTokenStatus] = useState<DashboardChatTokenStatus | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setTokenStatus(null)
+    void window.api.dashboard
+      .getChatTokenStatus(project.id)
+      .then((status) => {
+        if (!cancelled) setTokenStatus(status)
+      })
+      .catch(() => {
+        if (!cancelled) setTokenStatus(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [project.id])
 
   const saveSchedule = async (): Promise<void> => {
     setSaving(true)
@@ -73,6 +90,62 @@ export default function ProjectSettingsTab({
           <button type="button" className="dash-subtle" onClick={() => setEditWorkspace(true)}>
             Edit workspace &amp; channels
           </button>
+        )}
+      </section>
+
+      <section className="ws-settings-section">
+        <header className="ws-settings-head">
+          <h4>Slack token &amp; permissions</h4>
+          <p>
+            Read-only here. Slack Chat reads history with this token; sending replies
+            additionally needs the <b>chat:write</b> scope.
+          </p>
+        </header>
+        {tokenStatus === null ? (
+          <p className="ws-settings-token-state">Checking token…</p>
+        ) : (
+          <div className="ws-settings-token">
+            <p className="ws-settings-token-state">
+              {tokenStatus.connected ? (
+                <span className="ws-settings-token-dot ok" aria-hidden="true" />
+              ) : (
+                <span className="ws-settings-token-dot off" aria-hidden="true" />
+              )}
+              <b>
+                {tokenStatus.connected
+                  ? tokenStatus.source === 'oauth'
+                    ? 'Connected via OAuth app'
+                    : 'Connected via manual token'
+                  : 'Not connected'}
+              </b>
+              {tokenStatus.teamName ? ` · ${tokenStatus.teamName}` : ''}
+            </p>
+            {tokenStatus.maskedToken ? (
+              <p className="ws-settings-token-line">
+                Token: <code>{tokenStatus.maskedToken}</code> (full token stays encrypted in this app)
+              </p>
+            ) : null}
+            {tokenStatus.scopes ? (
+              <p className="ws-settings-token-line">
+                Scopes: <code>{tokenStatus.scopes.join(', ')}</code>
+              </p>
+            ) : tokenStatus.connected ? (
+              <p className="ws-settings-token-line">
+                Slack doesn&apos;t report scopes for this token type — sending is decided by the
+                token; errors surface when you send.
+              </p>
+            ) : null}
+            {tokenStatus.canSend === true ? (
+              <p className="ai-settings-notice">Sending is enabled — chat:write is granted.</p>
+            ) : null}
+            {tokenStatus.canSend === false ? (
+              <p className="ai-settings-error">
+                Read-only: this token is missing the <b>chat:write</b> scope, so Orbit cannot post
+                replies. Add <b>chat:write</b> to the Slack app&apos;s User Token Scopes (OAuth &amp;
+                Permissions), reinstall or reconnect the workspace, then try again.
+              </p>
+            ) : null}
+          </div>
         )}
       </section>
 

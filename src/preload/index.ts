@@ -16,6 +16,7 @@ import type {
   DashboardAiModelsResult,
   DashboardAiSettingsView,
   DashboardChatPage,
+  DashboardChatTokenStatus,
   DashboardSendMessageResult,
   DashboardSnapshot,
   DashboardSyncProgressPayload,
@@ -204,6 +205,8 @@ const api: IpcApi = {
       ipcRenderer.invoke(IpcChannels.DashboardGetMessages, payload) as Promise<DashboardChatPage>,
     sendMessage: (payload) =>
       ipcRenderer.invoke(IpcChannels.DashboardSendMessage, payload) as Promise<DashboardSendMessageResult>,
+    getChatTokenStatus: (projectId) =>
+      ipcRenderer.invoke(IpcChannels.DashboardChatTokenStatus, projectId) as Promise<DashboardChatTokenStatus>,
     getAiSettings: (payload) =>
       ipcRenderer.invoke(IpcChannels.DashboardGetAiSettings, payload) as Promise<DashboardAiSettingsView>,
     saveAiSettings: (payload) =>
