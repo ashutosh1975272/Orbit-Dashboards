@@ -320,37 +320,39 @@ export default function DashboardPage({
     <div className="dash-page">
       <div className="dash-scroll">
         <div className="dash-inner">
-          <FreshnessLine
-            lastUpdatedAt={snapshot.lastUpdatedAt}
-            syncState={snapshot.syncState}
-            busy={busy}
-            onOpen={() => onSelect('m:schedules')}
-          />
-          {errorLine ? <p className="dash-error">{errorLine}</p> : null}
+          <div className="dash-top">
+            <FreshnessLine
+              lastUpdatedAt={snapshot.lastUpdatedAt}
+              syncState={snapshot.syncState}
+              busy={busy}
+              onOpen={() => onSelect('m:schedules')}
+            />
+            {errorLine ? <p className="dash-error">{errorLine}</p> : null}
 
-          {onAskAgent ? (
-            <form
-              className="dash-ask-agent"
-              onSubmit={(event) => {
-                event.preventDefault()
-                const question = askDraft.trim()
-                if (!question) return
-                setAskDraft('')
-                onAskAgent(question)
-              }}
-            >
-              <input
-                type="text"
-                value={askDraft}
-                onChange={(event) => setAskDraft(event.target.value)}
-                placeholder="Ask agent…"
-                aria-label="Ask agent about this project"
-              />
-              <button type="submit" disabled={!askDraft.trim()}>
-                Ask
-              </button>
-            </form>
-          ) : null}
+            {onAskAgent ? (
+              <form
+                className="dash-ask-agent"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  const question = askDraft.trim()
+                  if (!question) return
+                  setAskDraft('')
+                  onAskAgent(question)
+                }}
+              >
+                <input
+                  type="text"
+                  value={askDraft}
+                  onChange={(event) => setAskDraft(event.target.value)}
+                  placeholder="Ask agent…"
+                  aria-label="Ask agent about this project"
+                />
+                <button type="submit" disabled={!askDraft.trim()}>
+                  Ask
+                </button>
+              </form>
+            ) : null}
+          </div>
 
           <section className="dash-kpis" aria-label="Key numbers">
             <div className="dash-tile">
@@ -457,244 +459,257 @@ export default function DashboardPage({
             </div>
           </section>
 
-          <section className="dash-hero" aria-label="Situation">
-            <p className="dash-hero-eyebrow">Where it stands</p>
-            <p className={`dash-hero-line${centre.situationLine ? '' : ' is-soft'}`}>
-              {centre.situationLine ||
-                (hasInsight ? 'No situation line yet.' : 'Not analysed yet.')}
-            </p>
-            {centre.recentLine ? (
-              <p className="dash-hero-changed">
-                <span>Just changed</span> {centre.recentLine}
-              </p>
-            ) : null}
-            {centre.nextStep ? (
-              <p className="dash-next">
-                <span>Next step</span> {centre.nextStep}
-              </p>
-            ) : null}
-          </section>
-
-          <section className="dash-visuals" aria-label="Activity, pace and mood">
-            <div className="dash-panel">
-              <div className="dash-panel-head">
-                <h5>Activity</h5>
-                <span className="dash-muted">14 days</span>
-              </div>
-              {metrics && metrics.daily.some((d) => d.client + d.ours > 0) ? (
-                <>
-                  <div className="dash-bars" aria-hidden="true">
-                    {metrics.daily.map((day) => {
-                      const total = day.client + day.ours
-                      const height =
-                        total === 0 ? 2 : Math.max(4, Math.round((total / maxDay) * 56))
-                      return (
-                        <div
-                          key={day.date}
-                          className={`dash-bar${day.isToday ? ' is-today' : ''}${total === 0 ? ' is-empty' : ''}`}
-                          title={`${day.date}: ${day.client} client, ${day.ours} ours`}
-                        >
-                          <div style={{ height }} className="dash-bar-stack">
-                            {total > 0 ? (
-                              <>
-                                <div
-                                  className="dash-bar-ours"
-                                  style={{ flexGrow: day.ours || 0 }}
-                                />
-                                <div
-                                  className="dash-bar-client"
-                                  style={{ flexGrow: day.client || 0 }}
-                                />
-                              </>
-                            ) : null}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                  <div className="dash-legend">
-                    <span className="dash-legend-client">Client</span>
-                    <span className="dash-legend-ours">Ours</span>
-                    <span className="dash-legend-total">
-                      {metrics.messages24h.client + metrics.messages24h.ours} in 24h
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <p className="dash-muted">No messages in the last 14 days.</p>
-              )}
-            </div>
-
-            <div className="dash-panel">
-              <div className="dash-panel-head">
-                <h5>Time and pace</h5>
-                {time.hasDates && time.daysLeft !== undefined ? (
-                  <span className="dash-muted">{time.daysLeft}d left</span>
+          <div className="dash-columns">
+            <div className="dash-main">
+              <section className="dash-hero" aria-label="Situation">
+                <p className="dash-hero-eyebrow">Where it stands</p>
+                <p className={`dash-hero-line${centre.situationLine ? '' : ' is-soft'}`}>
+                  {centre.situationLine ||
+                    (hasInsight ? 'No situation line yet.' : 'Not analysed yet.')}
+                </p>
+                {centre.recentLine ? (
+                  <p className="dash-hero-changed">
+                    <span>Just changed</span> {centre.recentLine}
+                  </p>
                 ) : null}
-              </div>
-              {time.hasDates ? (
-                <>
-                  <p className="dash-pace-line">
-                    <b>{time.daysUsed}</b> of <b>{time.totalDays}</b> days used
+                {centre.nextStep ? (
+                  <p className="dash-next">
+                    <span>Next step</span> {centre.nextStep}
                   </p>
-                  <div className="dash-track" aria-hidden="true">
-                    <div
-                      className={`dash-track-fill is-${time.pace}`}
-                      style={{ width: `${Math.min(100, time.progressPercent ?? 0)}%` }}
-                    />
+                ) : null}
+              </section>
+
+              <section className="dash-visuals" aria-label="Activity, pace and mood">
+                <div className="dash-panel">
+                  <div className="dash-panel-head">
+                    <h5>Activity</h5>
+                    <span className="dash-muted">14 days</span>
                   </div>
-                  <p className={`dash-pace is-${time.pace}`}>{time.paceLabel}</p>
-                  <p className="dash-muted">
-                    {shortDate(time.startDate)} → {shortDate(time.endDate)}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="dash-muted">No dates on this project yet.</p>
-                  <button type="button" className="dash-link" onClick={onOpenSettings}>
-                    Add dates
-                  </button>
-                </>
-              )}
-            </div>
+                  {metrics && metrics.daily.some((d) => d.client + d.ours > 0) ? (
+                    <>
+                      <div className="dash-bars" aria-hidden="true">
+                        {metrics.daily.map((day) => {
+                          const total = day.client + day.ours
+                          const height =
+                            total === 0 ? 2 : Math.max(4, Math.round((total / maxDay) * 56))
+                          return (
+                            <div
+                              key={day.date}
+                              className={`dash-bar${day.isToday ? ' is-today' : ''}${total === 0 ? ' is-empty' : ''}`}
+                              title={`${day.date}: ${day.client} client, ${day.ours} ours`}
+                            >
+                              <div style={{ height }} className="dash-bar-stack">
+                                {total > 0 ? (
+                                  <>
+                                    <div
+                                      className="dash-bar-ours"
+                                      style={{ flexGrow: day.ours || 0 }}
+                                    />
+                                    <div
+                                      className="dash-bar-client"
+                                      style={{ flexGrow: day.client || 0 }}
+                                    />
+                                  </>
+                                ) : null}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      <div className="dash-legend">
+                        <span className="dash-legend-client">Client</span>
+                        <span className="dash-legend-ours">Ours</span>
+                        <span className="dash-legend-total">
+                          {metrics.messages24h.client + metrics.messages24h.ours} in 24h
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="dash-muted">No messages in the last 14 days.</p>
+                  )}
+                </div>
 
-            <div className="dash-panel">
-              <div className="dash-panel-head">
-                <h5>Mood trend</h5>
-                <span className="dash-muted">
-                  {trend.length >= 3 ? `${trend.length} runs` : ''}
-                </span>
-              </div>
-              {trend.length >= 3 ? (
-                <>
-                  <MoodSpark points={trend} />
-                  <p className="dash-muted">since {shortDate(trend[0]?.atIso)}</p>
-                </>
-              ) : (
-                <p className="dash-muted">Needs 3+ agent runs.</p>
-              )}
-            </div>
-          </section>
-
-          <section className="dash-block" aria-label="Needs your attention">
-            <div className="dash-block-head">
-              <h5>Needs your attention</h5>
-              {waiting && waiting.count > 0 ? (
-                <span className="dash-muted">{waiting.count} open</span>
-              ) : null}
-            </div>
-            {!hasInsight ? (
-              <p className="dash-muted">Not analysed yet.</p>
-            ) : attention.length === 0 ? (
-              <p className="dash-muted">Not enough info to tell.</p>
-            ) : (
-              <ul className="dash-list">
-                {attention.map((item, index) => (
-                  <li className="dash-row" key={`${item.kind}-${index}`}>
-                    <span className={`dash-kind is-${item.kind}`}>
-                      {KIND_LABEL[item.kind] ?? item.kind}
-                    </span>
-                    <span className="dash-row-text">{item.text}</span>
-                    {item.source ? <SourceChip source={item.source} /> : null}
-                    <span className="dash-row-age">{item.atIso ? age(item.atIso) : '—'}</span>
-                    {item.channelId ? (
-                      <button
-                        type="button"
-                        className="dash-link"
-                        onClick={() => onSelect(`c:client:${item.channelId}` as SelectionId)}
-                      >
-                        Open
-                      </button>
+                <div className="dash-panel">
+                  <div className="dash-panel-head">
+                    <h5>Time and pace</h5>
+                    {time.hasDates && time.daysLeft !== undefined ? (
+                      <span className="dash-muted">{time.daysLeft}d left</span>
                     ) : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+                  </div>
+                  {time.hasDates ? (
+                    <>
+                      <p className="dash-pace-line">
+                        <b>{time.daysUsed}</b> of <b>{time.totalDays}</b> days used
+                      </p>
+                      <div className="dash-track" aria-hidden="true">
+                        <div
+                          className={`dash-track-fill is-${time.pace}`}
+                          style={{ width: `${Math.min(100, time.progressPercent ?? 0)}%` }}
+                        />
+                      </div>
+                      <p className={`dash-pace is-${time.pace}`}>{time.paceLabel}</p>
+                      <p className="dash-muted">
+                        {shortDate(time.startDate)} → {shortDate(time.endDate)}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="dash-muted">No dates on this project yet.</p>
+                      <button type="button" className="dash-link" onClick={onOpenSettings}>
+                        Add dates
+                      </button>
+                    </>
+                  )}
+                </div>
 
-          <section className="dash-block" aria-label="New since your last visit">
-            <div className="dash-block-head">
-              <h5>New since your last visit</h5>
-            </div>
-            {!newSince?.lastViewedAt ? (
-              <p className="dash-muted">
-                First visit — new requirements, decisions and questions will show here next time.
-              </p>
-            ) : newTotal === 0 ? (
-              <p className="dash-muted">Nothing new since your last visit.</p>
-            ) : (
-              <>
-                <div className="dash-counts">
-                  {newSince.counts.requirements > 0 ? (
-                    <span>{newSince.counts.requirements} requirements</span>
-                  ) : null}
-                  {newSince.counts.decisions > 0 ? (
-                    <span>{newSince.counts.decisions} decisions</span>
-                  ) : null}
-                  {newSince.counts.commitments > 0 ? (
-                    <span>{newSince.counts.commitments} commitments</span>
-                  ) : null}
-                  {newSince.counts.files > 0 ? <span>{newSince.counts.files} files</span> : null}
-                  {newSince.counts.questions > 0 ? (
-                    <span>{newSince.counts.questions} questions</span>
-                  ) : null}
-                  {newSince.counts.statusChanges > 0 ? (
-                    <span>{newSince.counts.statusChanges} status changes</span>
-                  ) : null}
+                <div className="dash-panel">
+                  <div className="dash-panel-head">
+                    <h5>Mood trend</h5>
+                    <span className="dash-muted">
+                      {trend.length >= 3 ? `${trend.length} runs` : ''}
+                    </span>
+                  </div>
+                  {trend.length >= 3 ? (
+                    <>
+                      <MoodSpark points={trend} />
+                      <p className="dash-muted">since {shortDate(trend[0]?.atIso)}</p>
+                    </>
+                  ) : (
+                    <p className="dash-muted">Needs 3+ agent runs.</p>
+                  )}
                 </div>
-                <ul className="dash-list">
-                  {newSince.items.map((item, index) => (
-                    <li className="dash-row" key={`${item.kind}-${index}`}>
-                      <span className={`dash-kind is-${item.kind}`}>
-                        {KIND_LABEL[item.kind] ?? item.kind}
-                      </span>
-                      <span className="dash-row-text">{item.text}</span>
-                      {item.atIso ? <span className="dash-row-age">{age(item.atIso)}</span> : null}
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </section>
+              </section>
+            </div>
 
-          <section className="dash-block" aria-label="Client ask">
-            <div className="dash-block-head">
-              <h5>Client ask</h5>
-              {requirements.length > 0 ? (
-                <span className="dash-muted">{requirements.length} total</span>
-              ) : null}
+            <div className="dash-rail">
+              <section className="dash-block" aria-label="Needs your attention">
+                <div className="dash-block-head">
+                  <h5>Needs your attention</h5>
+                  {waiting && waiting.count > 0 ? (
+                    <span className="dash-muted">{waiting.count} open</span>
+                  ) : null}
+                </div>
+                {!hasInsight ? (
+                  <p className="dash-muted">Not analysed yet.</p>
+                ) : attention.length === 0 ? (
+                  <p className="dash-muted">Not enough info to tell.</p>
+                ) : (
+                  <ul className="dash-list">
+                    {attention.map((item, index) => (
+                      <li className="dash-row" key={`${item.kind}-${index}`}>
+                        <span className={`dash-kind is-${item.kind}`}>
+                          {KIND_LABEL[item.kind] ?? item.kind}
+                        </span>
+                        <span className="dash-row-text">{item.text}</span>
+                        {item.source ? <SourceChip source={item.source} /> : null}
+                        <span className="dash-row-age">{item.atIso ? age(item.atIso) : '—'}</span>
+                        {item.channelId ? (
+                          <button
+                            type="button"
+                            className="dash-link"
+                            onClick={() => onSelect(`c:client:${item.channelId}` as SelectionId)}
+                          >
+                            Open
+                          </button>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+
+              <section className="dash-block" aria-label="New since your last visit">
+                <div className="dash-block-head">
+                  <h5>New since your last visit</h5>
+                </div>
+                {!newSince?.lastViewedAt ? (
+                  <p className="dash-muted">
+                    First visit — new requirements, decisions and questions will show here next
+                    time.
+                  </p>
+                ) : newTotal === 0 ? (
+                  <p className="dash-muted">Nothing new since your last visit.</p>
+                ) : (
+                  <>
+                    <div className="dash-counts">
+                      {newSince.counts.requirements > 0 ? (
+                        <span>{newSince.counts.requirements} requirements</span>
+                      ) : null}
+                      {newSince.counts.decisions > 0 ? (
+                        <span>{newSince.counts.decisions} decisions</span>
+                      ) : null}
+                      {newSince.counts.commitments > 0 ? (
+                        <span>{newSince.counts.commitments} commitments</span>
+                      ) : null}
+                      {newSince.counts.files > 0 ? (
+                        <span>{newSince.counts.files} files</span>
+                      ) : null}
+                      {newSince.counts.questions > 0 ? (
+                        <span>{newSince.counts.questions} questions</span>
+                      ) : null}
+                      {newSince.counts.statusChanges > 0 ? (
+                        <span>{newSince.counts.statusChanges} status changes</span>
+                      ) : null}
+                    </div>
+                    <ul className="dash-list">
+                      {newSince.items.map((item, index) => (
+                        <li className="dash-row" key={`${item.kind}-${index}`}>
+                          <span className={`dash-kind is-${item.kind}`}>
+                            {KIND_LABEL[item.kind] ?? item.kind}
+                          </span>
+                          <span className="dash-row-text">{item.text}</span>
+                          {item.atIso ? (
+                            <span className="dash-row-age">{age(item.atIso)}</span>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </section>
+
+              <section className="dash-block" aria-label="Client ask">
+                <div className="dash-block-head">
+                  <h5>Client ask</h5>
+                  {requirements.length > 0 ? (
+                    <span className="dash-muted">{requirements.length} total</span>
+                  ) : null}
+                </div>
+                {latestRequirements.length === 0 ? (
+                  <p className="dash-muted">No requirements stated yet.</p>
+                ) : (
+                  <ul className="dash-asks">
+                    {latestRequirements.map((requirement, index) => (
+                      <li key={index}>{requirement.text}</li>
+                    ))}
+                  </ul>
+                )}
+                {deliverables.length > 0 ? (
+                  <>
+                    <div className="dash-seg" aria-hidden="true">
+                      {(['done', 'in-progress', 'pending', 'not-started'] as const).map(
+                        (status) => (
+                          <span
+                            key={status}
+                            className={`dash-seg-part is-${status}`}
+                            style={{ flexGrow: deliverableCounts[status] }}
+                          />
+                        )
+                      )}
+                    </div>
+                    <div className="dash-legend">
+                      <span>{deliverableCounts.done} done</span>
+                      <span>{deliverableCounts['in-progress']} in progress</span>
+                      <span>{deliverableCounts.pending} pending</span>
+                      <span>{deliverableCounts['not-started']} not started</span>
+                    </div>
+                  </>
+                ) : (
+                  <p className="dash-muted">No deliverables stated yet.</p>
+                )}
+              </section>
             </div>
-            {latestRequirements.length === 0 ? (
-              <p className="dash-muted">No requirements stated yet.</p>
-            ) : (
-              <ul className="dash-asks">
-                {latestRequirements.map((requirement, index) => (
-                  <li key={index}>{requirement.text}</li>
-                ))}
-              </ul>
-            )}
-            {deliverables.length > 0 ? (
-              <>
-                <div className="dash-seg" aria-hidden="true">
-                  {(['done', 'in-progress', 'pending', 'not-started'] as const).map((status) => (
-                    <span
-                      key={status}
-                      className={`dash-seg-part is-${status}`}
-                      style={{ flexGrow: deliverableCounts[status] }}
-                    />
-                  ))}
-                </div>
-                <div className="dash-legend">
-                  <span>{deliverableCounts.done} done</span>
-                  <span>{deliverableCounts['in-progress']} in progress</span>
-                  <span>{deliverableCounts.pending} pending</span>
-                  <span>{deliverableCounts['not-started']} not started</span>
-                </div>
-              </>
-            ) : (
-              <p className="dash-muted">No deliverables stated yet.</p>
-            )}
-          </section>
+          </div>
         </div>
       </div>
     </div>
