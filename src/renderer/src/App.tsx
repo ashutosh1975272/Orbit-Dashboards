@@ -292,6 +292,8 @@ function App(): React.JSX.Element {
 
   const browserAuthBusy = authPhase === 'google' || authPhase === 'slack'
   const dashboardOpen = useDashboardStore((s) => s.dashboardOpen)
+  const closeDashboard = useDashboardStore((s) => s.closeDashboard)
+  const showDashboard = dashboardOpen && !browserAuthBusy
   const wizardOpen = useDashboardStore((s) => s.wizardOpenFor) != null
   const splitOn =
     settings.splitViewEnabled && Boolean(splitSecondary) && !browserAuthBusy && !locked
@@ -430,6 +432,7 @@ function App(): React.JSX.Element {
   const handleSidebarSelectApp = useCallback(
     (profileId: string, appId: AppId) => {
       void (async () => {
+        closeDashboard()
         const refreshed = useProfileStore.getState().profiles.find((p) => p.id === profileId)
         const signedIn = refreshed?.apps[appId].sessionStatus === 'signed-in'
 
@@ -466,7 +469,7 @@ function App(): React.JSX.Element {
         )
       })()
     },
-    [selectApp, startAppLogin]
+    [closeDashboard, selectApp, startAppLogin]
   )
 
   const handleAddGoogle = useCallback(async () => {
@@ -797,7 +800,7 @@ function App(): React.JSX.Element {
             </div>
           ) : null}
 
-          {dashboardOpen ? (
+          {showDashboard ? (
             <DashboardView />
           ) : showEmbed ? (
             <div className={`main-embed${splitOn ? ' is-split' : ''}`}>
