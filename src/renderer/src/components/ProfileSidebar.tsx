@@ -7,6 +7,7 @@ import {
   profileDisplayLabel,
   sidebarAppLabel
 } from '../../../shared/types'
+import { modKey } from '../lib/shortcut-label'
 import { formatUnreadBadge, unreadKey } from '../lib/unread-badge'
 import { AppIcon } from './AppIcon'
 import { SidebarPanelIcon } from './SidebarPanelIcon'
@@ -331,7 +332,7 @@ export const ProfileSidebar = memo(function ProfileSidebar({
               type="button"
               className="btn ghost icon-btn"
               onClick={onToggleSidebar}
-              title="Hide sidebar (⌘B)"
+              title={`Hide sidebar (${modKey()}B)`}
               aria-label="Hide sidebar"
             >
               <SidebarPanelIcon />
