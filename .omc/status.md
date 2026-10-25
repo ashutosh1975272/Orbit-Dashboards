@@ -1,5 +1,21 @@
 # Status Ledger
 
+## Expanded Dashboard — Phase 1 layout shell (2026-10-25, commit `ca69a78`)
+- `npm run typecheck` (node + web): PASS (exit 0)
+- `npm test`: PASS — 46 files, **385/385** tests (exit 0)
+- `npm run build`: PASS — preload 18.52 kB, renderer 84 modules, CSS 144.17 kB, JS 1,046.66 kB, built 2.56s (exit 0)
+- lint (`DashboardPage.tsx`): **0 errors, 0 warnings**; `main.css` is outside eslint's configured extensions
+- structure: `.dash-inner` → `.dash-top` (freshness + error + ask), `.dash-kpis`, `.dash-columns` → `.dash-main` (hero, visuals) + `.dash-rail` (attention, new since, client ask). No data or copy changes.
+- layout (`main.css`, Dashboard-only):
+  - `.dash-page` is the query container (`container-type/name: inline-size dash`), so breakpoints follow the card width, not the window
+  - base (<760px): one column; padding `20px 18px 32px`
+  - `>=760px`: padding `28px 32px 40px`; KPI `repeat(3)`; rail below main in a 2-column flow
+  - `>=1180px`: 12-col `.dash-columns`, KPI `repeat(6)`, main span 8 / rail span 4, gap 20
+  - `.dash-inner` max-width 1480, centered; other tabs keep `.ws-content-inner` at 860
+- surface: tiles/panels/blocks have no borders, one `color-mix(text 3.5%)` tint, 12px radius; hero 14px at `accent 6%`; the attention tile uses `box-shadow: inset 3px 0 0 var(--warn)`
+- fixed card height + internal `.dash-scroll` unchanged
+- visual screenshots at 1100/1500/1900 are Phase 5 by plan; this phase's gates are the four commands above.
+
 ## Expanded Dashboard — Phase 0c toast root cause + fix (2026-10-25, commit `5bb01ed`)
 - root cause (measured in a real Electron window, isolated profile/CDP 9230, real profile untouched):
   - fire condition was `if (collapsed)` after `setSettings` resolved, with no visible→hidden guard (`App.tsx:382-400` before the fix)
