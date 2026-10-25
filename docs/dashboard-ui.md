@@ -32,7 +32,7 @@ The sidebar state survives re-renders because expansion lives in the store, not 
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│ Client projects                 [Compact|Expanded|Mixed] [⋯] [New project] │
+│ Client projects        [Compact|Expanded|Mixed] [⋯] [Global settings] [New project] │
 │ 1 project · Synced 4m ago · Every 5 min                      │
 ├──────────────────────────────────────────────────────────────┤
 │ Across workspaces  Reply to AgentWork client confirming …    │
@@ -51,7 +51,8 @@ One header owns the page: title, a quiet status sub-line, view mode, the actions
 | Title | `Client projects` | Static |
 | Status sub-line | `1 project · Synced 4m ago · Every 5 min` | Project count, freshness of the newest sync (`just now` / `Xm ago` / `Xh ago` / `Xd ago`), poll interval from `snapshot.syncIntervalSeconds`. While syncing the middle item reads `Syncing 2/5` |
 | View mode | `Compact / Expanded / Mixed` | Sets `viewMode`; persisted to `localStorage['orbit.view']`. `Compact` clears `expandedIds`, `Expanded` fills it |
-| ⋯ menu | **AI settings**, **Sync all now**, **Collapse all**, **Expand all** | AI settings opens the dashboard-level fallback panel; Sync all calls `syncNow()` with no id; Collapse/Expand all rewrite `expandedIds` |
+| ⋯ menu | **Sync all now**, **Collapse all**, **Expand all** | Sync all calls `syncNow()` with no id; Collapse/Expand all rewrite `expandedIds` |
+| Secondary | `Global settings` | Opens the Global settings panel (`GlobalSettingsPanel.tsx`) — the one way in to the values that apply to every card. Its first section is the AI model and key |
 | Primary | `New project` | Opens the 5-step DashboardWizard |
 
 ### 2.2 Focus line (`dash-focus`)
@@ -229,12 +230,12 @@ The card-header **⋯ → Project settings** (or the compact row's `⋯`, or the
 
 | Section | Controls | Behaviour |
 |---|---|---|
-| **AI settings** | Provider (`NVIDIA NIM`), Model dropdown (loaded from `dashboard:list-ai-models`), API key (password field with **Show/Hide**), **Use global settings** | Stored per project. With the toggle on, the project key/model are ignored and the dashboard settings apply. The **EFFECTIVE NOW** box shows e.g. `Using global: nvidia/nemotron-3.5-super-120b-a12b · global key ••••abcd`. Only the mask ever reaches the renderer; keys are encrypted with `safeStorage` in the main process. |
+| **AI settings** | Provider (`NVIDIA NIM`), Model dropdown (loaded from `dashboard:list-ai-models`), API key (password field with **Show/Hide**), **Use global settings** | Stored per project. With the toggle on the project key/model are ignored, the fields go inert, and a line under the toggle names what is inherited (`Inheriting from Global settings — Using global: <model> · global key ••••abcd`). The **EFFECTIVE NOW** box shows the same resolution. Only the mask ever reaches the renderer; keys are encrypted with `safeStorage` in the main process. |
 | **Workspace & channels** | Summary line + **Edit workspace & channels** | Mounts the 5-step `DashboardWizard` inline (starts at channel selection, preserves OAuth connectors). Saving triggers a sync. |
 | **Slack token & permissions** | Read-only status line: connection, workspace name, masked token, granted scopes, and whether `chat:write` is present | `dashboard:chat-token-status` → `DashboardChatService.chatTokenStatus()`. The raw token never leaves the main process; the renderer gets the mask. When Slack reports no scopes for the token type, the panel says sending is decided by the token instead of guessing. |
 | **Schedule & completion** | Start date, End date, Completion % (0–100) | Writes through `upsertProject`; manual values win over dates/percentages extracted from chat. |
 
-The dashboard-level panel (header **⋯ → AI settings**) edits the same form without a project scope: its key/model are the fallback for every project. Resolution order per field is **project override (unless `useGlobal`) → dashboard global → environment defaults**; the insight engine and project chat both obtain providers through `AiSettingsService.resolveSettings(projectId)`. With no key anywhere, AI features stay off and the card keeps its heuristic insight.
+**Global settings** is the toolbar button beside **New project** (`GlobalSettingsPanel.tsx`) and the only route to the dashboard-level values — the `⋯` menu's old **AI settings** item is gone. Its first section, **AI model and key**, edits the same form without a project scope: its key/model are the fallback for every project. Resolution order per field is **project override (unless `useGlobal`) → dashboard global → environment defaults**; the insight engine and project chat both obtain providers through `AiSettingsService.resolveSettings(projectId)`. With no key anywhere, AI features stay off and the card keeps its heuristic insight. Tickets 03 and 04 add the remaining groups (sync, dates, prompt defaults, the team Slack connection) as sections of this one panel.
 
 ### 4.5 Visualizations (the sidebar's chart rows)
 
@@ -371,7 +372,7 @@ Each chip expands the row and lands on that detail card; there is no second togg
 
 | File | Responsibility |
 |---|---|
-| `DashboardView.tsx` | Page shell: one header (title, sub-line, view mode, actions menu, New project), focus line, project list, empty/loading/error states, wizard host, dashboard AI settings panel |
+| `DashboardView.tsx` | Page shell: one header (title, sub-line, view mode, actions menu, Global settings, New project), focus line, project list, empty/loading/error states, wizard host, Global settings panel |
 | `DashboardRail.tsx` | Sidebar entry (Dashboard → Slack) |
 | `ProjectCard.tsx` | Per-project switch between compact/expanded, deep-link entry props, memoised |
 | `CardHead.tsx` | Expanded header: identity, true-state chips, Sync, `⋯` (Edit project · Project settings · Collapse · Delete), AI badge |
@@ -384,8 +385,8 @@ Each chip expands the row and lands on that detail card; there is no second togg
 | `nav-icons.tsx` | The 16px outline icon set used by the sidebar and the rail |
 | `AgentChatPanel.tsx` | Xomni body: project chat / AgentWork mode shell and its empty state |
 | `ProjectSettingsTab.tsx` | Settings body: AI form, inline workspace wizard, Slack token status, schedule/completion |
-| `AiSettingsForm.tsx` | Shared AI settings form (project scope and global scope) |
-| `AiSettingsPanel.tsx` | Dashboard-level AI settings modal |
+| `AiSettingsForm.tsx` | Shared AI settings form (project scope and global scope), including the inheritance line a project shows while it has no override |
+| `GlobalSettingsPanel.tsx` | The dashboard's one settings modal: sections that apply to every card, AI model and key first |
 | `guide-model.ts` | Guide sections, detail cards, hints, completion, chat-thread builder, date formatters |
 | `guide-content.tsx` | Bodies for the 7 guide sections and 7 detail cards |
 | `CentreContent.tsx` | Dashboard body: one flat stack (Summary, Highlights, Last client message) separated by hairline dividers |
@@ -405,7 +406,7 @@ Each chip expands the row and lands on that detail card; there is no second togg
 
 | Surface | What it shows |
 |---|---|
-| Header | `Client projects`, sub-line `1 project · Synced 4m ago · Every 5 min`, `Compact / Expanded / Mixed`, `⋯`, `New project` |
+| Header | `Client projects`, sub-line `1 project · Synced 4m ago · Every 5 min`, `Compact / Expanded / Mixed`, `⋯`, `Global settings`, `New project` |
 | Focus line | `Across workspaces` — `Reply to AgentWork client confirming start and request project details` |
 | Project row | Agentwork · AgentWork · Agentwork-Application · Waiting on client · situation line · `1 question` · `Needs reply` · 0% · 15d |
 | Expanded header | `Agentwork` + `Waiting on client` + `Needs my reply` chips · AgentWork · Agentwork-Application · `AI 7h ago  private/nvidia/nemotron-3.5-super-120b-a12b` · Sync · `⋯` |

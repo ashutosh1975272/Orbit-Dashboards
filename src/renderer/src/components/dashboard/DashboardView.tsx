@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useDashboardStore } from '../../hooks/useDashboard'
 import ProjectCard from './ProjectCard'
 import DashboardWizard from './DashboardWizard'
-import AiSettingsPanel from './AiSettingsPanel'
+import GlobalSettingsPanel from './GlobalSettingsPanel'
 import ErrorBoundary from './ErrorBoundary'
 
 function fmtAge(iso: string | null): string {
@@ -51,7 +51,7 @@ export default function DashboardView(): React.ReactElement | null {
     projectId: string
     nonce: number
   } | null>(null)
-  const [aiSettingsOpen, setAiSettingsOpen] = useState(false)
+  const [globalSettingsOpen, setGlobalSettingsOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [accordionMode] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -254,16 +254,6 @@ export default function DashboardView(): React.ReactElement | null {
                     type="button"
                     role="menuitem"
                     onClick={() => {
-                      setAiSettingsOpen(true)
-                      setMenuOpen(false)
-                    }}
-                  >
-                    AI settings
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
                       void syncNow()
                       setMenuOpen(false)
                     }}
@@ -280,6 +270,15 @@ export default function DashboardView(): React.ReactElement | null {
                 </div>
               ) : null}
             </div>
+
+            <button
+              type="button"
+              className="btn btn-secondary"
+              data-testid="global-settings-open"
+              onClick={() => setGlobalSettingsOpen(true)}
+            >
+              Global settings
+            </button>
 
             <button type="button" className="btn btn-primary" onClick={() => openWizard()}>
               New project
@@ -400,7 +399,10 @@ export default function DashboardView(): React.ReactElement | null {
         </div>
 
         {wizardOpenFor ? <DashboardWizard /> : null}
-        <AiSettingsPanel open={aiSettingsOpen} onClose={() => setAiSettingsOpen(false)} />
+        <GlobalSettingsPanel
+          open={globalSettingsOpen}
+          onClose={() => setGlobalSettingsOpen(false)}
+        />
       </section>
     </ErrorBoundary>
   )

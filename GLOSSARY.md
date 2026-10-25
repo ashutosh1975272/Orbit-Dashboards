@@ -25,3 +25,5 @@
 | **Our Slack** | The user's own team workspace, connected once for all Projects (global, not per-card). Until it is connected the row shows a *Connect workspace* empty state, never an invented list. |
 | **Project info** | The sidebar section for everything the card has learned, nested in three sub-groups: *Needs attention*, *Project*, *Signals*. Sub-groups start closed. |
 | **Visualizations** | The sidebar section whose rows (Progress, Time elapsed, Last 7 days) render their chart in the centre panel only — never inside the sidebar. |
+| **Global Settings** | The dashboard's one settings modal, opened from the toolbar button beside *New project*. Holds the values shared by every Project — AI model and key first — each of which a card may override. Never called the "AI settings menu": the overflow-menu route is gone. |
+| **Inheritance** | How a card resolves one of those values: project override (only when its *Use global settings* switch is off) → Global Settings → environment default. The card shows which source is in effect. |

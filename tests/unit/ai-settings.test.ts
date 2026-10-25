@@ -175,6 +175,48 @@ describe('AiSettingsService.publicView', () => {
   })
 })
 
+describe('AiSettingsService.save — the Global Settings seam', () => {
+  it('writes the single global record when no project is named', async () => {
+    const store = await tmpStore()
+    const service = makeService(store)
+
+    await service.save({ provider: 'nvidia-nim', model: 'global/model', apiKey: 'global-key-2222' })
+
+    expect((await store.readGlobal()).model).toBe('global/model')
+    expect(await store.readKey(await store.readGlobal())).toBe('global-key-2222')
+    // A global save must not create a project record.
+    expect(await store.readProject('p1')).toBeNull()
+  })
+
+  it('rejects a provider it does not support', async () => {
+    const service = makeService(await tmpStore())
+    await expect(
+      service.save({ provider: 'openai' as 'nvidia-nim', model: 'gpt-x' })
+    ).rejects.toThrow(/provider/i)
+  })
+
+  it('rejects an API key or model id past the stored limits', async () => {
+    const service = makeService(await tmpStore())
+    await expect(service.save({ apiKey: 'k'.repeat(513) })).rejects.toThrow(/too long/i)
+    await expect(service.save({ model: 'm'.repeat(201) })).rejects.toThrow(/too long/i)
+
+    const store = await tmpStore()
+    await new AiSettingsService({ store, env: { apiKey: '', model: 'env/model' } }).save({
+      apiKey: 'k'.repeat(512)
+    })
+    expect((await store.readGlobal()).apiKeyPlain).toBe('k'.repeat(512))
+  })
+
+  it('answers a global save with masks only', async () => {
+    const service = makeService(await tmpStore())
+    const view = await service.save({ apiKey: 'global-key-2222', model: 'global/model' })
+
+    expect(view.global.apiKeyMask).toBe('••••2222')
+    expect(view.project).toBeNull()
+    expect(JSON.stringify(view)).not.toContain('global-key-2222')
+  })
+})
+
 describe('AiSettingsService.listModels', () => {
   it('returns an error when no key is configured anywhere', async () => {
     const store = await tmpStore()

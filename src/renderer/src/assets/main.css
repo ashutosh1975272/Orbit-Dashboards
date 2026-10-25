@@ -4320,6 +4320,16 @@ body.is-resizing-nav { cursor: col-resize; user-select: none; }
   line-height: 1.4;
   color: var(--text-muted);
 }
+.ai-settings-inherited {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.ai-settings-inherited b {
+  font-weight: 600;
+  color: var(--text);
+}
 .ai-settings-field {
   display: flex;
   flex-direction: column;
@@ -4411,9 +4421,12 @@ body.is-resizing-nav { cursor: col-resize; user-select: none; }
   min-height: 38px;
   padding: 0 16px;
 }
-.ai-settings-panel {
-  width: min(560px, 92vw);
+.global-settings-panel {
+  width: min(560px, 100%);
   max-height: min(90vh, 760px);
+}
+.global-settings-section + .global-settings-section {
+  margin-top: 12px;
 }
 
 /* ===== v2.8 — dashboard list (dashboard scope only) ===== */

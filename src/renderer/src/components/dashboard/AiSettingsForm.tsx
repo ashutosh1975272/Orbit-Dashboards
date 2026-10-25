@@ -64,7 +64,9 @@ export default function AiSettingsForm({ projectId }: AiSettingsFormProps): Reac
         setView(next)
         setUseGlobal(next.project ? next.project.useGlobal : true)
         setProvider(next.project?.provider ?? next.global.provider)
-        setModel(next.project?.model ?? '')
+        // The global form has no project record; reading the model from the
+        // wrong scope would show it empty and a save would clear the stored one.
+        setModel((projectId ? next.project?.model : next.global.model) ?? '')
       })
       .catch((err: unknown) => {
         if (!cancelled) {
@@ -204,6 +206,20 @@ export default function AiSettingsForm({ projectId }: AiSettingsFormProps): Reac
             </small>
           </span>
         </label>
+      ) : null}
+
+      {isProject && useGlobal && view ? (
+        <p className="ai-settings-inherited" data-testid="ai-inherited">
+          <b>
+            {view.effective.modelSource === 'global'
+              ? 'Inheriting from Global settings'
+              : 'No override'}
+          </b>{' '}
+          {view.effective.model}
+          {view.effective.modelSource === 'env' ? ' (environment default)' : ''} ·{' '}
+          {KEY_SOURCE_LABEL[view.effective.keySource]}
+          {view.effective.apiKeyMask ? ` ${view.effective.apiKeyMask}` : ''}
+        </p>
       ) : null}
 
       <label className="ai-settings-field">
