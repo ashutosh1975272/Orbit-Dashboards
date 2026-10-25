@@ -58,6 +58,14 @@ describe('MonitorStore', () => {
     expect(listed).toEqual([{ key: 'DASH_TOKEN_ACME', persisted: true }])
   })
 
+  it('blocks token save when OS encryption unavailable', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'dash-monitor-'))
+    dirs.push(dir)
+    const store = new MonitorStore({ rootDir: dir, encryptionAvailable: false })
+    await expect(store.saveManualToken('K', 'tok')).rejects.toThrow('OS encryption unavailable')
+    expect(await store.getManualToken('K')).toBeNull()
+  })
+
   it('persists sync interval override', async () => {
     const store = await tmpStore()
     expect(await store.syncIntervalSeconds()).toBe(300)

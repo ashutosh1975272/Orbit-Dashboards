@@ -154,6 +154,15 @@ describe('TeamWorkspaceStore', () => {
     )
   })
 
+  it('blocks manual connect when OS encryption unavailable', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'tw-'))
+    const store = new TeamWorkspaceStore({ rootDir: dir, encryptionAvailable: false })
+    await expect(store.connect({
+      payload: { source: 'manual' } as any,
+      teamId: 'T', teamName: 'Team', profileId: 'manual:K', token: 'secret'
+    })).rejects.toThrow('OS encryption unavailable')
+  })
+
   it('clears the record and the secret on disconnect', async () => {
     const { store, dir } = await makeStore()
     await store.connect({

@@ -58,6 +58,13 @@ describe('AiSettingsStore', () => {
     expect((await store.readProject('p2'))?.useGlobal).toBe(true)
   })
 
+  it('blocks api key save when OS encryption unavailable', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'ai-'))
+    const store = new AiSettingsStore({ rootDir: dir, encryptionAvailable: false })
+    const service = new AiSettingsService({ store, defaults: { chatModel: 'default/chat' } })
+    await expect(service.save({ apiKey: 'secret' })).rejects.toThrow('OS encryption unavailable')
+  })
+
   it('keeps values on undefined and clears them on null', async () => {
     const store = await tmpStore()
     await store.saveProject('p1', { model: 'm1', apiKey: 'project-key-1234' })
