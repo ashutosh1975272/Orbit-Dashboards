@@ -31,6 +31,7 @@ import { DashboardDigestStore, refreshDigest } from './dashboard/digest'
 import { DashboardChatService } from './dashboard/chat-service'
 import { HistoryStore } from './dashboard/history-store'
 import { DashboardViewedStore } from './dashboard/viewed-store'
+import { DashboardScheduleStore } from './dashboard/schedule-store'
 import { AiSettingsStore } from './dashboard/ai-settings-store'
 import { AiSettingsService } from './dashboard/ai-settings'
 import { InsightEngine } from './dashboard/insight-engine'
@@ -266,9 +267,7 @@ if (!gotSingleInstanceLock) {
         }
       }
     }
-    const listTeamWorkspaceCandidates = async (): Promise<
-      DashboardTeamWorkspaceCandidate[]
-    > => {
+    const listTeamWorkspaceCandidates = async (): Promise<DashboardTeamWorkspaceCandidate[]> => {
       const profiles = await profileStore.list()
       const byTeam = new Map<string, DashboardTeamWorkspaceCandidate>()
       for (const profile of profiles) {
@@ -315,6 +314,7 @@ if (!gotSingleInstanceLock) {
     })
     const dashboardHistoryStore = new HistoryStore({ rootDir: dashboardRoot })
     const dashboardViewedStore = new DashboardViewedStore({ rootDir: dashboardRoot })
+    const dashboardScheduleStore = new DashboardScheduleStore({ rootDir: dashboardRoot })
     // The engine always exists: with a key it enriches with NVIDIA NIM,
     // without one it still keeps every card meaningful via local heuristics.
     const insightEngine = new InsightEngine({
@@ -434,9 +434,48 @@ if (!gotSingleInstanceLock) {
         log.warn('[dashboard] workspace migration skipped', { err: String(err) })
       }
     }
-    const dashboardScheduler = new DashboardScheduler(dashboardEngine, () =>
-      dashboardMonitorStore.syncIntervalSeconds()
-    )
+    const dashboardScheduler = new DashboardScheduler(dashboardEngine, dashboardScheduleStore, {
+      runDailyRecheck: async () => {
+        const projects = await dashboardMonitorStore.listProjects()
+        let checked = 0
+        let skipped = 0
+        let failed = 0
+        for (const project of projects) {
+          const token =
+            project.tokenSource === 'manual'
+              ? project.manualTokenKey
+                ? await dashboardMonitorStore.getManualToken(project.manualTokenKey)
+                : null
+              : await tokenStore.tryGet(project.profileId, project.teamId)
+          const settings = await aiSettings.resolveSettings(project.id)
+          if (!token || !settings.apiKey) {
+            skipped += 1
+            continue
+          }
+          const snapshot = (await dashboardEngine.buildSnapshot(project.id))[0]
+          if (!snapshot) {
+            skipped += 1
+            continue
+          }
+          try {
+            await insightEngine.refresh(project, token, snapshot, { force: true })
+            checked += 1
+          } catch {
+            failed += 1
+          }
+        }
+        const parts = [`Re-grounded ${checked} project${checked === 1 ? '' : 's'}`]
+        if (skipped) parts.push(`${skipped} skipped (no token or key)`)
+        if (failed) parts.push(`${failed} failed`)
+        return { checked, skipped, detail: `${parts.join(' · ')}.` }
+      },
+      onChanged: (state) => {
+        const win = mainWindow
+        if (win && !win.isDestroyed()) {
+          win.webContents.send(IpcChannels.DashboardSchedulesChanged, state)
+        }
+      }
+    })
 
     const adminAuth = new AdminAuthController({
       sessionPath: defaultAdminSessionPath(userData)
@@ -659,6 +698,7 @@ if (!gotSingleInstanceLock) {
     })
 
     app.on('before-quit', () => {
+      dashboardScheduler.stop()
       lock.stopIdleWatch()
       if (sleepTimer) clearInterval(sleepTimer)
       tray.destroy()

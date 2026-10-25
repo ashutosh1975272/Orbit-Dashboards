@@ -172,6 +172,84 @@ function MoodSpark({
   )
 }
 
+function FreshnessLine({
+  lastUpdatedAt,
+  syncState,
+  busy,
+  onOpen
+}: {
+  lastUpdatedAt: string | null
+  syncState: 'idle' | 'syncing' | 'error'
+  busy: boolean
+  onOpen: () => void
+}): React.ReactElement {
+  const [nextRunAt, setNextRunAt] = useState<string | null>(null)
+  const [enabled, setEnabled] = useState<boolean | null>(null)
+  const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    let alive = true
+    window.api.dashboard
+      .getSchedules()
+      .then((state) => {
+        if (!alive) return
+        setEnabled(state.settings.slackSync.enabled)
+        setNextRunAt(state.nextRunAt)
+      })
+      .catch(() => undefined)
+    const off = window.api.dashboard.onSchedulesChanged((state) => {
+      if (!alive) return
+      setEnabled(state.settings.slackSync.enabled)
+      setNextRunAt(state.nextRunAt)
+    })
+    const tick = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => {
+      alive = false
+      off()
+      window.clearInterval(tick)
+    }
+  }, [])
+
+  const seconds = nextRunAt ? Math.ceil((new Date(nextRunAt).getTime() - now) / 1000) : null
+  const countdown =
+    seconds === null
+      ? null
+      : seconds <= 0
+        ? 'any moment'
+        : seconds < 3600
+          ? `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+          : `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`
+
+  return (
+    <button
+      type="button"
+      className="dash-fresh"
+      onClick={onOpen}
+      title="Open schedules"
+      data-testid="dash-freshness"
+    >
+      <span className={`dash-fresh-dot${busy ? ' is-live' : ''}`} aria-hidden="true" />
+      {busy ? (
+        <span>Syncing now…</span>
+      ) : lastUpdatedAt ? (
+        <span>Updated {age(lastUpdatedAt)}</span>
+      ) : (
+        <span>No sync yet</span>
+      )}
+      <span className="dash-fresh-sep">·</span>
+      <span className="dash-fresh-muted">
+        {syncState === 'error'
+          ? 'sync needs attention'
+          : enabled === false
+            ? 'sync paused'
+            : countdown
+              ? `next sync in ${countdown}`
+              : 'auto-sync on'}
+      </span>
+    </button>
+  )
+}
+
 function SourceChip({ source }: { source: DashboardSource }): React.ReactElement {
   return (
     <span className={`dash-source ${source === 'ours' ? 'is-ours' : 'is-client'}`}>
@@ -238,20 +316,13 @@ export default function DashboardPage({
     <div className="dash-page">
       <div className="dash-scroll">
         <div className="dash-inner">
-          <p className="dash-fresh" data-testid="dash-freshness">
-            <span className={`dash-fresh-dot${busy ? ' is-live' : ''}`} aria-hidden="true" />
-            {busy ? (
-              <span>Syncing now…</span>
-            ) : snapshot.lastUpdatedAt ? (
-              <span>Updated {age(snapshot.lastUpdatedAt)}</span>
-            ) : (
-              <span>No sync yet</span>
-            )}
-            <span className="dash-fresh-sep">·</span>
-            <span className="dash-fresh-muted">
-              {snapshot.syncState === 'error' ? 'sync needs attention' : 'auto-sync on'}
-            </span>
-          </p>
+          <FreshnessLine
+            lastUpdatedAt={snapshot.lastUpdatedAt}
+            syncState={snapshot.syncState}
+            busy={busy}
+            onOpen={() => onSelect('m:schedules')}
+          />
+          {errorLine ? <p className="dash-error">{errorLine}</p> : null}
           {errorLine ? <p className="dash-error">{errorLine}</p> : null}
 
           <section className="dash-kpis" aria-label="Key numbers">

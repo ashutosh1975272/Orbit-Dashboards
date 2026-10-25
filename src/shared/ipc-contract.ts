@@ -16,8 +16,11 @@ import type {
   InsightHistoryEntryContract,
   DashboardManualToken,
   DashboardMarkViewedPayload,
+  DashboardRunSchedulePayload,
+  DashboardSchedulesState,
   DashboardSnapshot,
   DashboardSyncProgressPayload,
+  DashboardUpdateSchedulePayload,
   DashboardTeamWorkspace,
   DashboardTeamWorkspaceCandidate,
   DashboardTeamWorkspaceChannelsPayload,
@@ -128,6 +131,10 @@ export const IpcChannels = {
   DashboardValidateManualToken: 'dashboard:validate-manual-token',
   DashboardSnapshotChanged: 'dashboard:snapshot-changed',
   DashboardSyncProgress: 'dashboard:sync-progress',
+  DashboardSchedulesGet: 'dashboard:schedules-get',
+  DashboardSchedulesUpdate: 'dashboard:schedules-update',
+  DashboardSchedulesRun: 'dashboard:schedules-run',
+  DashboardSchedulesChanged: 'dashboard:schedules-changed',
 
   DashboardSidebarGet: 'dashboard:sidebar-get',
   DashboardSidebarSet: 'dashboard:sidebar-set',
@@ -281,6 +288,10 @@ export interface IpcApi {
   dashboard: {
     getSnapshot: () => Promise<DashboardSnapshot>
     markViewed: (payload: DashboardMarkViewedPayload) => Promise<string>
+    getSchedules: () => Promise<DashboardSchedulesState>
+    updateSchedules: (payload: DashboardUpdateSchedulePayload) => Promise<DashboardSchedulesState>
+    runSchedule: (payload: DashboardRunSchedulePayload) => Promise<DashboardSchedulesState>
+    onSchedulesChanged: (callback: (state: DashboardSchedulesState) => void) => () => void
     getAppConfig: () => Promise<DashboardAppClientConfig>
     getHistory: (payload: { projectId: string }) => Promise<InsightHistoryEntryContract[]>
     getRecent: () => Promise<RecentActivity[]>

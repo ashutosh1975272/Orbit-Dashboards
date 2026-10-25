@@ -1,12 +1,14 @@
 # Dashboard page + Schedules + Flow — plan
 
-Date: 2026-10-25 · Branch: `beta` · Status: awaiting approval · No code written for A/B/C yet.
+Date: 2026-10-25 · Branch: `beta` · Status: Phase A and Phase B implemented, tested and
+committed. Phase C (Flow) still waits on the agent core (prompt registry + RAG).
 
 This plan covers the new prompt. Order confirmed by the owner: sidebar (already done) → **Phase A**, **Phase B** → Agent core → **Phase C (Flow)**.
 
 Current tree note: the earlier Phase 1 work (global team workspace, `source` tags, sync
-hardening) is implemented and tested but **uncommitted**. It is a prerequisite for the
-"Client Slack / Our Slack" parts below and is not re-planned here.
+hardening) is committed as `feat(dashboard): read our team workspace alongside each card's
+client workspace`. Phase A is committed as `feat(dashboard): add the glanceable Dashboard page
+inside the expanded card`.
 
 ## Fixed decisions (owner)
 

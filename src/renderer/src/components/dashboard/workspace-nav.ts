@@ -20,7 +20,7 @@ export type VisualKey = 'progress' | 'time' | 'week'
 
 export type GuideSection = 2 | 3 | 4 | 5 | 6 | 7
 
-export type XomniModeKey = 'project' | 'agentwork'
+export type XomniModeKey = 'project' | 'agentwork' | 'schedules'
 
 /** Which of the two Slack workspaces the chat panel targets. */
 export type SlackSourceKey = 'client' | 'team'
@@ -218,6 +218,12 @@ export const NAV_SECTIONS: NavSection[] = [
         label: 'Talk to AgentWork',
         desc: 'Hand a task to the agent. Opens up once AgentWork is connected.',
         icon: 'robot'
+      },
+      {
+        id: 'm:schedules',
+        label: 'Schedules',
+        desc: 'When this card syncs Slack, analyses new messages and re-checks itself.',
+        icon: 'clock'
       }
     ]
   },
@@ -676,10 +682,7 @@ export function toggleSectionNav(prev: WorkspaceNavState, key: SectionKey): Work
 }
 
 /** Toggle one Project info sub-group; several can stay open. */
-export function toggleInfoGroupNav(
-  prev: WorkspaceNavState,
-  key: InfoGroupKey
-): WorkspaceNavState {
+export function toggleInfoGroupNav(prev: WorkspaceNavState, key: InfoGroupKey): WorkspaceNavState {
   const openInfoGroups = prev.openInfoGroups.includes(key)
     ? prev.openInfoGroups.filter((k) => k !== key)
     : ensure(prev.openInfoGroups, key)
@@ -688,10 +691,7 @@ export function toggleInfoGroupNav(
 
 /** Toggle one connector's channel list; several can stay open. Never changes
  * what the centre panel shows. */
-export function toggleConnectorNav(
-  prev: WorkspaceNavState,
-  key: ConnectorKey
-): WorkspaceNavState {
+export function toggleConnectorNav(prev: WorkspaceNavState, key: ConnectorKey): WorkspaceNavState {
   const openConnectors = prev.openConnectors.includes(key)
     ? prev.openConnectors.filter((k) => k !== key)
     : ensure(prev.openConnectors, key)
@@ -718,10 +718,7 @@ export function selectNav(prev: WorkspaceNavState, selection: SelectionId): Work
 /** The collapsed rail icon for a section: what it selects when clicked.
  * Project info has no default body of its own, so it returns null until
  * something has been picked there. */
-export function railSectionSelection(
-  nav: WorkspaceNavState,
-  key: SectionKey
-): SelectionId | null {
+export function railSectionSelection(nav: WorkspaceNavState, key: SectionKey): SelectionId | null {
   const remembered = nav.sectionSelections[key]
   if (remembered && sectionOfSelection(remembered) === key) return remembered
   if (key === 'xomni') return 'm:project'

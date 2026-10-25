@@ -12,10 +12,12 @@ import type {
   DashboardChatTokenStatus,
   DashboardListChannelsPayload,
   DashboardMarkViewedPayload,
+  DashboardRunSchedulePayload,
   DashboardSendMessagePayload,
   DashboardSendMessageResult,
   DashboardSnapshot,
   DashboardSyncProgressPayload,
+  DashboardUpdateSchedulePayload,
   DashboardTeamWorkspaceCandidate,
   DashboardTeamWorkspaceChannelsPayload,
   DashboardTeamWorkspaceConnectPayload,
@@ -98,7 +100,8 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
     return {
       projects,
       manualTokens,
-      syncIntervalSeconds: await deps.monitorStore.syncIntervalSeconds(),
+      syncIntervalSeconds:
+        (await deps.scheduler.getState()).settings.slackSync.intervalMinutes * 60,
       digest: deps.getDigest ? await deps.getDigest() : null
     }
   }
@@ -114,6 +117,20 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
       return deps.viewedStore.markViewed(projectId, payload.atIso)
     }
   )
+
+  handleInvoke(IpcChannels.DashboardSchedulesGet, async () => deps.scheduler.getState())
+
+  handleInvoke(
+    IpcChannels.DashboardSchedulesUpdate,
+    async (payload: DashboardUpdateSchedulePayload) => deps.scheduler.updateSettings(payload ?? {})
+  )
+
+  handleInvoke(IpcChannels.DashboardSchedulesRun, async (payload: DashboardRunSchedulePayload) => {
+    if (payload?.kind !== 'slack-sync' && payload?.kind !== 'daily-recheck') {
+      throw new Error('Unknown schedule.')
+    }
+    return deps.scheduler.runNow(payload.kind)
+  })
 
   handleInvoke(
     IpcChannels.DashboardListChannels,

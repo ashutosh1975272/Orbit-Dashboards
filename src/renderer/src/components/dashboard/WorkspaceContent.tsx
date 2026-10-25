@@ -12,6 +12,7 @@ import { DetailBody, GuideDetailBody } from './guide-content'
 import SlackChatTab from './SlackChatTab'
 import ProjectSettingsTab from './ProjectSettingsTab'
 import AgentChatPanel from './AgentChatPanel'
+import SchedulesPage from './SchedulesPage'
 import {
   channelIdOf,
   connectorOf,
@@ -117,14 +118,18 @@ export default function WorkspaceContent({
   let bare = false
 
   if (nav.openGroup === 'xomni') {
-    body = (
-      <AgentChatPanel
-        projectName={identity.name}
-        projectId={summary.projectId}
-        mode={xomniModeOf(nav)}
-      />
-    )
-    bare = true
+    if (xomniModeOf(nav) === 'schedules') {
+      body = <SchedulesPage />
+    } else {
+      body = (
+        <AgentChatPanel
+          projectName={identity.name}
+          projectId={summary.projectId}
+          mode={xomniModeOf(nav)}
+        />
+      )
+      bare = true
+    }
   } else if (nav.openGroup === 'slack') {
     if (slackSourceOf(nav) === 'team' && !channels.teamConnected) {
       body = (

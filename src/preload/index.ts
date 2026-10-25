@@ -18,6 +18,7 @@ import type {
   DashboardChatPage,
   DashboardChatTokenStatus,
   DashboardSendMessageResult,
+  DashboardSchedulesState,
   DashboardSnapshot,
   DashboardSyncProgressPayload,
   DashboardTeamWorkspace,
@@ -170,6 +171,24 @@ const api: IpcApi = {
     getSnapshot: () => ipcRenderer.invoke(IpcChannels.DashboardGetSnapshot),
     markViewed: (payload) =>
       ipcRenderer.invoke(IpcChannels.DashboardMarkViewed, payload) as Promise<string>,
+    getSchedules: () =>
+      ipcRenderer.invoke(IpcChannels.DashboardSchedulesGet) as Promise<DashboardSchedulesState>,
+    updateSchedules: (payload) =>
+      ipcRenderer.invoke(
+        IpcChannels.DashboardSchedulesUpdate,
+        payload
+      ) as Promise<DashboardSchedulesState>,
+    runSchedule: (payload) =>
+      ipcRenderer.invoke(
+        IpcChannels.DashboardSchedulesRun,
+        payload
+      ) as Promise<DashboardSchedulesState>,
+    onSchedulesChanged: (callback: (state: DashboardSchedulesState) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, state: DashboardSchedulesState): void =>
+        callback(state)
+      ipcRenderer.on(IpcChannels.DashboardSchedulesChanged, listener)
+      return () => ipcRenderer.removeListener(IpcChannels.DashboardSchedulesChanged, listener)
+    },
     getAppConfig: () => ipcRenderer.invoke(IpcChannels.DashboardGetAppConfig),
     getHistory: (payload: { projectId: string }) =>
       ipcRenderer.invoke(IpcChannels.DashboardGetHistory, payload) as Promise<

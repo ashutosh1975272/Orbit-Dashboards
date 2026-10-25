@@ -107,7 +107,8 @@ export class InsightEngine {
   async refresh(
     project: DashboardProject,
     token: string,
-    baseSnapshot: DashboardProjectSnapshot
+    baseSnapshot: DashboardProjectSnapshot,
+    options?: { force?: boolean }
   ): Promise<DashboardProjectSnapshot> {
     const entries = await this.historyStore.read(project.id)
     const lastEntry = entries[0]
@@ -136,41 +137,44 @@ export class InsightEngine {
     }
 
     if (provider) {
-      if (newCount > 0) {
-        const minutesSince = lastEntry
-          ? (Date.now() - new Date(lastEntry.atIso).getTime()) / 60_000
-          : Infinity
-        const due = newCount >= MIN_NEW_FOR_IMMEDIATE || minutesSince >= HEARTBEAT_MINUTES
-        if (due) {
-          try {
-            const userNames = await this.fetchUsers(token)
-            const chatInput = this.toChatInput(raw, userNames, project)
-            const messages = buildInsightMessages({
-              projectName: project.name,
-              workspaceName: project.teamName ?? project.teamId,
-              clientName: project.clientName,
-              previous,
-              newMessages: chatInput,
-              newCount
-            })
-            const res = await provider.chatJson(messages, { temperature: 0.2 })
-            // only quotes that really exist in the chat may reach the card
-            const quotes = chatInput.map((m) => m.text)
-            merged = mergeInsight(res.data, previous, quotes)
-            modelUsed = res.modelUsed
-            source = 'ai'
-            this.log(
-              `[dashboard] insight refreshed (${project.name}) model=${modelUsed} new=${newCount}`
-            )
-          } catch (err) {
-            this.log(
-              `[dashboard] insight failed (${project.name}): ${
-                err instanceof Error ? err.message : String(err)
-              } — using heuristics`
-            )
-            merged = buildHeuristicInsight(baseSnapshot)
-            source = 'heuristic'
-          }
+      const minutesSince = lastEntry
+        ? (Date.now() - new Date(lastEntry.atIso).getTime()) / 60_000
+        : Infinity
+      // A forced daily re-check re-grounds even on a quiet day; otherwise the
+      // cost is only paid when messages arrived and either enough of them or
+      // enough time has passed.
+      const due =
+        options?.force === true ||
+        (newCount > 0 && (newCount >= MIN_NEW_FOR_IMMEDIATE || minutesSince >= HEARTBEAT_MINUTES))
+      if (due) {
+        try {
+          const userNames = await this.fetchUsers(token)
+          const chatInput = this.toChatInput(raw, userNames, project)
+          const messages = buildInsightMessages({
+            projectName: project.name,
+            workspaceName: project.teamName ?? project.teamId,
+            clientName: project.clientName,
+            previous,
+            newMessages: chatInput,
+            newCount
+          })
+          const res = await provider.chatJson(messages, { temperature: 0.2 })
+          // only quotes that really exist in the chat may reach the card
+          const quotes = chatInput.map((m) => m.text)
+          merged = mergeInsight(res.data, previous, quotes)
+          modelUsed = res.modelUsed
+          source = 'ai'
+          this.log(
+            `[dashboard] insight refreshed (${project.name}) model=${modelUsed} new=${newCount}`
+          )
+        } catch (err) {
+          this.log(
+            `[dashboard] insight failed (${project.name}): ${
+              err instanceof Error ? err.message : String(err)
+            } — using heuristics`
+          )
+          merged = buildHeuristicInsight(baseSnapshot)
+          source = 'heuristic'
         }
       }
     } else if (newCount > 0 || !previous) {

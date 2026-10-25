@@ -151,6 +151,59 @@ export interface DashboardMarkViewedPayload {
   atIso?: string
 }
 
+/* ===== v3 — Schedules ===== */
+
+export type DashboardScheduleKind = 'slack-sync' | 'agent-analysis' | 'daily-recheck'
+
+/** The only intervals the selector offers; one minute is the floor. */
+export const DASHBOARD_SCHEDULE_INTERVALS = [1, 5, 15, 30, 60] as const
+export type DashboardScheduleInterval = (typeof DASHBOARD_SCHEDULE_INTERVALS)[number]
+
+export interface DashboardScheduleSettings {
+  slackSync: { enabled: boolean; intervalMinutes: DashboardScheduleInterval }
+  /** Default off; a once-a-day re-ground while Orbit is open. */
+  dailyRecheck: { enabled: boolean; hour: number }
+}
+
+export interface DashboardScheduleRunSource {
+  source: DashboardSource
+  ok: boolean
+  error?: string | null
+}
+
+export interface DashboardScheduleRun {
+  id: string
+  kind: DashboardScheduleKind
+  startedAt: string
+  finishedAt: string
+  status: 'ok' | 'error' | 'skipped'
+  /** One honest line for the history row. */
+  detail: string
+  projects?: number
+  newMessages?: number
+  sources?: DashboardScheduleRunSource[]
+}
+
+export interface DashboardSchedulesState {
+  settings: DashboardScheduleSettings
+  lastRunAt: Record<DashboardScheduleKind, string | null>
+  /** Next Slack sync; null while paused. */
+  nextRunAt: string | null
+  /** Next daily re-check; null while off. */
+  nextDailyRunAt: string | null
+  running: boolean
+  runs: DashboardScheduleRun[]
+}
+
+export interface DashboardUpdateSchedulePayload {
+  slackSync?: { enabled?: boolean; intervalMinutes?: number }
+  dailyRecheck?: { enabled?: boolean; hour?: number }
+}
+
+export interface DashboardRunSchedulePayload {
+  kind: 'slack-sync' | 'daily-recheck'
+}
+
 export interface DashboardChannelDelta {
   channelId: string
   channelName: string
