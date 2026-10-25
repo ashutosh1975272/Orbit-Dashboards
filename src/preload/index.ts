@@ -15,8 +15,10 @@ import type {
 import type {
   DashboardAiModelsResult,
   DashboardAiSettingsView,
+  DashboardAiTestResult,
   DashboardChatPage,
   DashboardChatTokenStatus,
+  DashboardGlobalConfig,
   DashboardSendMessageResult,
   DashboardSchedulesState,
   DashboardSnapshot,
@@ -261,6 +263,16 @@ const api: IpcApi = {
         IpcChannels.DashboardListAiModels,
         payload
       ) as Promise<DashboardAiModelsResult>,
+    testAi: (payload) =>
+      ipcRenderer.invoke(IpcChannels.DashboardTestAi, payload) as Promise<DashboardAiTestResult>,
+    getGlobalConfig: () =>
+      ipcRenderer.invoke(IpcChannels.DashboardConfigGet) as Promise<DashboardGlobalConfig>,
+    onConfigChanged: (callback: (config: DashboardGlobalConfig) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, config: DashboardGlobalConfig): void =>
+        callback(config)
+      ipcRenderer.on(IpcChannels.DashboardConfigChanged, listener)
+      return () => ipcRenderer.removeListener(IpcChannels.DashboardConfigChanged, listener)
+    },
     getTeamWorkspace: () =>
       ipcRenderer.invoke(IpcChannels.DashboardTeamWorkspaceGet) as Promise<DashboardTeamWorkspace>,
     listTeamWorkspaceCandidates: () =>

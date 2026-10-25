@@ -11,15 +11,20 @@ import type { AiProviderId } from '../../shared/dashboard-contract'
 
 export interface StoredAiSettings {
   provider?: AiProviderId
+  /** Legacy chat-model field (pre-v2.8). New writes also set `chatModel`. */
   model?: string
+  chatModel?: string
+  embeddingModel?: string
   /** safeStorage ciphertext (base64). */
   apiKeyEnc?: string
   /** Plaintext fallback when OS encryption is unavailable (dev / tests). */
   apiKeyPlain?: string
+  status?: 'ok' | 'invalid' | 'not-configured'
+  lastVerifiedAt?: string
 }
 
 export interface StoredProjectAiSettings extends StoredAiSettings {
-  /** true = ignore these overrides and use the dashboard settings. */
+  /** Legacy coarse switch. true = ignore every project AI field. */
   useGlobal?: boolean
 }
 
@@ -33,6 +38,8 @@ export interface AiSettingsPatch {
   provider?: AiProviderId
   /** null clears the override; undefined keeps it. */
   model?: string | null
+  /** null clears the override; undefined keeps it. */
+  embeddingModel?: string | null
   /** null clears the key; undefined keeps it. */
   apiKey?: string | null
   useGlobal?: boolean
@@ -75,6 +82,11 @@ function cleanKey(value: string | null | undefined): string | null {
   return trimmed ? trimmed : null
 }
 
+function normalizeRecord<T extends StoredAiSettings>(record: T): T {
+  if (record.chatModel || !record.model) return record
+  return { ...record, chatModel: record.model }
+}
+
 export class AiSettingsStore {
   private readonly filePath: string
   private readonly encryptionAvailable: boolean
@@ -86,11 +98,25 @@ export class AiSettingsStore {
   }
 
   async readGlobal(): Promise<StoredAiSettings> {
-    return (await this.read()).global
+    return normalizeRecord((await this.read()).global)
   }
 
   async readProject(projectId: string): Promise<StoredProjectAiSettings | null> {
-    return (await this.read()).projects[projectId] ?? null
+    const project = (await this.read()).projects[projectId]
+    return project ? normalizeRecord(project) : null
+  }
+
+  async listProjectIds(): Promise<string[]> {
+    return Object.keys((await this.read()).projects)
+  }
+
+  async markVerified(
+    status: 'ok' | 'invalid' | 'not-configured',
+    atIso = new Date().toISOString()
+  ): Promise<void> {
+    await this.update((data) => {
+      data.global = { ...data.global, status, lastVerifiedAt: atIso }
+    })
   }
 
   async saveGlobal(patch: AiSettingsPatch): Promise<void> {
@@ -135,16 +161,23 @@ export class AiSettingsStore {
     return stored.apiKeyPlain ?? null
   }
 
-  private applyPatch(
-    previous: StoredAiSettings,
-    patch: AiSettingsPatch
-  ): StoredAiSettings {
+  private applyPatch(previous: StoredAiSettings, patch: AiSettingsPatch): StoredAiSettings {
     const next: StoredAiSettings = { ...previous }
     if (patch.provider !== undefined) next.provider = patch.provider
     if (patch.model !== undefined) {
       const model = cleanModel(patch.model)
-      if (model) next.model = model
-      else delete next.model
+      if (model) {
+        next.model = model
+        next.chatModel = model
+      } else {
+        delete next.model
+        delete next.chatModel
+      }
+    }
+    if (patch.embeddingModel !== undefined) {
+      const embeddingModel = cleanModel(patch.embeddingModel)
+      if (embeddingModel) next.embeddingModel = embeddingModel
+      else delete next.embeddingModel
     }
     if (patch.apiKey !== undefined) {
       delete next.apiKeyEnc

@@ -6,17 +6,18 @@ import type {
   DashboardAiSettingsView
 } from '../../../../shared/dashboard-contract'
 
+const SOURCE_LABEL: Record<AiSettingsSource, string> = {
+  project: 'project override',
+  global: 'global config',
+  default: 'built-in default',
+  none: 'not configured'
+}
+
 const KEY_SOURCE_LABEL: Record<AiSettingsSource, string> = {
   project: 'project key',
   global: 'global key',
-  env: 'environment key',
+  default: 'no key',
   none: 'no key'
-}
-
-const MODEL_SOURCE_LABEL: Record<'project' | 'global' | 'env', string> = {
-  project: 'Using project settings',
-  global: 'Using global',
-  env: 'Using environment'
 }
 
 interface AiSettingsFormProps {
@@ -29,13 +30,17 @@ export default function AiSettingsForm({ projectId }: AiSettingsFormProps): Reac
   const [useGlobal, setUseGlobal] = useState(true)
   const [provider, setProvider] = useState<AiProviderId>('nvidia-nim')
   const [model, setModel] = useState('')
+  const [embeddingModel, setEmbeddingModel] = useState('')
   const [models, setModels] = useState<string[]>([])
+  const [embeddingModels, setEmbeddingModels] = useState<string[]>([])
   const [modelsError, setModelsError] = useState<string | null>(null)
   const [loadingModels, setLoadingModels] = useState(true)
   const [apiKey, setApiKey] = useState('')
   const [showKey, setShowKey] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
@@ -46,9 +51,11 @@ export default function AiSettingsForm({ projectId }: AiSettingsFormProps): Reac
     try {
       const result = await window.api.dashboard.listAiModels(projectId ? { projectId } : undefined)
       setModels(result.models)
+      setEmbeddingModels(result.embeddingModels)
       setModelsError(result.error ?? null)
     } catch (err) {
       setModels([])
+      setEmbeddingModels([])
       setModelsError(err instanceof Error ? err.message : 'Could not load models')
     } finally {
       setLoadingModels(false)
@@ -64,9 +71,10 @@ export default function AiSettingsForm({ projectId }: AiSettingsFormProps): Reac
         setView(next)
         setUseGlobal(next.project ? next.project.useGlobal : true)
         setProvider(next.project?.provider ?? next.global.provider)
-        // The global form has no project record; reading the model from the
-        // wrong scope would show it empty and a save would clear the stored one.
         setModel((projectId ? next.project?.model : next.global.model) ?? '')
+        setEmbeddingModel(
+          (projectId ? next.project?.embeddingModel : next.global.embeddingModel) ?? ''
+        )
       })
       .catch((err: unknown) => {
         if (!cancelled) {
@@ -82,11 +90,13 @@ export default function AiSettingsForm({ projectId }: AiSettingsFormProps): Reac
       .then((result) => {
         if (cancelled) return
         setModels(result.models)
+        setEmbeddingModels(result.embeddingModels)
         setModelsError(result.error ?? null)
       })
       .catch((err: unknown) => {
         if (cancelled) return
         setModels([])
+        setEmbeddingModels([])
         setModelsError(err instanceof Error ? err.message : 'Could not load models')
       })
       .finally(() => {
@@ -100,18 +110,22 @@ export default function AiSettingsForm({ projectId }: AiSettingsFormProps): Reac
 
   const modelOptions = useMemo(() => {
     const all = new Set(models)
-    if (view?.effective.model) all.add(view.effective.model)
+    if (view?.effective.chatModel) all.add(view.effective.chatModel)
     const stored = isProject ? view?.project?.model : view?.global.model
     if (stored) all.add(stored)
     return Array.from(all).sort()
   }, [models, view, isProject])
 
+  const embeddingOptions = useMemo(() => {
+    const all = new Set(embeddingModels)
+    if (view?.effective.embeddingModel) all.add(view.effective.embeddingModel)
+    const stored = isProject ? view?.project?.embeddingModel : view?.global.embeddingModel
+    if (stored) all.add(stored)
+    return Array.from(all).sort()
+  }, [embeddingModels, view, isProject])
+
   const storedHasKey = isProject ? Boolean(view?.project?.hasKey) : Boolean(view?.global?.hasKey)
   const storedMask = isProject ? view?.project?.apiKeyMask : view?.global.apiKeyMask
-
-  const effectiveLine = view
-    ? `${MODEL_SOURCE_LABEL[view.effective.modelSource]}: ${view.effective.model}`
-    : 'Reading settings…'
 
   const keyHint = ((): string => {
     if (!view) return ''
@@ -120,7 +134,6 @@ export default function AiSettingsForm({ projectId }: AiSettingsFormProps): Reac
       return `This project uses the ${KEY_SOURCE_LABEL[view.effective.keySource]} ${view.effective.apiKeyMask ?? ''}`.trim()
     }
     if (storedHasKey) return `Saved: ${storedMask}`
-    if (view.effective.keySource === 'env') return 'Using the environment key from .env'
     if (view.effective.keySource !== 'none') {
       return `No key here — falls back to the ${KEY_SOURCE_LABEL[view.effective.keySource]}`
     }
@@ -131,6 +144,7 @@ export default function AiSettingsForm({ projectId }: AiSettingsFormProps): Reac
     setSaving(true)
     setError(null)
     setNotice(null)
+    setTestResult(null)
     try {
       const trimmedKey = apiKey.trim()
       const payload = isProject
@@ -141,23 +155,44 @@ export default function AiSettingsForm({ projectId }: AiSettingsFormProps): Reac
               useGlobal: false,
               provider,
               model: model.trim() || null,
+              embeddingModel: embeddingModel.trim() || null,
               ...(trimmedKey ? { apiKey: trimmedKey } : {})
             }
         : {
             provider,
             model: model.trim() || null,
+            embeddingModel: embeddingModel.trim() || null,
             ...(trimmedKey ? { apiKey: trimmedKey } : {})
           }
       const next = await window.api.dashboard.saveAiSettings(payload)
       setView(next)
       setApiKey('')
-      setNotice('Saved')
+      setNotice('Saved. Run Test connection to verify.')
       setLoadingModels(true)
       await loadModels()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save AI settings')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const test = async (): Promise<void> => {
+    setTesting(true)
+    setTestResult(null)
+    setError(null)
+    try {
+      const result = await window.api.dashboard.testAi(projectId ? { projectId } : undefined)
+      if (result.ok) {
+        setTestResult(`Connected. ${result.models ?? 0} models available.`)
+        setView(await window.api.dashboard.getAiSettings(projectId ? { projectId } : undefined))
+      } else {
+        setTestResult(result.error ?? 'Connection failed.')
+      }
+    } catch (err) {
+      setTestResult(err instanceof Error ? err.message : 'Connection failed.')
+    } finally {
+      setTesting(false)
     }
   }
 
@@ -199,24 +234,15 @@ export default function AiSettingsForm({ projectId }: AiSettingsFormProps): Reac
             }}
           />
           <span>
-            <b>Use global settings</b>
-            <small>
-              On: this project uses the dashboard key and model. Off: the fields below override
-              them.
-            </small>
+            <b>Use global config</b>
+            <small>Off: the fields below override only the values you fill in.</small>
           </span>
         </label>
       ) : null}
 
       {isProject && useGlobal && view ? (
         <p className="ai-settings-inherited" data-testid="ai-inherited">
-          <b>
-            {view.effective.modelSource === 'global'
-              ? 'Inheriting from Global settings'
-              : 'No override'}
-          </b>{' '}
-          {view.effective.model}
-          {view.effective.modelSource === 'env' ? ' (environment default)' : ''} ·{' '}
+          <b>Inheriting global config</b> {view.effective.chatModel} ·{' '}
           {KEY_SOURCE_LABEL[view.effective.keySource]}
           {view.effective.apiKeyMask ? ` ${view.effective.apiKeyMask}` : ''}
         </p>
@@ -234,16 +260,14 @@ export default function AiSettingsForm({ projectId }: AiSettingsFormProps): Reac
       </label>
 
       <label className="ai-settings-field">
-        <span>Model</span>
+        <span>Chat model</span>
         <div className="ai-settings-inline">
           <select
             value={model}
             disabled={!editable || loading || saving}
             onChange={(e) => setModel(e.target.value)}
           >
-            <option value="">
-              {isProject ? 'Inherit from global' : 'Inherit from environment'}
-            </option>
+            <option value="">{isProject ? 'Inherit from global' : 'Use built-in default'}</option>
             {modelOptions.map((option) => (
               <option key={option} value={option}>
                 {option}
@@ -253,7 +277,7 @@ export default function AiSettingsForm({ projectId }: AiSettingsFormProps): Reac
           <button
             type="button"
             className="dash-subtle"
-            disabled={loadingModels}
+            disabled={loadingModels || !editable}
             onClick={() => {
               setLoadingModels(true)
               setModelsError(null)
@@ -264,6 +288,27 @@ export default function AiSettingsForm({ projectId }: AiSettingsFormProps): Reac
           </button>
         </div>
         {modelsError ? <small className="ai-settings-hint is-error">{modelsError}</small> : null}
+      </label>
+
+      <label className="ai-settings-field">
+        <span>Embedding model</span>
+        <select
+          value={embeddingModel}
+          disabled={!editable || loading || saving}
+          onChange={(e) => setEmbeddingModel(e.target.value)}
+        >
+          <option value="">
+            {isProject ? 'Inherit from global' : 'Use built-in embedding default'}
+          </option>
+          {embeddingOptions.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+        <small className="ai-settings-hint">
+          Used when the agent indexes this project’s messages. Changing it requires a re-index.
+        </small>
       </label>
 
       <label className="ai-settings-field">
@@ -292,19 +337,43 @@ export default function AiSettingsForm({ projectId }: AiSettingsFormProps): Reac
 
       <div className="ai-settings-effective" data-testid="ai-effective">
         <span className="ai-settings-label">Effective now</span>
-        <b>{effectiveLine}</b>
+        <b>{view ? `${view.effective.chatModel} · ${view.effective.embeddingModel}` : '…'}</b>
         <span className="ai-settings-hint">
+          Chat: {SOURCE_LABEL[view?.effective.chatModelSource ?? 'none']} · Embedding:{' '}
+          {SOURCE_LABEL[view?.effective.embeddingModelSource ?? 'none']} ·{' '}
           {KEY_SOURCE_LABEL[view?.effective.keySource ?? 'none']}
           {view?.effective.apiKeyMask ? ` ${view.effective.apiKeyMask}` : ''}
         </span>
+        {view?.global.lastVerifiedAt ? (
+          <span className="ai-settings-hint">
+            Last checked {new Date(view.global.lastVerifiedAt).toLocaleString()}
+          </span>
+        ) : null}
       </div>
 
+      {testResult ? (
+        <p
+          className={
+            testResult.startsWith('Connected') ? 'ai-settings-notice' : 'ai-settings-error'
+          }
+        >
+          {testResult}
+        </p>
+      ) : null}
       {error ? <p className="ai-settings-error">{error}</p> : null}
       {notice ? <p className="ai-settings-notice">{notice}</p> : null}
 
       <div className="ai-settings-actions">
         <button type="submit" className="dash-primary" disabled={saving || loading}>
-          {saving ? 'Saving…' : 'Save AI settings'}
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+        <button
+          type="button"
+          className="dash-subtle"
+          disabled={testing || saving}
+          onClick={() => void test()}
+        >
+          {testing ? 'Testing…' : 'Test connection'}
         </button>
         {storedHasKey ? (
           <button

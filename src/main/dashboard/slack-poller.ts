@@ -76,12 +76,27 @@ const MAX_HISTORY_PAGES = 5
 const MAX_THREADS_PER_SYNC = 10
 const MAX_THREAD_PAGES = 3
 
-async function callApi<T extends { ok: boolean; error?: string }>(
+interface SlackCallResult<T> {
+  body: T
+  /** x-oauth-scopes header, when Slack returns it. */
+  scopes: string[] | null
+}
+
+function parseScopes(header: string | null): string[] | null {
+  if (!header) return null
+  const scopes = header
+    .split(',')
+    .map((scope) => scope.trim())
+    .filter(Boolean)
+  return scopes.length > 0 ? scopes : null
+}
+
+async function callApiDetailed<T extends { ok: boolean; error?: string }>(
   method: string,
   token: string,
   params: Record<string, string>,
   attempt = 0
-): Promise<T> {
+): Promise<SlackCallResult<T>> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), SLACK_TIMEOUT_MS)
   let res: Response
@@ -111,13 +126,22 @@ async function callApi<T extends { ok: boolean; error?: string }>(
       const retryAfter = Number(res.headers.get('Retry-After') ?? '1')
       const waitSeconds = Number.isFinite(retryAfter) ? Math.min(60, Math.max(1, retryAfter)) : 1
       await sleep(waitSeconds * 1000)
-      return callApi(method, token, params, attempt + 1)
+      return callApiDetailed(method, token, params, attempt + 1)
     }
     const err = new Error(`slack ${method}: ${body.error}`)
     ;(err as Error & { slackError?: string }).slackError = body.error
     throw err
   }
-  return body
+  return { body, scopes: parseScopes(res.headers.get('x-oauth-scopes')) }
+}
+
+async function callApi<T extends { ok: boolean; error?: string }>(
+  method: string,
+  token: string,
+  params: Record<string, string>,
+  attempt = 0
+): Promise<T> {
+  return (await callApiDetailed<T>(method, token, params, attempt)).body
 }
 
 /** Build the canonical archive link Slack itself uses for a message. */
@@ -287,14 +311,14 @@ export class SlackPoller {
     if (this.baseUrl.startsWith('http://_FAKE')) {
       return { valid: true, teamId: 'FAKE_TEAM', teamName: 'Fake Team' }
     }
-    const res = await callApi<AuthTestResponse>('auth.test', token, {})
+    const { body: res, scopes } = await callApiDetailed<AuthTestResponse>('auth.test', token, {})
     return {
       valid: true,
       teamId: res.team_id,
       teamName: res.team,
       userName: res.user,
       userId: res.user_id,
-      scopes: res.scopes,
+      scopes: scopes ?? res.scopes,
       error: undefined
     }
   }

@@ -12,6 +12,7 @@ export interface StoredTeamWorkspace {
   profileId: string
   teamId: string
   teamName: string
+  teamDomain?: string
   source: 'oauth' | 'manual'
   /** safeStorage ciphertext (base64). Absent for an OAuth connection. */
   tokenEnc?: string
@@ -19,6 +20,8 @@ export interface StoredTeamWorkspace {
   tokenPlain?: string
   /** Mask shown in the UI ("••••abcd") — never the raw token. */
   maskedToken: string | null
+  status?: 'connected' | 'needs-reconnect'
+  lastVerifiedAt?: string
   channels: DashboardMonitor[]
   updatedAt: string
 }
@@ -27,7 +30,10 @@ export interface TeamWorkspaceConnection {
   profileId: string
   teamId: string
   teamName: string
+  teamDomain: string | null
   source: 'oauth' | 'manual'
+  status: 'connected' | 'needs-reconnect'
+  lastVerifiedAt: string | null
   /** Raw token for a manual connection; null when the token lives in TokenStore. */
   token: string | null
   channels: DashboardMonitor[]
@@ -66,8 +72,11 @@ const UNCONNECTED: DashboardTeamWorkspace = {
   profileId: null,
   teamId: null,
   teamName: null,
+  teamDomain: null,
   source: 'none',
   maskedToken: null,
+  status: 'needs-reconnect',
+  lastVerifiedAt: null,
   channels: [],
   updatedAt: null
 }
@@ -103,8 +112,11 @@ export class TeamWorkspaceStore {
       profileId: ws.profileId,
       teamId: ws.teamId,
       teamName: ws.teamName,
+      teamDomain: ws.teamDomain ?? null,
       source: ws.source as DashboardTeamWorkspaceSource,
       maskedToken: ws.maskedToken,
+      status: ws.status ?? 'connected',
+      lastVerifiedAt: ws.lastVerifiedAt ?? null,
       channels: ws.channels,
       updatedAt: ws.updatedAt
     }
@@ -118,7 +130,10 @@ export class TeamWorkspaceStore {
       profileId: ws.profileId,
       teamId: ws.teamId,
       teamName: ws.teamName,
+      teamDomain: ws.teamDomain ?? null,
       source: ws.source,
+      status: ws.status ?? 'connected',
+      lastVerifiedAt: ws.lastVerifiedAt ?? null,
       token: await this.readToken(ws),
       channels: ws.channels
     }
@@ -129,26 +144,53 @@ export class TeamWorkspaceStore {
     payload: DashboardTeamWorkspaceConnectPayload
     teamId: string
     teamName: string
+    teamDomain?: string | null
     profileId: string
     /** For an OAuth connection the token itself stays in TokenStore; only its mask is stored. */
     token?: string
     maskedToken?: string | null
     channels?: DashboardMonitor[]
+    status?: 'connected' | 'needs-reconnect'
     now?: string
   }): Promise<DashboardTeamWorkspace> {
     const encrypted = input.token ? await this.encrypt(input.token) : null
+    const now = input.now ?? new Date().toISOString()
     const record: StoredTeamWorkspace = {
       profileId: input.profileId,
       teamId: input.teamId,
       teamName: input.teamName,
+      teamDomain: input.teamDomain ?? undefined,
       source: input.payload.source,
       ...(encrypted?.enc ? { tokenEnc: encrypted.enc } : {}),
       ...(encrypted?.plain ? { tokenPlain: encrypted.plain } : {}),
       maskedToken: input.maskedToken ?? maskToken(input.token ?? null),
+      status: input.status ?? 'connected',
+      lastVerifiedAt: now,
       channels: input.channels ?? [],
-      updatedAt: input.now ?? new Date().toISOString()
+      updatedAt: now
     }
     await this.mutate(() => ({ workspace: record }))
+    return this.readPublic()
+  }
+
+  /** Update token health without touching the secret or the pinned channels. */
+  async setStatus(
+    status: 'connected' | 'needs-reconnect',
+    atIso = new Date().toISOString()
+  ): Promise<DashboardTeamWorkspace> {
+    let found = false
+    await this.mutate((current) => {
+      if (!current.workspace) return current
+      found = true
+      return {
+        workspace: {
+          ...current.workspace,
+          status,
+          lastVerifiedAt: atIso
+        }
+      }
+    })
+    if (!found) return this.readPublic()
     return this.readPublic()
   }
 

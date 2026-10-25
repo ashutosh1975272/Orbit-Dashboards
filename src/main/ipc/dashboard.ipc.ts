@@ -6,6 +6,8 @@ import type {
   DashboardAiSettingsQueryPayload,
   DashboardAiSettingsSavePayload,
   DashboardAiSettingsView,
+  DashboardAiTestResult,
+  DashboardGlobalConfig,
   DashboardManualToken,
   DashboardChatPage,
   DashboardChatQueryPayload,
@@ -41,6 +43,8 @@ import { handleInvoke } from './handle'
 import type { HistoryStore } from '../dashboard/history-store'
 import type { DashboardSidebarStateStore } from '../dashboard/sidebar-state'
 import { maskToken, type TeamWorkspaceStore } from '../dashboard/team-workspace-store'
+import type { ConfigService } from '../dashboard/config-service'
+import { describeMissingScopes, missingSlackScopes } from '../dashboard/slack-scopes'
 import type { DashboardViewedStore } from '../dashboard/viewed-store'
 
 export interface DashboardIpcDeps {
@@ -61,6 +65,8 @@ export interface DashboardIpcDeps {
   chatService?: DashboardChatService
   /** v2.7 — global + per-project AI provider settings */
   aiSettings?: AiSettingsService
+  /** v2.8 — one effective config resolver for Slack + AI */
+  configService?: ConfigService
   /** v3 — the one team workspace shared by every card */
   teamWorkspace?: TeamWorkspaceStore
   /** v3 — workspaces the app can already reach, offered when connecting ours */
@@ -104,6 +110,11 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
         (await deps.scheduler.getState()).settings.slackSync.intervalMinutes * 60,
       digest: deps.getDigest ? await deps.getDigest() : null
     }
+  }
+
+  const broadcastConfigChanged = async (): Promise<void> => {
+    if (!deps.configService) return
+    broadcast(IpcChannels.DashboardConfigChanged, await deps.configService.publicGlobalConfig())
   }
 
   handleInvoke(IpcChannels.DashboardGetSnapshot, async () => publicSnapshot())
@@ -340,29 +351,48 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
         // Verify with Slack before storing: a dead token must never look connected.
         const check = await poller.authTest(token)
         if (!check.valid) throw new Error(check.error ?? 'Slack rejected this token')
+        if (payload.source === 'manual') {
+          const missing = missingSlackScopes(check.scopes)
+          if (missing.length > 0) throw new Error(describeMissingScopes(missing))
+        }
         const teamId = check.teamId ?? payload.teamId ?? ''
         if (!teamId) throw new Error('Slack did not report a workspace id for this token.')
-        return store.connect({
+        const next = await store.connect({
           payload,
           profileId:
             payload.source === 'manual' ? `manual:${teamId}` : (payload.profileId as string),
           teamId,
           teamName: check.teamName ?? teamId,
           token: payload.source === 'manual' ? (token as string) : undefined,
-          maskedToken: maskToken(token)
+          maskedToken: maskToken(token),
+          status: 'connected'
         })
+        await broadcastConfigChanged()
+        return next
       }
     )
 
     handleInvoke(
       IpcChannels.DashboardTeamWorkspaceChannels,
-      async (payload: DashboardTeamWorkspaceChannelsPayload) => store.setChannels(payload.channels)
+      async (payload: DashboardTeamWorkspaceChannelsPayload) => {
+        const next = await store.setChannels(payload.channels)
+        await broadcastConfigChanged()
+        return next
+      }
     )
 
     handleInvoke(IpcChannels.DashboardTeamWorkspaceClear, async () => {
-      await store.clear()
-      return store.readPublic()
+      const next = await store.clear()
+      await broadcastConfigChanged()
+      return next
     })
+  }
+
+  // v2.8 — one effective config resolver for Slack + AI.
+  if (deps.configService) {
+    handleInvoke(IpcChannels.DashboardConfigGet, async (): Promise<DashboardGlobalConfig> =>
+      deps.configService!.publicGlobalConfig()
+    )
   }
 
   // v2.7 — AI provider settings (keys stay in main; public views are masked)
@@ -374,13 +404,24 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
     )
     handleInvoke(
       IpcChannels.DashboardSaveAiSettings,
-      async (payload: DashboardAiSettingsSavePayload): Promise<DashboardAiSettingsView> =>
-        deps.aiSettings!.save(payload)
+      async (payload: DashboardAiSettingsSavePayload): Promise<DashboardAiSettingsView> => {
+        const next = await deps.aiSettings!.save(payload)
+        await broadcastConfigChanged()
+        return next
+      }
     )
     handleInvoke(
       IpcChannels.DashboardListAiModels,
       async (payload?: DashboardAiModelsQueryPayload): Promise<DashboardAiModelsResult> =>
         deps.aiSettings!.listModels(payload?.projectId)
+    )
+    handleInvoke(
+      IpcChannels.DashboardTestAi,
+      async (payload?: DashboardAiSettingsQueryPayload): Promise<DashboardAiTestResult> => {
+        const result = await deps.aiSettings!.testConnection(payload?.projectId)
+        await broadcastConfigChanged()
+        return result
+      }
     )
   }
 

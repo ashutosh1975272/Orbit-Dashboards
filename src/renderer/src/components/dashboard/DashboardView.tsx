@@ -1,5 +1,6 @@
 import type React from 'react'
 import { useEffect, useRef, useState } from 'react'
+import type { DashboardGlobalConfig } from '../../../../shared/dashboard-contract'
 import { useDashboardStore } from '../../hooks/useDashboard'
 import ProjectCard from './ProjectCard'
 import DashboardWizard from './DashboardWizard'
@@ -26,6 +27,24 @@ function MoreGlyph(): React.JSX.Element {
   )
 }
 
+function GearGlyph(): React.JSX.Element {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+      />
+      <path
+        d="M19.4 13.5a7.7 7.7 0 0 0 0-3l2-1.5-2-3.5-2.4 1a7.8 7.8 0 0 0-2.6-1.5L14 2h-4l-.4 3a7.8 7.8 0 0 0-2.6 1.5l-2.4-1-2 3.5 2 1.5a7.7 7.7 0 0 0 0 3l-2 1.5 2 3.5 2.4-1a7.8 7.8 0 0 0 2.6 1.5L10 22h4l.4-3a7.8 7.8 0 0 0 2.6-1.5l2.4 1 2-3.5-2-1.5Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 /**
  * Dashboard page (v2.8): one header, one focus line, then a dense list of
  * project rows. A row expands in place into the full workspace.
@@ -43,7 +62,14 @@ export default function DashboardView(): React.ReactElement | null {
   const wizardOpenFor = useDashboardStore((s) => s.wizardOpenFor)
   const openWizard = useDashboardStore((s) => s.openWizard)
   const [renderError, setRenderError] = useState<Error | null>(null)
-  const [viewMode, setViewMode] = useState<'compact' | 'expanded' | 'mixed'>('mixed')
+  const [viewMode, setViewMode] = useState<'compact' | 'expanded' | 'mixed'>(() => {
+    try {
+      const saved = localStorage.getItem('orbit.view') as 'compact' | 'expanded' | 'mixed' | null
+      return saved ?? 'mixed'
+    } catch {
+      return 'mixed'
+    }
+  })
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [focusGuideSection, setFocusGuideSection] = useState<Record<string, number>>({})
   const [focusDetailKey, setFocusDetailKey] = useState<
@@ -54,6 +80,7 @@ export default function DashboardView(): React.ReactElement | null {
     nonce: number
   } | null>(null)
   const [globalSettingsOpen, setGlobalSettingsOpen] = useState(false)
+  const [globalConfig, setGlobalConfig] = useState<DashboardGlobalConfig | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [accordionMode] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -87,10 +114,20 @@ export default function DashboardView(): React.ReactElement | null {
   }, [applySnapshot, applyProgress, loadSnapshot])
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('orbit.view') as 'compact' | 'expanded' | 'mixed' | null
-      if (saved) setViewMode(saved)
-    } catch {}
+    let cancelled = false
+    void window.api.dashboard
+      .getGlobalConfig()
+      .then((next) => {
+        if (!cancelled) setGlobalConfig(next)
+      })
+      .catch(() => undefined)
+    const off = window.api.dashboard.onConfigChanged((next) => {
+      if (!cancelled) setGlobalConfig(next)
+    })
+    return () => {
+      cancelled = true
+      off()
+    }
   }, [])
 
   useEffect(() => {
@@ -202,9 +239,13 @@ export default function DashboardView(): React.ReactElement | null {
     null
   )
 
-  const handleViewChange = (mode: 'compact' | 'expanded' | 'mixed') => {
+  const handleViewChange = (mode: 'compact' | 'expanded' | 'mixed'): void => {
     setViewMode(mode)
-    try { localStorage.setItem('orbit.view', mode) } catch {}
+    try {
+      localStorage.setItem('orbit.view', mode)
+    } catch {
+      // localStorage can be unavailable in hardened sessions; view still changes.
+    }
     if (mode === 'compact') setExpandedIds(new Set())
     else if (mode === 'expanded')
       setExpandedIds(new Set((snapshot?.projects ?? []).map((p) => p.project.id)))
@@ -219,6 +260,10 @@ export default function DashboardView(): React.ReactElement | null {
     setExpandedIds(new Set(projects.map((p) => p.project.id)))
     setMenuOpen(false)
   }
+
+  const setupPending = Boolean(
+    globalConfig && (!globalConfig.ourSlack.connected || !globalConfig.nvidia.configured)
+  )
 
   return (
     <ErrorBoundary label="dashboard-view">
@@ -295,11 +340,12 @@ export default function DashboardView(): React.ReactElement | null {
 
             <button
               type="button"
-              className="btn btn-secondary"
+              className="btn btn-secondary dash-settings-btn"
               data-testid="global-settings-open"
               onClick={() => setGlobalSettingsOpen(true)}
             >
-              Global settings
+              <GearGlyph />
+              Settings
             </button>
 
             <button type="button" className="btn btn-primary" onClick={() => openWizard()}>
@@ -307,6 +353,26 @@ export default function DashboardView(): React.ReactElement | null {
             </button>
           </div>
         </header>
+
+        {setupPending ? (
+          <button
+            type="button"
+            className="dash-global-pending"
+            data-testid="global-setup-pending"
+            onClick={() => setGlobalSettingsOpen(true)}
+          >
+            <span>
+              <b>Global setup pending</b> —{' '}
+              {!globalConfig?.ourSlack.connected && !globalConfig?.nvidia.configured
+                ? 'connect Our Slack and NVIDIA'
+                : !globalConfig?.ourSlack.connected
+                  ? 'connect Our Slack'
+                  : 'add an NVIDIA key'}{' '}
+              in Settings. Cards keep their client data; AI and Our Slack stay off until then.
+            </span>
+            <span aria-hidden>→</span>
+          </button>
+        ) : null}
 
         {digest ? (
           <p className="dash-focus" data-testid="dash-digest">
@@ -407,7 +473,9 @@ export default function DashboardView(): React.ReactElement | null {
 
           {projects.length === 0 && (
             <div className="empty-state" data-testid="empty-state">
-              <div className="icon" aria-hidden="true">+</div>
+              <div className="icon" aria-hidden="true">
+                +
+              </div>
               <h3>No project cards yet</h3>
               <p>
                 Click <strong>New project</strong>. A guided setup walks you through it: create the

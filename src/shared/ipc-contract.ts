@@ -4,6 +4,8 @@ import type {
   DashboardAiSettingsQueryPayload,
   DashboardAiSettingsSavePayload,
   DashboardAiSettingsView,
+  DashboardAiTestResult,
+  DashboardGlobalConfig,
   DashboardListChannelsPayload,
   DashboardAppClientConfig,
   DashboardChatMessage,
@@ -146,6 +148,9 @@ export const IpcChannels = {
   DashboardGetAiSettings: 'dashboard:get-ai-settings',
   DashboardSaveAiSettings: 'dashboard:save-ai-settings',
   DashboardListAiModels: 'dashboard:list-ai-models',
+  DashboardTestAi: 'dashboard:test-ai',
+  DashboardConfigGet: 'dashboard:config-get',
+  DashboardConfigChanged: 'dashboard:config-changed',
 
   DashboardTeamWorkspaceGet: 'dashboard:team-workspace-get',
   DashboardTeamWorkspaceCandidates: 'dashboard:team-workspace-candidates',
@@ -317,6 +322,9 @@ export interface IpcApi {
     getAiSettings: (payload?: DashboardAiSettingsQueryPayload) => Promise<DashboardAiSettingsView>
     saveAiSettings: (payload: DashboardAiSettingsSavePayload) => Promise<DashboardAiSettingsView>
     listAiModels: (payload?: DashboardAiModelsQueryPayload) => Promise<DashboardAiModelsResult>
+    testAi: (payload?: DashboardAiSettingsQueryPayload) => Promise<DashboardAiTestResult>
+    getGlobalConfig: () => Promise<DashboardGlobalConfig>
+    onConfigChanged: (callback: (config: DashboardGlobalConfig) => void) => () => void
     getTeamWorkspace: () => Promise<DashboardTeamWorkspace>
     listTeamWorkspaceCandidates: () => Promise<DashboardTeamWorkspaceCandidate[]>
     connectTeamWorkspace: (

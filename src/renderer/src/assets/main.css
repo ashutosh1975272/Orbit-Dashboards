@@ -5871,3 +5871,121 @@ body.is-resizing-nav { cursor: col-resize; user-select: none; }
     display: none;
   }
 }
+
+/* v2.8 — Global Config */
+.dash-settings-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.dash-global-pending {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 18px;
+  padding: 11px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border-panel));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: left;
+  cursor: pointer;
+}
+.dash-global-pending b {
+  color: var(--text);
+  font-weight: 600;
+}
+.dash-global-pending:hover {
+  border-color: var(--accent);
+}
+.global-config-connected {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-panel);
+  border-radius: 10px;
+  background: var(--bg-panel);
+}
+.global-config-connected > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.global-config-connected b {
+  font-size: 13px;
+  color: var(--text);
+}
+.global-config-status {
+  flex: none;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.global-config-status.is-ok {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+}
+.global-config-status.is-bad {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+.global-config-usage {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.global-config-usage > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-panel);
+  border-radius: 8px;
+}
+.global-config-usage b {
+  font-size: 19px;
+  line-height: 1.1;
+  color: var(--text);
+}
+.global-config-usage span {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.global-config-howto-toggle {
+  align-self: flex-start;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 11.5px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.global-config-howto {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.global-settings-panel .settings-header {
+  align-items: flex-start;
+}
+.global-settings-panel .settings-header .settings-hint {
+  margin: 5px 0 0;
+  max-width: 52ch;
+}

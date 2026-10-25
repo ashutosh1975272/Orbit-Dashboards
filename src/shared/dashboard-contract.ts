@@ -30,10 +30,17 @@ export interface DashboardTeamWorkspace {
   profileId: string | null
   teamId: string | null
   teamName: string | null
+  teamDomain: string | null
   source: DashboardTeamWorkspaceSource
   /** Mask such as "••••abcd"; null when nothing is connected. */
   maskedToken: string | null
-  /** The channels pinned from this workspace onto every card. */
+  /** Last known health of the connected token. */
+  status: 'connected' | 'needs-reconnect'
+  lastVerifiedAt: string | null
+  /**
+   * Legacy global pins. Kept for existing cards until per-project Our Slack
+   * channel mapping lands; new cards map channels on the project.
+   */
   channels: DashboardMonitor[]
   updatedAt: string | null
 }
@@ -74,6 +81,15 @@ export interface DashboardProject {
   /** Slack user id of the token owner (= the freelancer, not the client). */
   selfUserId?: string
   monitors: DashboardMonitor[]
+  /**
+   * Our Slack channels this project reads. Empty means none; per-project
+   * mapping replaces the legacy global pin set.
+   */
+  ourSlackChannels?: DashboardMonitor[]
+  /** Vault key for a project-specific Our Slack token (advanced override). */
+  ourSlackTokenKey?: string
+  ourSlackTeamId?: string
+  ourSlackTeamName?: string
   /** User-set dates (ISO yyyy-mm-dd) — win over extractedDates. */
   startDate?: string
   endDate?: string
@@ -624,25 +640,34 @@ export type AiProviderId = 'nvidia-nim'
 /** Never contains the raw key — only a mask such as "••••abcd". */
 export interface AiSettingsPublic {
   provider: AiProviderId
-  /** Configured model, null when this scope does not override one. */
+  /** Configured chat model, null when this scope does not override one. */
   model: string | null
+  /** Configured embedding model, null when this scope does not override one. */
+  embeddingModel: string | null
   /** Masked stored key ("••••abcd"); null when none is stored here. */
   apiKeyMask: string | null
   hasKey: boolean
+  status: DashboardConfigStatus
+  lastVerifiedAt: string | null
 }
 
 export interface ProjectAiSettingsPublic extends AiSettingsPublic {
-  /** true = ignore this project's overrides and use the dashboard settings. */
+  /** Legacy coarse switch. Field-level overrides are reflected in `sources`. */
   useGlobal: boolean
 }
 
-export type AiSettingsSource = 'project' | 'global' | 'env' | 'none'
+export type AiSettingsSource = 'project' | 'global' | 'default' | 'none'
 
 /** What the insight engine / project chat will actually use. */
 export interface EffectiveAiSettings {
   provider: AiProviderId
+  /** Chat model. `model` is kept as a compatibility alias. */
   model: string
-  modelSource: 'project' | 'global' | 'env'
+  chatModel: string
+  embeddingModel: string
+  modelSource: AiSettingsSource
+  chatModelSource: AiSettingsSource
+  embeddingModelSource: AiSettingsSource
   keySource: AiSettingsSource
   /** Masked key for the effective key, never the key itself. */
   apiKeyMask: string | null
@@ -666,6 +691,8 @@ export interface DashboardAiSettingsSavePayload {
   provider?: AiProviderId
   /** null clears the override; undefined keeps the stored value. */
   model?: string | null
+  /** null clears the override; undefined keeps the stored value. */
+  embeddingModel?: string | null
   /** null clears the key; undefined keeps it; a string replaces it. */
   apiKey?: string | null
 }
@@ -676,6 +703,39 @@ export interface DashboardAiModelsQueryPayload {
 
 export interface DashboardAiModelsResult {
   models: string[]
+  /** Embedding model ids, when the provider exposes them separately. */
+  embeddingModels: string[]
   source: AiSettingsSource
   error?: string
+}
+
+/* ===== Global config (one per app) ===== */
+
+export type DashboardConfigStatus = 'ok' | 'invalid' | 'not-configured'
+
+export interface DashboardGlobalNvidiaConfig {
+  configured: boolean
+  apiKeyMask: string | null
+  chatModel: string | null
+  embeddingModel: string | null
+  status: DashboardConfigStatus
+  lastVerifiedAt: string | null
+}
+
+export interface DashboardConfigUsage {
+  projects: number
+  usingGlobalAi: number
+  usingGlobalOurSlack: number
+}
+
+export interface DashboardGlobalConfig {
+  ourSlack: DashboardTeamWorkspace
+  nvidia: DashboardGlobalNvidiaConfig
+  usage: DashboardConfigUsage
+}
+
+export interface DashboardAiTestResult {
+  ok: boolean
+  error?: string
+  models?: number
 }

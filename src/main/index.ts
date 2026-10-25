@@ -33,7 +33,9 @@ import { HistoryStore } from './dashboard/history-store'
 import { DashboardViewedStore } from './dashboard/viewed-store'
 import { DashboardScheduleStore } from './dashboard/schedule-store'
 import { AiSettingsStore } from './dashboard/ai-settings-store'
-import { AiSettingsService } from './dashboard/ai-settings'
+import { AiSettingsService, DEFAULT_EMBEDDING_MODEL } from './dashboard/ai-settings'
+import { ConfigService } from './dashboard/config-service'
+import { migrateConfigV1 } from './dashboard/config-migration'
 import { InsightEngine } from './dashboard/insight-engine'
 import { SlackPoller } from './dashboard/slack-poller'
 import { loadAppEnv } from './load-app-env'
@@ -290,27 +292,47 @@ if (!gotSingleInstanceLock) {
       process.env.NVIDIA_NIM_MODEL_PRIMARY ?? 'nvidia/nemotron-3.5-super-vl-120b-a12b'
     const nimFallback =
       process.env.NVIDIA_NIM_MODEL_FALLBACK ?? 'nvidia/nemotron-3.5-lightning-30b-a3b'
+    const nimEmbeddingModel = process.env.NVIDIA_NIM_EMBEDDING_MODEL ?? DEFAULT_EMBEDDING_MODEL
     const nimTimeoutMs = Number(process.env.NVIDIA_NIM_TIMEOUT_MS ?? 90_000)
     const nimMaxTokens = Number(process.env.NVIDIA_NIM_MAX_TOKENS ?? 2000)
     // reasoning models burn the whole token budget on reasoning and answer
     // nothing, so thinking is off by default (re-enable from .env)
     const nimEnableThinking = process.env.NVIDIA_NIM_ENABLE_THINKING === 'true'
-    // v2.7 — project settings → global settings → env defaults. The key never
-    // leaves this process; the renderer only sees masks.
+    // v2.7 — project settings → global settings → built-in default models. The
+    // key never leaves this process; the renderer only sees masks.
     const aiSettingsStore = new AiSettingsStore({
       rootDir: dashboardRoot,
       encryptionAvailable: (await import('electron')).safeStorage.isEncryptionAvailable()
     })
+    // One-time seed from .env keeps existing installs working; afterwards the
+    // resolver is the only reader of AI config.
+    await migrateConfigV1({
+      rootDir: dashboardRoot,
+      aiSettingsStore,
+      env: {
+        nvidiaApiKey: process.env.NVIDIA_NIM_API_KEY,
+        nvidiaChatModel: nimPrimary,
+        nvidiaEmbeddingModel: nimEmbeddingModel
+      }
+    }).catch((err) => {
+      log.warn(`[dashboard] config migration skipped: ${err instanceof Error ? err.message : err}`)
+    })
     const aiSettings = new AiSettingsService({
       store: aiSettingsStore,
-      env: {
-        apiKey: process.env.NVIDIA_NIM_API_KEY ?? '',
-        model: nimPrimary,
+      defaults: {
+        chatModel: nimPrimary,
+        embeddingModel: nimEmbeddingModel,
         fallbackModel: nimFallback
       },
       timeoutMs: Number.isFinite(nimTimeoutMs) ? nimTimeoutMs : 90_000,
       maxTokens: Number.isFinite(nimMaxTokens) ? nimMaxTokens : 2000,
       enableThinking: nimEnableThinking
+    })
+    const configService = new ConfigService({
+      aiSettings,
+      teamWorkspace: teamWorkspaceStore,
+      monitorStore: dashboardMonitorStore,
+      oauthTokenProvider: { tryGet: (profileId, teamId) => tokenStore.tryGet(profileId, teamId) }
     })
     const dashboardHistoryStore = new HistoryStore({ rootDir: dashboardRoot })
     const dashboardViewedStore = new DashboardViewedStore({ rootDir: dashboardRoot })
@@ -524,6 +546,7 @@ if (!gotSingleInstanceLock) {
       sidebarStateStore: dashboardSidebarStateStore,
       chatService: dashboardChatService,
       aiSettings,
+      configService,
       teamWorkspace: teamWorkspaceStore,
       listTeamWorkspaceCandidates,
       viewedStore: dashboardViewedStore

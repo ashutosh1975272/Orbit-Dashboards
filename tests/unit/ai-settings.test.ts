@@ -16,7 +16,10 @@ async function tmpStore(): Promise<AiSettingsStore> {
 function makeService(store: AiSettingsStore): AiSettingsService {
   return new AiSettingsService({
     store,
-    env: { apiKey: 'env-key-9999', model: 'env/model' }
+    defaults: {
+      chatModel: 'default/chat',
+      embeddingModel: 'default/embed'
+    }
   })
 }
 
@@ -78,29 +81,30 @@ describe('AiSettingsStore', () => {
 })
 
 describe('AiSettingsService.resolveSettings', () => {
-  it('prefers the project, then global, then environment', async () => {
+  it('prefers the project, then global, then built-in defaults', async () => {
     const store = await tmpStore()
     const service = makeService(store)
 
     let resolved = await service.resolveSettings('p1')
-    expect(resolved.apiKey).toBe('env-key-9999')
-    expect(resolved.model).toBe('env/model')
-    expect(resolved.keySource).toBe('env')
-    expect(resolved.modelSource).toBe('env')
+    expect(resolved.apiKey).toBeNull()
+    expect(resolved.chatModel).toBe('default/chat')
+    expect(resolved.embeddingModel).toBe('default/embed')
+    expect(resolved.keySource).toBe('none')
+    expect(resolved.chatModelSource).toBe('default')
 
     await store.saveGlobal({ apiKey: 'global-key-2222', model: 'global-model' })
     resolved = await service.resolveSettings('p1')
     expect(resolved.apiKey).toBe('global-key-2222')
-    expect(resolved.model).toBe('global-model')
+    expect(resolved.chatModel).toBe('global-model')
     expect(resolved.keySource).toBe('global')
-    expect(resolved.modelSource).toBe('global')
+    expect(resolved.chatModelSource).toBe('global')
 
     await service.save({ projectId: 'p1', model: 'project-model', apiKey: 'project-key-3333' })
     resolved = await service.resolveSettings('p1')
     expect(resolved.apiKey).toBe('project-key-3333')
-    expect(resolved.model).toBe('project-model')
+    expect(resolved.chatModel).toBe('project-model')
     expect(resolved.keySource).toBe('project')
-    expect(resolved.modelSource).toBe('project')
+    expect(resolved.chatModelSource).toBe('project')
   })
 
   it('ignores project overrides while useGlobal is on', async () => {
@@ -114,27 +118,39 @@ describe('AiSettingsService.resolveSettings', () => {
     })
 
     const resolved = await service.resolveSettings('p1')
-    expect(resolved.model).toBe('global-model')
+    expect(resolved.chatModel).toBe('global-model')
     expect(resolved.apiKey).toBe('global-key-2222')
-    expect(resolved.modelSource).toBe('global')
+    expect(resolved.chatModelSource).toBe('global')
     expect(resolved.keySource).toBe('global')
   })
 
-  it('falls back to the environment when nothing is configured', async () => {
+  it('resolves chat and embedding overrides independently', async () => {
     const store = await tmpStore()
     const service = makeService(store)
-    const view = await service.publicView()
-    expect(view.effective.model).toBe('env/model')
-    expect(view.effective.keySource).toBe('env')
-    expect(view.global.hasKey).toBe(false)
+    await store.saveGlobal({
+      apiKey: 'global-key-2222',
+      model: 'global-chat',
+      embeddingModel: 'global-embed'
+    })
+    await service.save({
+      projectId: 'p1',
+      useGlobal: false,
+      model: 'project-chat',
+      embeddingModel: null
+    })
+
+    const resolved = await service.resolveSettings('p1')
+    expect(resolved.apiKey).toBe('global-key-2222')
+    expect(resolved.chatModel).toBe('project-chat')
+    expect(resolved.embeddingModel).toBe('global-embed')
+    expect(resolved.chatModelSource).toBe('project')
+    expect(resolved.embeddingModelSource).toBe('global')
+    expect(resolved.keySource).toBe('global')
   })
 
-  it('returns no key when the environment is empty too', async () => {
+  it('returns no key when nothing is configured', async () => {
     const store = await tmpStore()
-    const service = new AiSettingsService({
-      store,
-      env: { apiKey: '  ', model: 'env/model' }
-    })
+    const service = makeService(store)
     const resolved = await service.resolveSettings('missing')
     expect(resolved.apiKey).toBeNull()
     expect(resolved.keySource).toBe('none')
@@ -201,7 +217,10 @@ describe('AiSettingsService.save — the Global Settings seam', () => {
     await expect(service.save({ model: 'm'.repeat(201) })).rejects.toThrow(/too long/i)
 
     const store = await tmpStore()
-    await new AiSettingsService({ store, env: { apiKey: '', model: 'env/model' } }).save({
+    await new AiSettingsService({
+      store,
+      defaults: { chatModel: 'default/chat' }
+    }).save({
       apiKey: 'k'.repeat(512)
     })
     expect((await store.readGlobal()).apiKeyPlain).toBe('k'.repeat(512))
@@ -220,9 +239,13 @@ describe('AiSettingsService.save — the Global Settings seam', () => {
 describe('AiSettingsService.listModels', () => {
   it('returns an error when no key is configured anywhere', async () => {
     const store = await tmpStore()
-    const service = new AiSettingsService({ store, env: { apiKey: '', model: 'env/model' } })
+    const service = new AiSettingsService({
+      store,
+      defaults: { chatModel: 'default/chat' }
+    })
     const result = await service.listModels()
     expect(result.models).toEqual([])
+    expect(result.embeddingModels).toEqual([])
     expect(result.source).toBe('none')
     expect(result.error).toBeTruthy()
   })
