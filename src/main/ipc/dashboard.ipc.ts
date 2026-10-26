@@ -415,10 +415,9 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
         // Verify with Slack before storing: a dead token must never look connected.
         const check = await poller.authTest(token)
         if (!check.valid) throw new Error(check.error ?? 'Slack rejected this token')
-        if (payload.source === 'manual') {
-          const missing = missingSlackScopes(check.scopes)
-          if (missing.length > 0) throw new Error(describeMissingScopes(missing))
-        }
+        // OAuth tokens can be under-scoped too; warn at connect instead of later.
+        const missing = missingSlackScopes(check.scopes)
+        if (missing.length > 0) throw new Error(describeMissingScopes(missing))
         const teamId = check.teamId ?? payload.teamId ?? ''
         if (!teamId) throw new Error('Slack did not report a workspace id for this token.')
         const next = await store.connect({

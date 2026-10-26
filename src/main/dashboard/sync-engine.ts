@@ -1,4 +1,5 @@
-import { SlackPoller } from './slack-poller'
+import { SlackPoller, isSlackAuthFailure } from './slack-poller'
+import { slackTokenKey } from './slack-throttle'
 import type { InsightEngine } from './insight-engine'
 import type {
   DashboardChannelDelta,
@@ -40,8 +41,21 @@ export interface TeamWorkspaceReader {
     teamId: string
     token: string | null
     channels: DashboardMonitor[]
+    status?: 'connected' | 'needs-reconnect'
   } | null>
+  /** Token-health write-back so Settings can show the reconnect badge. */
+  setStatus?(status: 'connected' | 'needs-reconnect', atIso?: string): Promise<unknown>
 }
+
+/** One channel page fetched during the current sync cycle. */
+type CycleHistoryPage = { messages: DashboardStoredMessage[]; hasMore: boolean }
+
+/**
+ * Cycle-scoped memo keyed by (token identity, channel, cursor): two cards on
+ * one workspace share the fetch. Never kept across cycles — every incremental
+ * cursor must be re-read fresh next time.
+ */
+export type CycleHistoryCache = Map<string, Promise<CycleHistoryPage>>
 
 /** One workspace a sync run has to read. */
 interface SyncWorkspace {
@@ -96,7 +110,8 @@ export class DashboardSyncEngine {
   private readonly pollerFactory: () => DashboardPoller
   private readonly log: (msg: string) => void
   private readonly insightReader: InsightReader | undefined
-  private readonly historyReader: ((projectId: string) => Promise<InsightHistoryEntry[]>) | undefined
+  private readonly historyReader:
+    ((projectId: string) => Promise<InsightHistoryEntry[]>) | undefined
   private readonly viewedStore: { get(projectId: string): Promise<string | null> } | undefined
   private readonly metricsCache: Map<string, { key: string; value: DashboardMetrics }> = new Map()
   private readonly onSynced: ((snapshots: DashboardProjectSnapshot[]) => void) | undefined
@@ -158,7 +173,8 @@ export class DashboardSyncEngine {
   /** Pull new messages for every channel of one workspace and append them. */
   private async syncWorkspace(
     workspace: SyncWorkspace,
-    poller: DashboardPoller
+    poller: DashboardPoller,
+    historyCache?: CycleHistoryCache
   ): Promise<DashboardChannelDelta[]> {
     const perChannel: DashboardChannelDelta[] = []
 
@@ -170,12 +186,19 @@ export class DashboardSyncEngine {
       )
       const cursor = before?.cursor
 
-      const result = await poller.fetchHistory({
-        token: workspace.token,
-        channelId: monitor.channelId,
-        afterTs: cursor,
-        limit: 200
-      })
+      const result = await this.cycleFetch(
+        historyCache,
+        workspace.token,
+        monitor.channelId,
+        cursor,
+        () =>
+          poller.fetchHistory({
+            token: workspace.token,
+            channelId: monitor.channelId,
+            afterTs: cursor,
+            limit: 200
+          })
+      )
 
       const stored = await this.deltaStore.appendMessages({
         profileId: workspace.profileId,
@@ -206,6 +229,36 @@ export class DashboardSyncEngine {
     return perChannel
   }
 
+  /** One page per (token identity, channel, cursor) per cycle — see CycleHistoryCache. */
+  private cycleFetch(
+    cache: CycleHistoryCache | undefined,
+    token: string,
+    channelId: string,
+    cursor: string | undefined,
+    load: () => Promise<CycleHistoryPage>
+  ): Promise<CycleHistoryPage> {
+    if (!cache) return load()
+    const key = `${slackTokenKey(token)}|${channelId}|${cursor ?? ''}`
+    const cached = cache.get(key)
+    if (cached) return cached
+    const created = load()
+    cache.set(key, created)
+    return created
+  }
+
+  /** Reflect our-team token health in Settings; identical states write nothing. */
+  private async markTeamStatus(
+    status: 'connected' | 'needs-reconnect',
+    current?: 'connected' | 'needs-reconnect'
+  ): Promise<void> {
+    if (!this.teamWorkspace?.setStatus || current === status) return
+    try {
+      await this.teamWorkspace.setStatus(status, new Date().toISOString())
+    } catch (err) {
+      this.log(`[dashboard] team workspace status write failed: ${String(err)}`)
+    }
+  }
+
   /** Read our team workspace without throwing: a missing one is simply absent. */
   private async ourWorkspace(): Promise<{
     connection: {
@@ -213,6 +266,7 @@ export class DashboardSyncEngine {
       teamId: string
       token: string | null
       channels: DashboardMonitor[]
+      status?: 'connected' | 'needs-reconnect'
     } | null
     error: string | null
   }> {
@@ -278,7 +332,10 @@ export class DashboardSyncEngine {
     }
   }
 
-  async syncProject(projectId: string): Promise<DashboardProjectSnapshot | null> {
+  async syncProject(
+    projectId: string,
+    historyCache?: CycleHistoryCache
+  ): Promise<DashboardProjectSnapshot | null> {
     const projects = await this.monitorStore.listProjects()
     const project = projects.find((p) => p.id === projectId)
     if (!project) return null
@@ -310,7 +367,8 @@ export class DashboardSyncEngine {
           token,
           monitors: project.monitors
         },
-        poller
+        poller,
+        historyCache
       )
 
       // Our team workspace is additive: if it fails, the client sync still
@@ -333,10 +391,16 @@ export class DashboardSyncEngine {
                 token: connection.token,
                 monitors: connection.channels
               },
-              poller
+              poller,
+              historyCache
             )
+            await this.markTeamStatus('connected', connection.status)
           } catch (err) {
             ourWorkspaceError = err instanceof Error ? err.message : 'our workspace sync failed'
+            // Only a dead token flips the badge; a network blip must not.
+            if (isSlackAuthFailure(err)) {
+              await this.markTeamStatus('needs-reconnect', connection.status)
+            }
             this.log(`[dashboard] our-workspace sync failed: ${ourWorkspaceError}`)
           }
         }
@@ -402,8 +466,10 @@ export class DashboardSyncEngine {
   async syncAll(): Promise<DashboardProjectSnapshot[]> {
     const projects = await this.monitorStore.listProjects()
     const results: DashboardProjectSnapshot[] = []
+    // One cache per cycle: cards watching the same channel share the page fetch.
+    const historyCache: CycleHistoryCache = new Map()
     for (const project of projects) {
-      const snap = await this.syncProject(project.id)
+      const snap = await this.syncProject(project.id, historyCache)
       if (snap) results.push(snap)
     }
     try {
@@ -616,8 +682,11 @@ export class DashboardInsightSyncEngine extends DashboardSyncEngine {
     }
   }
 
-  override async syncProject(projectId: string): Promise<DashboardProjectSnapshot | null> {
-    const snapshot = await super.syncProject(projectId)
+  override async syncProject(
+    projectId: string,
+    historyCache?: CycleHistoryCache
+  ): Promise<DashboardProjectSnapshot | null> {
+    const snapshot = await super.syncProject(projectId, historyCache)
     if (!snapshot || !this.insightEngine) return snapshot
     const projects = await this.monitorStore.listProjects()
     const project = projects.find((p) => p.id === projectId)

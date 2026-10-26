@@ -1,5 +1,6 @@
 /** Slack API polling dedicated to the dashboard (existing client untouched). */
 import type { DashboardStoredMessage } from './delta-store'
+import { reportSlackRateLimit, slackTokenKey, withSlackLimit } from './slack-throttle'
 
 export interface PollFetchResult {
   messages: DashboardStoredMessage[]
@@ -91,17 +92,29 @@ function parseScopes(header: string | null): string[] | null {
   return scopes.length > 0 ? scopes : null
 }
 
-async function callApiDetailed<T extends { ok: boolean; error?: string }>(
+/** Slack errors whose only fix is reconnecting the token. */
+const SLACK_RECONNECT_ERRORS = new Set([
+  'invalid_auth',
+  'not_authed',
+  'token_revoked',
+  'account_inactive'
+])
+
+/** True when a poller error means "the token is dead" (never for network blips). */
+export function isSlackAuthFailure(err: unknown): boolean {
+  const slackError = (err as (Error & { slackError?: string }) | undefined)?.slackError
+  return slackError !== undefined && SLACK_RECONNECT_ERRORS.has(slackError)
+}
+
+async function fetchSlack(
   method: string,
   token: string,
-  params: Record<string, string>,
-  attempt = 0
-): Promise<SlackCallResult<T>> {
+  params: Record<string, string>
+): Promise<Response> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), SLACK_TIMEOUT_MS)
-  let res: Response
   try {
-    res = await fetch(`https://slack.com/api/${method}`, {
+    return await fetch(`https://slack.com/api/${method}`, {
       method: 'POST',
       signal: controller.signal,
       headers: {
@@ -115,18 +128,48 @@ async function callApiDetailed<T extends { ok: boolean; error?: string }>(
   } finally {
     clearTimeout(timer)
   }
+}
+
+function rateLimitWaitMs(res: Response): number {
+  const retryAfter = Number(res.headers.get('Retry-After') ?? '1')
+  const waitSeconds = Number.isFinite(retryAfter) ? Math.min(60, Math.max(1, retryAfter)) : 1
+  return waitSeconds * 1000
+}
+
+async function handleRateLimit<T extends { ok: boolean; error?: string }>(
+  method: string,
+  token: string,
+  params: Record<string, string>,
+  attempt: number,
+  res: Response
+): Promise<SlackCallResult<T>> {
+  if (attempt >= MAX_RATE_LIMIT_RETRIES) {
+    const err = new Error(`slack ${method}: still rate limited after ${attempt + 1} attempts`)
+    ;(err as Error & { slackError?: string }).slackError = 'ratelimited'
+    throw err
+  }
+  const waitMs = rateLimitWaitMs(res)
+  // Every other caller on this token must also wait out the window.
+  reportSlackRateLimit(slackTokenKey(token), waitMs)
+  await sleep(waitMs)
+  return callApiDetailed<T>(method, token, params, attempt + 1)
+}
+
+async function callApiDetailed<T extends { ok: boolean; error?: string }>(
+  method: string,
+  token: string,
+  params: Record<string, string>,
+  attempt = 0
+): Promise<SlackCallResult<T>> {
+  const res = await withSlackLimit(slackTokenKey(token), () => fetchSlack(method, token, params))
+  // A 429 status is a rate limit even when the body is not Slack's JSON error.
+  if (res.status === 429) {
+    return handleRateLimit<T>(method, token, params, attempt, res)
+  }
   const body = (await res.json()) as T
   if (!body.ok) {
     if (body.error === 'ratelimited') {
-      if (attempt >= MAX_RATE_LIMIT_RETRIES) {
-        const err = new Error(`slack ${method}: still rate limited after ${attempt + 1} attempts`)
-        ;(err as Error & { slackError?: string }).slackError = 'ratelimited'
-        throw err
-      }
-      const retryAfter = Number(res.headers.get('Retry-After') ?? '1')
-      const waitSeconds = Number.isFinite(retryAfter) ? Math.min(60, Math.max(1, retryAfter)) : 1
-      await sleep(waitSeconds * 1000)
-      return callApiDetailed(method, token, params, attempt + 1)
+      return handleRateLimit<T>(method, token, params, attempt, res)
     }
     const err = new Error(`slack ${method}: ${body.error}`)
     ;(err as Error & { slackError?: string }).slackError = body.error

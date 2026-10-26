@@ -6615,6 +6615,12 @@ body.is-resizing-nav { cursor: col-resize; user-select: none; }
   color: var(--danger);
   background: color-mix(in srgb, var(--danger) 12%, transparent);
 }
+/* Team token-health pill — same language as the workspace detail badges. */
+.global-config-connected .team-reconnect-badge {
+  flex: none;
+  height: 22px;
+  padding: 0 10px;
+}
 .global-config-usage {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

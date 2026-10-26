@@ -114,15 +114,13 @@ export default function TeamSlackSettings(): React.ReactElement {
               {workspace.teamDomain ? ` · ${workspace.teamDomain}.slack.com` : ''}
             </small>
           </div>
-          <span
-            className={
-              workspace.status === 'connected'
-                ? 'global-config-status is-ok'
-                : 'global-config-status is-bad'
-            }
-          >
-            {workspace.status === 'connected' ? 'Connected' : 'Needs reconnect'}
-          </span>
+          {workspace.status === 'connected' ? (
+            <span className="global-config-status is-ok">Connected</span>
+          ) : (
+            <span className="ws-detail-badge tone-danger team-reconnect-badge">
+              Needs reconnect
+            </span>
+          )}
         </div>
 
         <p className="ai-settings-hint">
