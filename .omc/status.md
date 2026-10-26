@@ -1,5 +1,35 @@
 # Status Ledger
 
+## Project Card — Remove Ask Agent from Project Card (2026-10-26)
+- `npm run typecheck`: PASS (node + web, exit 0)
+- `npm test`: PASS — **61 files, 490/490** tests (exit 0, no regressions)
+- `npm run build`: PASS — main 419.67 kB, preload 18.89 kB, renderer 94 modules, CSS 163.02 kB, JS 1,087.90 kB (exit 0)
+- removed from `DashboardPage.tsx`:
+  - `ASK_SUGGESTIONS` array ('Kitna complete hua?', 'Kaun se blockers hain?', 'Client ne last kya bola?', 'Next step kya hai?')
+  - `onAskAgent` prop and handler
+  - `askDraft` state, `askDisabled` condition, and `submitQuestion` callback
+  - `dash-ask` JSX block containing `dash-ask-agent` form (`<input>`, `<button>Ask</button>`) and suggestion chips
+- retained intact:
+  - Freshness line (`FreshnessLine` / `.dash-fresh`): "Updated Xd ago · next sync in M:SS" (or countdown / auto-sync / paused / error)
+  - `Sync` button (`.dash-fresh-sync`)
+  - all card headers, KPI tiles, progress ring, situation, next step, attention, activity, rail widgets
+  - `AgentChatPanel.tsx` (Xomni "Chat with project") with its own composer and suggestions untouched
+- removed dead CSS from `src/renderer/src/assets/main.css`:
+  - `.dash-ask`, `.dash-ask-agent`, `.dash-ask-hint`, `.dash-ask-chips`, `.dash-chip-btn`
+- specs updated / marked REMOVED:
+  - `.omc/plans/dashboard-expanded.md`
+  - `docs/PROJECT-OVERVIEW.md` and root `PROJECT-OVERVIEW.md`
+  - `docs/superpowers/specs/2026-10-25-single-sidebar-workspace-design.md`
+  - root `dashboard-ui.md`
+- tests updated (not deleted/skipped):
+  - `tests/ui/dashboard-page.test.tsx`:
+    - `does not render Ask agent input, Ask button or suggestion chips, and keeps the freshness line and Sync button`
+    - `omits Ask agent input and chips when no AI key is configured while retaining Freshness line and setup checklist`
+- screenshots recorded in `.omc/screenshots/`:
+  - Before: `before-dashboard-rich-1100.png`, `before-dashboard-rich-1500.png`, `before-dashboard-rich-1900.png`, `before-dashboard-sparse-1100.png`, `before-dashboard-sparse-1500.png`, `before-dashboard-sparse-1900.png`
+  - After: `after-dashboard-rich-1100.png`, `after-dashboard-rich-1500.png`, `after-dashboard-rich-1900.png`, `after-dashboard-sparse-1100.png`, `after-dashboard-sparse-1500.png`, `after-dashboard-sparse-1900.png`
+  - Canonical: `dashboard-rich-1100.png`, `dashboard-rich-1500.png`, `dashboard-rich-1900.png`, `dashboard-sparse-1100.png`, `dashboard-sparse-1500.png`, `dashboard-sparse-1900.png`
+
 ## Audit P0 / correctness fixes — all ten items shipped (2026-10-26, commits `eef3223`, `25c3369`, `6089b72`, `966e173`)
 - `pnpm typecheck` (node + web): PASS (exit 0)
 - `pnpm vitest run`: PASS — **59 files, 462/462** (exit 0). `vitest.audit.config.ts` deleted; `tests/audit/**` runs in the default suite

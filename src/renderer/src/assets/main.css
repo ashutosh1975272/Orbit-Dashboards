@@ -4072,63 +4072,6 @@ body.is-resizing-nav { cursor: col-resize; user-select: none; }
   font-size: 12px;
   color: var(--warn);
 }
-.dash-ask {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.dash-ask-agent {
-  display: flex;
-  gap: 8px;
-  width: 100%;
-}
-.dash-ask-agent input {
-  flex: 1;
-  min-width: 0;
-  height: 36px;
-  padding: 0 12px;
-  border-radius: var(--radius-input);
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text);
-  font-size: 13px;
-}
-.dash-ask-agent input::placeholder { color: var(--text-faint); }
-.dash-ask-agent input:focus {
-  outline: none;
-  border-color: var(--accent-btn);
-  box-shadow: 0 0 0 2px var(--accent-soft);
-}
-.dash-ask-agent button {
-  flex-shrink: 0;
-  height: 36px;
-  padding: 0 16px;
-  border-radius: var(--radius-input);
-  border: 1px solid var(--border-btn);
-  background: var(--surface-2);
-  color: var(--text-muted);
-  font-size: 12.5px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.dash-ask-agent button:hover:not(:disabled) { color: var(--text); background: var(--hover); }
-.dash-ask-agent button:disabled { opacity: 0.45; cursor: default; }
-.dash-ask-hint { margin: 0; }
-.dash-ask-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.dash-chip-btn {
-  padding: 5px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--border-soft);
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 11.5px;
-  cursor: pointer;
-}
-.dash-chip-btn:hover { color: var(--text); background: var(--hover); }
 
 .dash-kpis {
   display: grid;

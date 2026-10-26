@@ -38,12 +38,21 @@ const schedules: DashboardSchedulesState = {
   runs: []
 }
 
-function installApi(options: { hasKey?: boolean; activity?: DashboardProjectActivity } = {}): {
+function installApi(
+  options: {
+    hasKey?: boolean
+    activity?: DashboardProjectActivity
+    nextRunAt?: string | null
+  } = {}
+): {
   getProjectActivity: ReturnType<typeof vi.fn>
 } {
   const getProjectActivity = vi.fn(async () => options.activity ?? richActivity)
   setDashboardApi({
-    getSchedules: vi.fn(async () => schedules),
+    getSchedules: vi.fn(async () => ({
+      ...schedules,
+      nextRunAt: options.nextRunAt ?? schedules.nextRunAt
+    })),
     onSchedulesChanged: vi.fn(() => () => undefined),
     getProjectChatStatus: vi.fn(async () => ({
       hasKey: options.hasKey ?? true,
@@ -61,12 +70,10 @@ function renderPage(
   snapshot: DashboardProjectSnapshot,
   overrides: {
     onSelect?: Mock<(selection: SelectionId) => void>
-    onAskAgent?: Mock<(question: string) => void>
     onOpenSettings?: Mock<() => void>
   } = {}
 ): void {
   const onSelect = vi.fn<(selection: SelectionId) => void>()
-  const onAskAgent = vi.fn<(question: string) => void>()
   const onOpenSettings = vi.fn<() => void>()
   render(
     <DashboardPage
@@ -78,7 +85,6 @@ function renderPage(
       onSync={vi.fn()}
       onOpenSettings={overrides.onOpenSettings ?? onOpenSettings}
       onSelect={overrides.onSelect ?? onSelect}
-      onAskAgent={overrides.onAskAgent ?? onAskAgent}
     />
   )
 }
@@ -223,15 +229,22 @@ describe('DashboardPage — rich data', () => {
     expect(screen.queryByText('Finish setup')).toBeNull()
   })
 
-  it('sends a suggestion chip through the ask hand-off', () => {
-    installApi({ hasKey: true })
-    const onAskAgent = vi.fn<(question: string) => void>()
-    renderPage(richSnapshot, { onAskAgent })
+  it('does not render Ask agent input, Ask button or suggestion chips, and keeps the freshness line and Sync button', async () => {
+    installApi({ hasKey: true, nextRunAt: new Date(Date.now() + 180000).toISOString() })
+    renderPage(richSnapshot)
 
-    const input = screen.getByLabelText('Ask agent about this project') as HTMLInputElement
-    expect(input.disabled).toBe(false)
-    fireEvent.click(screen.getByRole('button', { name: 'Kaun se blockers hain?' }))
-    expect(onAskAgent).toHaveBeenCalledWith('Kaun se blockers hain?')
+    expect(screen.queryByLabelText('Ask agent about this project')).toBeNull()
+    expect(screen.queryByPlaceholderText(/Ask agent/)).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Ask' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Kitna complete hua?' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Kaun se blockers hain?' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Client ne last kya bola?' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Next step kya hai?' })).toBeNull()
+
+    expect(screen.getByRole('button', { name: 'Sync' })).toBeTruthy()
+    const freshness = screen.getByTestId('dash-freshness')
+    expect(freshness.textContent).toContain('Updated')
+    await waitFor(() => expect(freshness.textContent).toContain('next sync in'))
   })
 })
 
@@ -269,17 +282,20 @@ describe('DashboardPage — sparse data', () => {
     expect(screen.getByRole('button', { name: 'Add dates' })).toBeTruthy()
   })
 
-  it('disables the ask input and routes the hint to settings without a key', async () => {
+  it('omits Ask agent input and chips when no AI key is configured while retaining Freshness line and setup checklist', async () => {
     installApi({ hasKey: false, activity: emptyActivity })
     const onOpenSettings = vi.fn<() => void>()
     renderPage(sparseSnapshot, { onOpenSettings })
 
-    const input = screen.getByLabelText('Ask agent about this project') as HTMLInputElement
-    await waitFor(() => expect(input.disabled).toBe(true))
-    expect(input.placeholder).toBe('Add an AI key to ask about this project')
+    expect(screen.queryByLabelText('Ask agent about this project')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Ask' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Kaun se blockers hain?' })).toBeNull()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open settings' }))
+    expect(screen.getByRole('button', { name: 'Sync' })).toBeTruthy()
+    expect(screen.getByTestId('dash-freshness')).toBeTruthy()
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Add key' })).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: 'Add key' }))
     expect(onOpenSettings).toHaveBeenCalledTimes(1)
   })
 

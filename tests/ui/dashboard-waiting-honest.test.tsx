@@ -61,7 +61,6 @@ function renderPage(snapshot: DashboardProjectSnapshot, onSelect: OnSelect): voi
       onSync={vi.fn()}
       onOpenSettings={vi.fn()}
       onSelect={onSelect}
-      onAskAgent={vi.fn()}
     />
   )
 }

@@ -39,7 +39,7 @@ with no placeholder.
 | Ball in court | **new** activity IPC: client-workspace rows only; last client vs last self reply | new |
 | Latest messages | **new** activity IPC: merged client + mapped our-Slack rows, newest 6, noise filtered | new |
 | Top participants / channels (14d) | **new** activity IPC: counts from stored deltas, names from `users.list` | new |
-| Ask agent key state | `getProjectChatStatus(projectId)` (only `hasKey` rendered) | existing |
+| Ask agent (REMOVED) | Feature cancelled; removed from project card top bar | removed |
 
 The activity IPC reuses `DashboardChatService` because it is the only place
 that already resolves Slack display names (`workspaceContext`, 5-minute cache,
@@ -131,9 +131,8 @@ Tests:
 - `.dash-inner` width/padding, container queries, `.dash-columns` / `.dash-main` /
   `.dash-rail`, borderless surface cards, slim freshness bar. No data changes.
 
-**Phase 2 — top: freshness + ask + KPIs**
-- Freshness bar + `Sync now` (needs `onSync` passed down); full-width Ask agent +
-  4 suggestion chips; disabled input + muted settings link when no key.
+**Phase 2 — top: freshness + KPIs**
+- Freshness bar + `Sync now` (needs `onSync` passed down); [REMOVED: Ask agent + suggestion chips cancelled].
 - Six KPI tiles with 32px/500 values, 12px sentence-case labels, no fake zeros;
   "Oldest: 16d" / "Age unknown"; "Needs 3+ replies to measure"; waiting metric fix.
 
@@ -178,10 +177,7 @@ Tests:
 
 1. Setup checklist: right rail only; centre empty panels collapse silently.
 2. Waiting count dedupe + blockers/risks as a sub-line only (see data map).
-3. Ask agent: "Chat with project" phases 1–4 are already on `beta`
-   (`0f67b97`, `7dc01f3`, `dfaa8e6`, `972b3df`, `eff1222`), so Enter opens the
-   chat page **and auto-sends** the question once `getProjectChatStatus().hasKey`
-   is true. If the status has no key, it opens the chat page and prefills only.
+3. Ask agent: [REMOVED] cancelled from project card; chat entry remains accessible via the Xomni tab in the rail.
 4. Demo data is a renderer-only in-memory fixture; never persists anywhere;
    "Demo data" watermark; production-bundle grep proof.
 5. `dashboard:project-activity` IPC: validate `projectId` against the monitor

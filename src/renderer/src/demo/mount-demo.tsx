@@ -62,7 +62,6 @@ export function mountDemo(mode: DemoMode): void {
           onSync={() => undefined}
           onOpenSettings={() => undefined}
           onSelect={() => undefined}
-          onAskAgent={() => undefined}
         />
       </div>
     </StrictMode>

@@ -12,7 +12,7 @@ interface AgentChatPanelProps {
   projectName: string
   projectId: string
   mode: XomniModeKey
-  /** Question handed over from the Dashboard's "Ask agent" bar. */
+  /** Optional question handed to the project chat on mount. */
   initialQuestion?: string | null
   onConsumeInitial?: () => void
   onOpenSettings?: () => void

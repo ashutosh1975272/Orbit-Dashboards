@@ -6,7 +6,7 @@
 
 **Build order (explicit checkpoints — do not skip ahead):**
 1. **Phase 1 — Layout + sidebar + visual cleanup.** Ship and show before touching chat.
-2. **Phase 2 — Agent chat** (grounded Q&A in the centre panel + inline "Ask agent" on Summary).
+2. **Phase 2 — Agent chat** (grounded Q&A in the centre panel; inline "Ask agent" on Summary REMOVED).
 3. **Phase 3 — Agent edit** (propose → confirm → apply, with Undo).
 
 ---
@@ -98,7 +98,7 @@ Rework `CardHead`:
 ### 5.1 Panel
 - Full-height chat in the centre: messages scroll, composer **sticky at the bottom**.
 - **Empty state:** 3–4 suggestion chips — `Kitna complete hua?`, `Kaun se blockers hain?`, `Client ne last kya bola?`, plus one more. Clicking one sends it as the question.
-- **Inline entry from Summary:** the Summary overview gets a small **"Ask agent…"** input at its bottom. On Enter, switch to Agent chat and send that text as the first question.
+- **Inline entry from Summary:** [REMOVED] previously had an "Ask agent…" input at its bottom; cancelled and removed from the project card.
 
 ### 5.2 Contract (main)
 - Channel **`DashboardAskAgent: 'dashboard:ask-agent'`**.

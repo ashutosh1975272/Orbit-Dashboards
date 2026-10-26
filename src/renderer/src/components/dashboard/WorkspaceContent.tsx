@@ -48,7 +48,6 @@ interface WorkspaceContentProps {
   /** Dashboard overview → chat hand-off. */
   chatDraft?: string | null
   onConsumeChatDraft?: () => void
-  onAskAgent?: (question: string) => void
 }
 
 /** Headings for the bodies no row owns. */
@@ -102,8 +101,7 @@ export default function WorkspaceContent({
   onOpenSettings,
   onSelect,
   chatDraft,
-  onConsumeChatDraft,
-  onAskAgent
+  onConsumeChatDraft
 }: WorkspaceContentProps): React.ReactElement {
   const { centre, leftSidebar, rightSidebar, identity } = view
   const { title, desc } = panelMeta(nav, channels)
@@ -123,7 +121,6 @@ export default function WorkspaceContent({
           onSync={onSync}
           onOpenSettings={onOpenSettings}
           onSelect={onSelect}
-          onAskAgent={onAskAgent}
         />
       </section>
     )

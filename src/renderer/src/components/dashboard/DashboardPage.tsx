@@ -24,8 +24,6 @@ interface DashboardPageProps {
   onSync: () => void
   onOpenSettings: () => void
   onSelect: (selection: SelectionId) => void
-  /** Hand a question to the project chat. */
-  onAskAgent?: (question: string) => void
 }
 
 const STATUS_LABEL: Record<InsightStatus, string> = {
@@ -61,13 +59,6 @@ const KIND_LABEL: Record<DashboardAttentionItem['kind'], string> = {
   file: 'File',
   status: 'Status'
 }
-
-const ASK_SUGGESTIONS = [
-  'Kitna complete hua?',
-  'Kaun se blockers hain?',
-  'Client ne last kya bola?',
-  'Next step kya hai?'
-]
 
 function age(iso: string | null | undefined): string {
   if (!iso) return '—'
@@ -344,11 +335,9 @@ export default function DashboardPage({
   syncing,
   onSync,
   onOpenSettings,
-  onSelect,
-  onAskAgent
+  onSelect
 }: DashboardPageProps): React.ReactElement {
   const { centre, leftSidebar, rightSidebar } = view
-  const [askDraft, setAskDraft] = useState('')
   const [hasKey, setHasKey] = useState<boolean | null>(null)
   const insight = snapshot.insight ?? null
   const hasInsight = Boolean(insight)
@@ -372,14 +361,6 @@ export default function DashboardPage({
       off()
     }
   }, [summary.projectId])
-
-  const askDisabled = hasKey === false
-  const submitQuestion = (question: string): void => {
-    const text = question.trim()
-    if (!text || askDisabled) return
-    setAskDraft('')
-    onAskAgent?.(text)
-  }
 
   const manual = typeof project.manualCompletion === 'number'
   const evidence = insight?.progressEvidence?.trim() ?? ''
@@ -519,54 +500,6 @@ export default function DashboardPage({
               onSync={onSync}
             />
             {errorLine ? <p className="dash-error">{errorLine}</p> : null}
-
-            {onAskAgent ? (
-              <div className="dash-ask">
-                <form
-                  className="dash-ask-agent"
-                  onSubmit={(event) => {
-                    event.preventDefault()
-                    submitQuestion(askDraft)
-                  }}
-                >
-                  <input
-                    type="text"
-                    value={askDraft}
-                    onChange={(event) => setAskDraft(event.target.value)}
-                    placeholder={
-                      askDisabled ? 'Add an AI key to ask about this project' : 'Ask agent…'
-                    }
-                    aria-label="Ask agent about this project"
-                    disabled={askDisabled}
-                  />
-                  <button type="submit" disabled={askDisabled || !askDraft.trim()}>
-                    Ask
-                  </button>
-                </form>
-                {askDisabled ? (
-                  <p className="dash-muted dash-ask-hint">
-                    No AI key yet.{' '}
-                    <button type="button" className="dash-link" onClick={onOpenSettings}>
-                      Open settings
-                    </button>{' '}
-                    to add one.
-                  </p>
-                ) : (
-                  <div className="dash-ask-chips">
-                    {ASK_SUGGESTIONS.map((question) => (
-                      <button
-                        key={question}
-                        type="button"
-                        className="dash-chip-btn"
-                        onClick={() => submitQuestion(question)}
-                      >
-                        {question}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : null}
           </div>
 
           <section className="dash-kpis" aria-label="Key numbers">

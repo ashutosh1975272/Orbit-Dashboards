@@ -303,8 +303,7 @@ groups (top to bottom) are:
 
 - **Freshness line** — "Updated X ago / Syncing now / sync needs attention", next-run
   countdown, and a **Sync** button.
-- **Ask agent** box — a question field plus suggestion chips (Hindi/English mix), which
-  hands the question to the Xomni chat. Disabled with a hint when no AI key is set.
+- **Ask agent** box — [REMOVED] previously a question field plus suggestion chips; cancelled and removed from the project card.
 - **KPI tiles** — Progress (ring + %), Status, Waiting on you (count-up), Client mood,
   Our response time, Last client contact.
 - **Where it stands** — situation line, "just changed", "next step", and the
