@@ -21,6 +21,14 @@ interface ProjectCardProps {
   tabNonce?: number
   initialGuideSection?: number
   initialDetailKey?: DetailKey
+  pinned?: boolean
+  onTogglePin?: () => void
+  canMoveUp?: boolean
+  canMoveDown?: boolean
+  onMoveUp?: () => void
+  onMoveDown?: () => void
+  /** Memo guard: pin order changes must refresh the action closures. */
+  pinOrderKey?: string
 }
 
 function ProjectCardInner({
@@ -34,7 +42,13 @@ function ProjectCardInner({
   initialTab,
   tabNonce,
   initialGuideSection,
-  initialDetailKey
+  initialDetailKey,
+  pinned = false,
+  onTogglePin,
+  canMoveUp = false,
+  canMoveDown = false,
+  onMoveUp,
+  onMoveDown
 }: ProjectCardProps): React.ReactElement {
   const project = snapshot.project
   const syncNow = useDashboardStore((s) => s.syncNow)
@@ -55,6 +69,12 @@ function ProjectCardInner({
         onSettings={() => onOpenSettings(project.id)}
         onRemove={() => onDelete(project.id)}
         syncing={syncing}
+        pinned={pinned}
+        onTogglePin={onTogglePin}
+        canMoveUp={canMoveUp}
+        canMoveDown={canMoveDown}
+        onMoveUp={onMoveUp}
+        onMoveDown={onMoveDown}
       />
     )
   }
@@ -72,6 +92,8 @@ function ProjectCardInner({
       onEdit={() => openWizard(project.id)}
       onRemove={() => onDelete(project.id)}
       onToggle={onToggle}
+      pinned={pinned}
+      onTogglePin={onTogglePin}
       initialTab={initialTab}
       initialGuideSection={initialGuideSection}
       initialDetailKey={initialDetailKey}
@@ -89,6 +111,10 @@ export default memo(ProjectCardInner, (prev, next) => {
     prev.snapshot.ourWorkspaceError === next.snapshot.ourWorkspaceError &&
     prev.snapshot.metrics === next.snapshot.metrics &&
     prev.expanded === next.expanded &&
+    prev.pinned === next.pinned &&
+    prev.pinOrderKey === next.pinOrderKey &&
+    prev.canMoveUp === next.canMoveUp &&
+    prev.canMoveDown === next.canMoveDown &&
     prev.index === next.index &&
     prev.initialTab === next.initialTab &&
     prev.tabNonce === next.tabNonce &&

@@ -72,4 +72,17 @@ describe('MonitorStore', () => {
     await store.setSyncIntervalSeconds(120)
     expect(await store.syncIntervalSeconds()).toBe(120)
   })
+
+  it('persists pinned order, ignores unknown ids and cleans deleted projects', async () => {
+    const store = await tmpStore()
+    const a = await store.upsertProject({ project: { ...project('a'), id: '' } })
+    const b = await store.upsertProject({ project: { ...project('b'), id: '' } })
+    const c = await store.upsertProject({ project: { ...project('c'), id: '' } })
+    expect(await store.setPinnedOrder([b.id, 'missing', a.id, b.id])).toEqual([b.id, a.id])
+    expect(await store.readPinnedOrder()).toEqual([b.id, a.id])
+
+    await store.deleteProject(a.id)
+    expect(await store.readPinnedOrder()).toEqual([b.id])
+    expect((await store.listProjects()).map((p) => p.id)).toEqual([b.id, c.id])
+  })
 })

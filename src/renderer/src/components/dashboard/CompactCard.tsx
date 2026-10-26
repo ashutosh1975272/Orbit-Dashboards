@@ -1,6 +1,7 @@
 import type React from 'react'
 import { useEffect, useRef, useState } from 'react'
 import type { CardSummary } from './card-view'
+import ProjectPinButton from './ProjectPinButton'
 
 interface CompactCardProps {
   summary: CardSummary
@@ -10,6 +11,12 @@ interface CompactCardProps {
   onSettings: () => void
   onRemove: () => void
   syncing: boolean
+  pinned?: boolean
+  onTogglePin?: () => void
+  canMoveUp?: boolean
+  canMoveDown?: boolean
+  onMoveUp?: () => void
+  onMoveDown?: () => void
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -19,7 +26,13 @@ const STATUS_LABEL: Record<string, string> = {
   'waiting-on-client': 'Waiting on client'
 }
 
-function fmtAge(iso: string | null): string {
+const MOOD_LABEL: Record<string, string> = {
+  good: 'Good',
+  neutral: 'Neutral',
+  tense: 'Tense'
+}
+
+function fmtAge(iso: string | null | undefined): string {
   if (!iso) return '—'
   const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60_000))
   if (mins < 1) return 'now'
@@ -27,6 +40,13 @@ function fmtAge(iso: string | null): string {
   const hours = Math.round(mins / 60)
   if (hours < 24) return `${hours}h`
   return `${Math.round(hours / 24)}d`
+}
+
+function replyTime(seconds: number | null | undefined): string | null {
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds)) return null
+  if (seconds < 3600) return `${Math.max(1, Math.round(seconds / 60))}m`
+  if (seconds < 86_400) return `${Math.round(seconds / 3600)}h`
+  return `${Math.round(seconds / 86_400)}d`
 }
 
 function MoreGlyph(): React.JSX.Element {
@@ -39,8 +59,29 @@ function MoreGlyph(): React.JSX.Element {
   )
 }
 
-/** One dense project row. Everything that needs a decision is on the line;
- *  the full workspace opens in place when the row is activated. */
+function SyncGlyph(): React.JSX.Element {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M20 11a8 8 0 0 0-14.9-4M4 13a8 8 0 0 0 14.9 4M4 5v6h6M20 19v-6h-6"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function isInteractive(target: EventTarget | null): boolean {
+  return Boolean(
+    target instanceof Element &&
+    target.closest('button, a, input, textarea, select, [role="menu"], [role="menuitem"]')
+  )
+}
+
+/** One dense project row with three honest tiers. Anything without evidence is
+ *  hidden or rendered as an em dash — never as a fabricated zero. */
 export default function CompactCard({
   summary,
   onToggle,
@@ -48,7 +89,13 @@ export default function CompactCard({
   onSync,
   onSettings,
   onRemove,
-  syncing
+  syncing,
+  pinned = false,
+  onTogglePin,
+  canMoveUp = false,
+  canMoveDown = false,
+  onMoveUp,
+  onMoveDown
 }: CompactCardProps): React.ReactElement {
   const {
     projectId,
@@ -58,11 +105,22 @@ export default function CompactCard({
     clientName,
     status,
     needsReply,
+    inactive,
     situationLine,
+    justChanged,
+    nextStep,
     progress,
     paceLabel,
+    daysTotal,
+    week,
     lastClientAt,
-    counts
+    counts,
+    mood,
+    updatedAt,
+    newSince,
+    medianReplySeconds,
+    deliverables,
+    ballInCourt
   } = summary
 
   const [menuOpen, setMenuOpen] = useState(false)
@@ -71,8 +129,7 @@ export default function CompactCard({
   useEffect(() => {
     if (!menuOpen) return
     const close = (event: MouseEvent): void => {
-      if (menuRef.current?.contains(event.target as Node)) return
-      setMenuOpen(false)
+      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false)
     }
     document.addEventListener('mousedown', close)
     return () => document.removeEventListener('mousedown', close)
@@ -84,64 +141,233 @@ export default function CompactCard({
   }
 
   const statusLabel = status ? (STATUS_LABEL[status] ?? status) : null
-  const age = lastClientAt ? fmtAge(lastClientAt) : null
-  const ageLabel = age ? (age === 'now' ? 'now' : `${age} ago`) : '—'
-  const activityTitle = age ? `Last client message ${age} ago` : 'No client messages yet'
+  const clientAge = lastClientAt ? fmtAge(lastClientAt) : null
+  const myAge = summary.myLastReplyAt ? fmtAge(summary.myLastReplyAt) : null
+  const median = replyTime(medianReplySeconds)
+  const weekCounts = week ?? []
+  const weekMax = Math.max(...weekCounts.map((day) => day.count), 1)
+  const moodLabel = mood ? (MOOD_LABEL[mood] ?? null) : null
+  const newCount = newSince ?? 0
+
+  const chipCounts =
+    counts.questions + counts.blockers + counts.risks + newCount + (deliverables?.total ?? 0)
 
   return (
     <article
       className={`proj-row${status ? ` is-${status}` : ''}`}
       id={`dash-card-anchor-${projectId}`}
       data-testid={`dash-card-${index}`}
+      tabIndex={0}
+      aria-label={`Open ${name}`}
+      onClick={(event) => {
+        if (isInteractive(event.target)) return
+        onToggle()
+      }}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          onToggle()
+        }
+      }}
     >
       <span className="proj-row-bar" aria-hidden />
 
       <div className="proj-row-body">
-        <button
-          type="button"
-          className="proj-row-main"
-          onClick={onToggle}
-          aria-expanded={false}
-          aria-label={`Open ${name}`}
-        >
-          <span className="proj-row-head">
-            <span className="proj-row-name">{name}</span>
-            <span className="proj-row-ws">{workspaceName}</span>
-            {clientName && clientName !== workspaceName ? (
-              <span className="proj-row-client">{clientName}</span>
-            ) : null}
-            {statusLabel ? <span className="proj-row-status">{statusLabel}</span> : null}
+        <div className="proj-row-head">
+          {onTogglePin ? (
+            <ProjectPinButton
+              pinned={pinned}
+              projectName={name}
+              onToggle={onTogglePin}
+              className="proj-pin-inline"
+            />
+          ) : null}
+          <span className="proj-row-name" title={name}>
+            {name}
           </span>
-          <span className="proj-row-line">{situationLine || 'No summary yet'}</span>
-        </button>
+          <span className="proj-row-ws" title={workspaceName}>
+            {workspaceName}
+          </span>
+          {clientName && clientName !== workspaceName ? (
+            <span className="proj-row-client" title={clientName}>
+              {clientName}
+            </span>
+          ) : null}
+          {statusLabel ? <span className="proj-row-status">{statusLabel}</span> : null}
+          {needsReply ? <span className="proj-flag">Needs reply</span> : null}
+          {inactive ? <span className="proj-flag is-muted">Inactive 24h+</span> : null}
 
-        {counts.questions + counts.blockers + counts.risks > 0 ? (
-          <div className="proj-row-chips">
-            {counts.questions > 0 ? (
-              <button type="button" className="proj-chip" onClick={() => openSection(101)}>
-                {counts.questions} {counts.questions === 1 ? 'question' : 'questions'}
-              </button>
-            ) : null}
-            {counts.blockers > 0 ? (
+          <span className="proj-row-head-actions">
+            <button
+              type="button"
+              className="proj-icon-btn"
+              disabled={syncing}
+              aria-label={`Sync ${name}`}
+              title={syncing ? 'Syncing…' : 'Sync now'}
+              onClick={() => onSync(projectId)}
+            >
+              {syncing ? <span className="proj-spin" aria-hidden /> : <SyncGlyph />}
+            </button>
+            <div className="dash-menu-wrap" ref={menuRef}>
               <button
                 type="button"
-                className="proj-chip is-danger"
-                onClick={() => openSection(102)}
+                className="proj-more"
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+                aria-label={`Actions for ${name}`}
+                onClick={() => setMenuOpen((open) => !open)}
               >
-                {counts.blockers} {counts.blockers === 1 ? 'blocker' : 'blockers'}
+                <MoreGlyph />
               </button>
-            ) : null}
-            {counts.risks > 0 ? (
-              <button type="button" className="proj-chip is-warn" onClick={() => openSection(103)}>
-                {counts.risks} {counts.risks === 1 ? 'risk' : 'risks'}
-              </button>
-            ) : null}
-          </div>
+              {menuOpen ? (
+                <div
+                  className="dash-menu"
+                  role="menu"
+                  aria-label={`Actions for ${name}`}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape') setMenuOpen(false)
+                  }}
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={syncing}
+                    onClick={() => {
+                      onSync(projectId)
+                      setMenuOpen(false)
+                    }}
+                  >
+                    {syncing ? 'Syncing…' : 'Sync now'}
+                  </button>
+                  {pinned && onMoveUp ? (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      disabled={!canMoveUp}
+                      onClick={() => {
+                        onMoveUp()
+                        setMenuOpen(false)
+                      }}
+                    >
+                      Move up
+                    </button>
+                  ) : null}
+                  {pinned && onMoveDown ? (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      disabled={!canMoveDown}
+                      onClick={() => {
+                        onMoveDown()
+                        setMenuOpen(false)
+                      }}
+                    >
+                      Move down
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      onSettings()
+                      setMenuOpen(false)
+                    }}
+                  >
+                    Project settings
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="is-danger"
+                    onClick={() => {
+                      onRemove()
+                      setMenuOpen(false)
+                    }}
+                  >
+                    Delete project
+                  </button>
+                </div>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              className="proj-chevron"
+              onClick={onToggle}
+              aria-label={`Open ${name}`}
+            />
+          </span>
+        </div>
+
+        <span className={`proj-row-line${situationLine ? '' : ' is-empty'}`}>
+          {situationLine || 'No summary yet'}
+        </span>
+
+        {justChanged ? (
+          <span className="proj-row-changed">
+            <b>Just changed</b> {justChanged}
+          </span>
         ) : null}
+
+        {nextStep ? (
+          <span className="proj-row-next" title={nextStep}>
+            <b>Next</b> {nextStep}
+          </span>
+        ) : null}
+
+        <div className="proj-row-meta">
+          {ballInCourt ? (
+            <span className={`proj-court is-${ballInCourt}`}>
+              {ballInCourt === 'yours' ? 'Your court' : "Client's court"}
+            </span>
+          ) : null}
+          {clientAge ? (
+            <span className="proj-meta-item">
+              Client {clientAge} ago{myAge ? ` · Me ${myAge} ago` : ' · Me —'}
+            </span>
+          ) : null}
+          {median ? <span className="proj-meta-item">Reply {median}</span> : null}
+
+          {chipCounts > 0 ? (
+            <span className="proj-row-chips">
+              {counts.questions > 0 ? (
+                <button type="button" className="proj-chip" onClick={() => openSection(101)}>
+                  {counts.questions} {counts.questions === 1 ? 'question' : 'questions'}
+                </button>
+              ) : null}
+              {counts.blockers > 0 ? (
+                <button
+                  type="button"
+                  className="proj-chip is-danger"
+                  onClick={() => openSection(102)}
+                >
+                  {counts.blockers} {counts.blockers === 1 ? 'blocker' : 'blockers'}
+                </button>
+              ) : null}
+              {counts.risks > 0 ? (
+                <button
+                  type="button"
+                  className="proj-chip is-warn"
+                  onClick={() => openSection(103)}
+                >
+                  {counts.risks} {counts.risks === 1 ? 'risk' : 'risks'}
+                </button>
+              ) : null}
+              {newCount > 0 ? <span className="proj-chip is-muted">{newCount} new</span> : null}
+              {deliverables ? (
+                <span className="proj-chip is-muted">
+                  {deliverables.done}/{deliverables.total} deliverables
+                </span>
+              ) : null}
+            </span>
+          ) : null}
+
+          {moodLabel ? <span className={`proj-mood is-${mood}`}>{moodLabel}</span> : null}
+          {updatedAt ? <span className="proj-meta-item">Updated {fmtAge(updatedAt)}</span> : null}
+        </div>
       </div>
 
       <div className="proj-row-side">
-        {needsReply ? <span className="proj-flag">Needs reply</span> : null}
         <span
           className={`proj-meter${progress === null ? ' is-unknown' : ''}`}
           title={
@@ -159,74 +385,25 @@ export default function CompactCard({
           </span>
           <span className="proj-meter-num">{progress === null ? '—' : `${progress}%`}</span>
         </span>
-        <span className="proj-age" title={activityTitle}>
-          {ageLabel}
-        </span>
-      </div>
 
-      <div className="proj-actions">
-        <div className="dash-menu-wrap" ref={menuRef}>
-          <button
-            type="button"
-            className="proj-more"
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-            aria-label={`Actions for ${name}`}
-            onClick={() => setMenuOpen((open) => !open)}
-          >
-            <MoreGlyph />
-          </button>
-          {menuOpen ? (
-            <div
-              className="dash-menu"
-              role="menu"
-              aria-label={`Actions for ${name}`}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') setMenuOpen(false)
-              }}
-            >
-              <button
-                type="button"
-                role="menuitem"
-                disabled={syncing}
-                onClick={() => {
-                  onSync(projectId)
-                  setMenuOpen(false)
-                }}
-              >
-                {syncing ? 'Syncing…' : 'Sync now'}
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  onSettings()
-                  setMenuOpen(false)
-                }}
-              >
-                Project settings
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                className="is-danger"
-                onClick={() => {
-                  onRemove()
-                  setMenuOpen(false)
-                }}
-              >
-                Delete project
-              </button>
-            </div>
-          ) : null}
-        </div>
-        <button
-          type="button"
-          className="proj-chevron"
-          onClick={onToggle}
-          aria-label={`Open ${name}`}
-          tabIndex={-1}
-        />
+        <span className="proj-pace" title={paceLabel}>
+          {daysTotal ? `${summary.daysUsed ?? 0} of ${daysTotal} days` : 'No dates'}
+        </span>
+
+        {weekCounts.some((day) => day.count > 0) ? (
+          <span className="proj-week" aria-label="Last 7 days activity">
+            {weekCounts.map((day) => (
+              <span
+                key={day.date}
+                className={`proj-week-bar${day.isToday ? ' is-today' : ''}`}
+                title={`${day.date}: ${day.count} message${day.count === 1 ? '' : 's'}`}
+                style={{ height: `${Math.max(2, Math.round((day.count / weekMax) * 16))}px` }}
+              />
+            ))}
+          </span>
+        ) : (
+          <span className="proj-week-empty">No messages this week</span>
+        )}
       </div>
     </article>
   )

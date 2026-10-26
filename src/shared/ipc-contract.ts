@@ -26,6 +26,7 @@ import type {
   InsightHistoryEntryContract,
   DashboardManualToken,
   DashboardMarkViewedPayload,
+  DashboardPinnedOrderPayload,
   DashboardRunSchedulePayload,
   DashboardSchedulesState,
   DashboardSnapshot,
@@ -134,6 +135,7 @@ export const IpcChannels = {
   DashboardGetRecent: 'dashboard:get-recent',
   DashboardListChannels: 'dashboard:list-channels',
   DashboardViewSet: 'dashboard:view-set',
+  DashboardPinnedOrderSet: 'dashboard:pinned-order-set',
   DashboardUpsertProject: 'dashboard:upsert-project',
   DashboardDeleteProject: 'dashboard:delete-project',
   DashboardSyncNow: 'dashboard:sync-now',
@@ -324,6 +326,7 @@ export interface IpcApi {
     addManualToken: (payload: ManualTokenPayload) => Promise<DashboardSnapshot>
     validateManualToken: (payload: ManualTokenPayload) => Promise<ValidateTokenResultPayload>
     setView: (payload: DashboardViewSetPayload) => Promise<void>
+    setPinnedOrder: (payload: DashboardPinnedOrderPayload) => Promise<DashboardSnapshot>
     onSnapshotChanged: (callback: (snapshot: DashboardSnapshot) => void) => () => void
     onSyncProgress: (callback: (payload: DashboardSyncProgressPayload) => void) => () => void
     getSidebarState: (projectId: string) => Promise<ProjectSidebarState>

@@ -214,6 +214,11 @@ const api: IpcApi = {
     validateManualToken: (payload) =>
       ipcRenderer.invoke(IpcChannels.DashboardAddManualToken, payload),
     setView: (payload) => ipcRenderer.invoke(IpcChannels.DashboardViewSet, payload),
+    setPinnedOrder: (payload) =>
+      ipcRenderer.invoke(
+        IpcChannels.DashboardPinnedOrderSet,
+        payload
+      ) as Promise<DashboardSnapshot>,
     onSnapshotChanged: (callback: (snapshot: DashboardSnapshot) => void) => {
       const listener = (_event: Electron.IpcRendererEvent, snapshot: DashboardSnapshot): void =>
         callback(snapshot)

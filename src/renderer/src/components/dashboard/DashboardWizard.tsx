@@ -1,6 +1,7 @@
 import type React from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { useDashboardStore } from '../../hooks/useDashboard'
+import { buildManifest, USER_SCOPES } from './slack-manifest'
 
 /**
  * Add-project wizard (v2.1 — docs/tickets/dashboard-v2.1.md):
@@ -8,22 +9,6 @@ import { useDashboardStore } from '../../hooks/useDashboard'
  * install it to the workspace, copy the xoxp token, then paste it to connect.
  * Steps 2/3: choose channels → confirm card → automatic first sync.
  */
-
-const USER_SCOPES = [
-  'channels:read',
-  'channels:history',
-  'groups:read',
-  'groups:history',
-  'team:read',
-  'users:read',
-  'users.profile:read',
-  'im:read',
-  'im:history',
-  'mpim:read',
-  'mpim:history',
-  'emoji:read',
-  'chat:write'
-]
 
 const OPTIONAL_SCOPES = new Set([
   'users:read',
@@ -37,30 +22,6 @@ const OPTIONAL_SCOPES = new Set([
 ])
 
 const APPS_HOME = 'https://api.slack.com/apps'
-
-function buildManifest(_clientId: string, redirectUri: string): string {
-  return JSON.stringify(
-    {
-      display_information: {
-        name: 'Orbit Dashboard Connector',
-        description: 'Project feed and chat replies for the Orbit dashboard',
-        background_color: '#1B1F3B'
-      },
-      oauth_config: {
-        redirect_urls: redirectUri ? [redirectUri] : [],
-        scopes: { user: USER_SCOPES }
-      },
-      settings: {
-        org_deploy_enabled: false,
-        socket_mode_enabled: false,
-        is_hosted: false,
-        interactivity: { enabled: false }
-      }
-    },
-    null,
-    2
-  )
-}
 
 function maskToken(token: string): string {
   if (token.length < 14) return '•'.repeat(token.length)
@@ -150,10 +111,7 @@ export default function DashboardWizard({
 
   // app-config for manifest (fetched once)
   const [appConfig, setAppConfig] = useState<{ clientId: string; redirectUri: string } | null>(null)
-  const manifest = useMemo(
-    () => buildManifest(appConfig?.clientId ?? '', appConfig?.redirectUri ?? ''),
-    [appConfig]
-  )
+  const manifest = useMemo(() => buildManifest(appConfig?.redirectUri ?? ''), [appConfig])
   const [copied, setCopied] = useState<'manifest' | 'none'>('none')
   useEffect(() => {
     let alive = true

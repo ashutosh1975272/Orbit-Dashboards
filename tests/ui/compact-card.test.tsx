@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import CompactCard from '../../src/renderer/src/components/dashboard/CompactCard'
 import type { CardSummary } from '../../src/renderer/src/components/dashboard/card-view'
 
@@ -37,15 +37,24 @@ function summary(overrides: Partial<CardSummary> = {}): CardSummary {
 
 const noop = (): void => undefined
 
-function renderCard(overrides: Partial<CardSummary>): void {
+function renderCard(
+  overrides: Partial<CardSummary>,
+  props: Partial<{
+    onToggle: () => void
+    onTogglePin: () => void
+    pinned: boolean
+  }> = {}
+): void {
   render(
     <CompactCard
       summary={summary(overrides)}
-      onToggle={noop}
+      onToggle={props.onToggle ?? noop}
       onSync={noop}
       onSettings={noop}
       onRemove={noop}
       syncing={false}
+      pinned={props.pinned}
+      onTogglePin={props.onTogglePin}
     />
   )
 }
@@ -62,5 +71,56 @@ describe('CompactCard progress', () => {
     renderCard({ progress: 50 })
     const meter = screen.getByTitle(/50% complete/)
     expect(meter.textContent).toContain('50%')
+  })
+})
+
+describe('CompactCard tiers', () => {
+  it('renders only the evidence-backed Tier 2/3 fields it receives', () => {
+    renderCard({
+      ballInCourt: 'yours',
+      medianReplySeconds: 5220,
+      newSince: 3,
+      deliverables: { done: 2, total: 5 },
+      mood: 'tense',
+      updatedAt: new Date(Date.now() - 4 * 60_000).toISOString(),
+      justChanged: 'Priya asked about SSO.',
+      nextStep: 'Send the Friday plan.'
+    })
+
+    expect(screen.getByText('Your court')).toBeTruthy()
+    expect(screen.getByText(/Reply 1h/)).toBeTruthy()
+    expect(screen.getByText('3 new')).toBeTruthy()
+    expect(screen.getByText('2/5 deliverables')).toBeTruthy()
+    expect(screen.getByText('Tense')).toBeTruthy()
+    expect(screen.getByText('Priya asked about SSO.')).toBeTruthy()
+    expect(screen.getByText('Send the Friday plan.')).toBeTruthy()
+    expect(screen.getByText(/Updated 4m/)).toBeTruthy()
+  })
+
+  it('hides the evidence rows when the data is missing', () => {
+    renderCard({ progress: null })
+    expect(screen.queryByText('Your court')).toBeNull()
+    expect(screen.queryByText(/Reply /)).toBeNull()
+    expect(screen.queryByText(/deliverables/)).toBeNull()
+    expect(screen.queryByText('No messages this week')).toBeTruthy()
+  })
+
+  it('pins from the card header without toggling the card', () => {
+    const onToggle = vi.fn()
+    const onTogglePin = vi.fn()
+    renderCard({}, { pinned: true, onToggle, onTogglePin })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Unpin Acme rollout' }))
+    expect(onTogglePin).toHaveBeenCalledTimes(1)
+    expect(onToggle).not.toHaveBeenCalled()
+  })
+
+  it('toggles when the card body is clicked or Enter is pressed', () => {
+    const onToggle = vi.fn()
+    renderCard({}, { onToggle })
+    const card = screen.getByTestId('dash-card-0')
+    fireEvent.click(card)
+    fireEvent.keyDown(card, { key: 'Enter' })
+    expect(onToggle).toHaveBeenCalledTimes(2)
   })
 })

@@ -295,6 +295,12 @@ export interface DashboardSnapshot {
   syncIntervalSeconds: number
   /** v2.3 — one line across all workspaces (each item names its workspace). */
   digest?: DashboardDigest | null
+  /** Client-projects page: user-owned order for the Pinned section. */
+  pinnedOrder?: string[]
+}
+
+export interface DashboardPinnedOrderPayload {
+  order: string[]
 }
 
 /** v2.3 — cross-workspace digest (the ONLY place workspaces are combined). */

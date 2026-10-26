@@ -112,7 +112,8 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
       manualTokens,
       syncIntervalSeconds:
         (await deps.scheduler.getState()).settings.slackSync.intervalMinutes * 60,
-      digest: deps.getDigest ? await deps.getDigest() : null
+      digest: deps.getDigest ? await deps.getDigest() : null,
+      pinnedOrder: await deps.monitorStore.readPinnedOrder()
     }
   }
 
@@ -175,6 +176,17 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
       /* the renderer tracks view-state itself; reserve for future main-side needs */
       void payload
       return { ok: true }
+    }
+  )
+
+  handleInvoke(
+    IpcChannels.DashboardPinnedOrderSet,
+    async (payload: { order?: unknown }): Promise<DashboardSnapshot> => {
+      const order = Array.isArray(payload?.order)
+        ? payload.order.filter((id): id is string => typeof id === 'string')
+        : []
+      await deps.monitorStore.setPinnedOrder(order)
+      return broadcastSnapshot()
     }
   )
 

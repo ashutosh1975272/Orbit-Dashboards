@@ -565,6 +565,9 @@ function App(): React.JSX.Element {
 
   const handleOpenWorkspace = useCallback(
     (profileId: string, appId: AppId, teamId: string) => {
+      // Opening a workspace paints the native Slack view; the dashboard must
+      // close first so React and the embed stay in sync (same as app rows).
+      closeDashboard()
       void (async () => {
         await openWorkspace(profileId, appId, teamId, viewportBounds())
         const profile = useProfileStore.getState().profiles.find((p) => p.id === profileId)
@@ -580,7 +583,7 @@ function App(): React.JSX.Element {
         setSettings(next)
       })()
     },
-    [openWorkspace]
+    [closeDashboard, openWorkspace]
   )
 
   const emptyCopy = useMemo(() => {

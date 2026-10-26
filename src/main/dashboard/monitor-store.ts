@@ -18,6 +18,8 @@ interface MonitorFile {
   manualTokenMeta?: Record<string, ManualTokenMeta>
   /** v2.2 — channelId → owning workspace id (enforces 1 workspace = 1 card). */
   channelOwners?: Record<string, string>
+  /** Client-projects page: user-owned Pinned order (newest pin last). */
+  pinnedOrder?: string[]
   syncIntervalSeconds?: number
   updatedAt?: string
 }
@@ -139,7 +141,24 @@ export class MonitorStore {
   async deleteProject(projectId: string): Promise<void> {
     const data = await this.read()
     data.projects = data.projects.filter((p) => p.id !== projectId)
+    data.pinnedOrder = (data.pinnedOrder ?? []).filter((id) => id !== projectId)
     await this.write(data)
+  }
+
+  /** Pinned order survives restarts; unknown/deleted ids are ignored on read. */
+  async readPinnedOrder(): Promise<string[]> {
+    const data = await this.read()
+    const projectIds = new Set(data.projects.map((project) => project.id))
+    return [...new Set(data.pinnedOrder ?? [])].filter((id) => projectIds.has(id))
+  }
+
+  async setPinnedOrder(order: string[]): Promise<string[]> {
+    const data = await this.read()
+    const projectIds = new Set(data.projects.map((project) => project.id))
+    const cleaned = [...new Set(order)].filter((id) => projectIds.has(id))
+    data.pinnedOrder = cleaned
+    await this.write(data)
+    return cleaned
   }
 
   /**

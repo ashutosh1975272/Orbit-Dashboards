@@ -14,6 +14,7 @@ import type {
   InsightUrgency,
   ProjectInsight
 } from '../../../../shared/dashboard-contract'
+import { ballInCourt, isInactive } from './dashboard-page-selectors'
 
 export interface CardDates {
   startDate?: string
@@ -241,6 +242,13 @@ export interface CardSummary {
   score: number
   aiBadge: string
   syncedLabel: string
+  /** Compact Tier 2/3 — null/absent when the underlying data is missing. */
+  mood?: InsightMood | null
+  updatedAt?: string | null
+  newSince?: number
+  medianReplySeconds?: number | null
+  deliverables?: { done: number; total: number } | null
+  ballInCourt?: 'yours' | 'client' | null
 }
 
 function fmtAge(iso: string | null): string {
@@ -713,9 +721,7 @@ export function buildCardSummary(snapshot: DashboardProjectSnapshot, index = 0):
 
   const needsReply = insight ? insight.clientAsk.needsReply : false
   const urgency: InsightUrgency = insight ? insight.clientAsk.urgency : 'normal'
-  const inactive =
-    !insight?.clientAsk?.lastClientMessage &&
-    Date.now() - new Date(snapshot.lastUpdatedAt ?? Date.now()).getTime() > 24 * 60 * 60 * 1000
+  const inactive = isInactive(snapshot)
 
   const lastClientAt = insight?.clientAsk?.lastClientMessage?.whenIso ?? null
   const myLastReplyAt = null
@@ -756,6 +762,24 @@ export function buildCardSummary(snapshot: DashboardProjectSnapshot, index = 0):
     ? `${snapshot.insightSource === 'heuristic' ? 'heuristic' : 'AI'} · ${fmtAge(snapshot.insightUpdatedAt)}${snapshot.insightModel ? ` · ${snapshot.insightModel}` : ''}`
     : 'no insight yet'
 
+  const newSinceCounts = snapshot.metrics?.newSince?.counts
+  const newSince = newSinceCounts
+    ? newSinceCounts.requirements +
+      newSinceCounts.decisions +
+      newSinceCounts.commitments +
+      newSinceCounts.files +
+      newSinceCounts.statusChanges +
+      newSinceCounts.questions
+    : 0
+  const deliverableTotal = insight?.deliverables.length ?? 0
+  const deliverables =
+    deliverableTotal > 0
+      ? {
+          done: insight?.deliverables.filter((item) => item.status === 'done').length ?? 0,
+          total: deliverableTotal
+        }
+      : null
+
   return {
     projectId: project.id,
     index,
@@ -783,6 +807,15 @@ export function buildCardSummary(snapshot: DashboardProjectSnapshot, index = 0):
     counts,
     score,
     aiBadge,
-    syncedLabel: `synced ${fmtAge(snapshot.lastUpdatedAt)}`
+    syncedLabel: `synced ${fmtAge(snapshot.lastUpdatedAt)}`,
+    mood: insight?.mood ?? snapshot.mood.state ?? null,
+    updatedAt: snapshot.lastUpdatedAt ?? null,
+    newSince,
+    medianReplySeconds:
+      (snapshot.metrics?.ourResponse?.pairs ?? 0) >= 3
+        ? (snapshot.metrics?.ourResponse?.medianSeconds ?? null)
+        : null,
+    deliverables,
+    ballInCourt: ballInCourt(lastClientAt, myLastReplyAt)
   }
 }

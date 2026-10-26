@@ -26,6 +26,8 @@ interface ExpandedWorkspaceProps {
   onEdit: () => void
   onRemove: () => void
   onToggle: () => void
+  pinned?: boolean
+  onTogglePin?: () => void
   /** Force a starting view (card-header gear opens Settings). */
   initialTab?: WorkspaceEntryTab
   /** Force a starting guide section (compact chip deep-link). */
@@ -52,6 +54,8 @@ export default function ExpandedWorkspace({
   onEdit,
   onRemove,
   onToggle,
+  pinned = false,
+  onTogglePin,
   initialTab,
   initialGuideSection,
   initialDetailKey
@@ -187,6 +191,8 @@ export default function ExpandedWorkspace({
         onEdit={onEdit}
         onRemove={onRemove}
         onToggle={handleToggle}
+        pinned={pinned}
+        onTogglePin={onTogglePin}
       />
 
       <div

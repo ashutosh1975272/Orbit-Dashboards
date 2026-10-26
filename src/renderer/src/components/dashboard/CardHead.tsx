@@ -1,5 +1,6 @@
 import type React from 'react'
 import { useEffect, useRef, useState } from 'react'
+import ProjectPinButton from './ProjectPinButton'
 
 export interface CardHeadFlag {
   label: string
@@ -21,6 +22,8 @@ interface CardHeadProps {
   onEdit: () => void
   onRemove?: () => void
   onToggle: () => void
+  pinned?: boolean
+  onTogglePin?: () => void
 }
 
 function MoreGlyph(): React.JSX.Element {
@@ -44,7 +47,9 @@ export default function CardHead({
   onSettings,
   onEdit,
   onRemove,
-  onToggle
+  onToggle,
+  pinned = false,
+  onTogglePin
 }: CardHeadProps): React.ReactElement {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -90,6 +95,14 @@ export default function CardHead({
       </div>
 
       <div className="ws-head-actions">
+        {onTogglePin ? (
+          <ProjectPinButton
+            pinned={pinned}
+            projectName={name}
+            onToggle={onTogglePin}
+            className="ws-head-pin"
+          />
+        ) : null}
         <button
           type="button"
           className="btn btn-ghost"

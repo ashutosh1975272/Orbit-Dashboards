@@ -371,7 +371,8 @@ export const ProfileSidebar = memo(function ProfileSidebar({
                     type="button"
                     className="recent-item"
                     onClick={() => {
-                      onSelect(r.profileId)
+                      // Opening the workspace already activates its profile/app;
+                      // a second onSelect here races it and can clear activeAppId.
                       if (app) {
                         onOpenWorkspace(r.profileId, app, r.teamId)
                       }
