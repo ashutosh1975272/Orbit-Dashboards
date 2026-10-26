@@ -30,6 +30,13 @@ export interface BrowserSourceStatusEvent {
   errorMessage?: string
 }
 
+export interface AddBrowserPlatformInput {
+  name: string
+  type: BrowserPlatformType
+  url: string
+  icon?: string
+}
+
 export interface BrowserSourceViewportBounds {
   x: number
   y: number

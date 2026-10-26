@@ -1,4 +1,9 @@
 import type {
+  AddBrowserPlatformInput,
+  BrowserPlatformConfig,
+  BrowserSourceStatusEvent
+} from './browser-sources-contract'
+import type {
   DashboardAiModelsQueryPayload,
   DashboardAiModelsResult,
   DashboardAiSettingsQueryPayload,
@@ -175,7 +180,18 @@ export const IpcChannels = {
   DashboardTeamWorkspaceCandidates: 'dashboard:team-workspace-candidates',
   DashboardTeamWorkspaceConnect: 'dashboard:team-workspace-connect',
   DashboardTeamWorkspaceChannels: 'dashboard:team-workspace-channels',
-  DashboardTeamWorkspaceClear: 'dashboard:team-workspace-clear'
+  DashboardTeamWorkspaceClear: 'dashboard:team-workspace-clear',
+
+  BrowserSourceList: 'browser-source:list',
+  BrowserSourceAdd: 'browser-source:add',
+  BrowserSourceUpdate: 'browser-source:update',
+  BrowserSourceRemove: 'browser-source:remove',
+  BrowserSourceReorder: 'browser-source:reorder',
+  BrowserSourceActivate: 'browser-source:activate',
+  BrowserSourceDeactivate: 'browser-source:deactivate',
+  BrowserSourceUpdateBounds: 'browser-source:update-bounds',
+  BrowserSourceSetEmbedVisible: 'browser-source:set-embed-visible',
+  BrowserSourceStatusChanged: 'browser-source:status-changed'
 } as const
 
 export type IpcChannel = (typeof IpcChannels)[keyof typeof IpcChannels]
@@ -364,10 +380,28 @@ export interface IpcApi {
     ) => Promise<DashboardTeamWorkspace>
     clearTeamWorkspace: () => Promise<DashboardTeamWorkspace>
   }
+  browserSources: {
+    list: () => Promise<BrowserPlatformConfig[]>
+    add: (input: AddBrowserPlatformInput) => Promise<BrowserPlatformConfig>
+    update: (
+      id: string,
+      patch: Partial<Pick<BrowserPlatformConfig, 'name' | 'url' | 'icon' | 'order'>>
+    ) => Promise<BrowserPlatformConfig | null>
+    remove: (id: string, clearSession?: boolean) => Promise<boolean>
+    reorder: (orderedIds: string[]) => Promise<BrowserPlatformConfig[]>
+    activate: (platformId: string, bounds: ViewportBounds) => Promise<boolean>
+    deactivate: () => Promise<void>
+    updateBounds: (bounds: ViewportBounds) => Promise<void>
+    setEmbedVisible: (visible: boolean) => Promise<void>
+    onStatusChanged: (callback: (event: BrowserSourceStatusEvent) => void) => () => void
+  }
 }
 
 export type {
   ActivateAppPayload,
+  AddBrowserPlatformInput,
+  BrowserPlatformConfig,
+  BrowserSourceStatusEvent,
   DashboardAiModelsQueryPayload,
   DashboardAiModelsResult,
   DashboardAiSettingsQueryPayload,

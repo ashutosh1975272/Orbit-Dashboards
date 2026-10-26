@@ -19,6 +19,9 @@ import { registerOauthIpc } from './ipc/oauth.ipc'
 import { registerProfileIpc } from './ipc/profiles.ipc'
 import { registerSlackDataIpc } from './ipc/slack-data.ipc'
 import { registerDashboardIpc } from './ipc/dashboard.ipc'
+import { registerBrowserSourcesIpc } from './ipc/browser-sources.ipc'
+import { BrowserPlatformStore } from './browser-sources/browser-platform-store'
+import { BrowserSourceViewManager } from './browser-sources/browser-source-view-manager'
 import { DashboardDeltaStore } from './dashboard/delta-store'
 import { MonitorStore } from './dashboard/monitor-store'
 import { DashboardInsightSyncEngine } from './dashboard/sync-engine'
@@ -81,6 +84,7 @@ if (!gotSingleInstanceLock) {
 
   let mainWindow: BrowserWindow | null = null
   const browserViewManager = new BrowserViewManager()
+  const browserSourceViewManager = new BrowserSourceViewManager()
   let lastUnread: Record<string, number> = {}
   const pendingUnreadNotices = new Map<string, number>()
   let unreadNoticeTimer: ReturnType<typeof setTimeout> | null = null
@@ -245,6 +249,7 @@ if (!gotSingleInstanceLock) {
       encryptionAvailable: (await import('electron')).safeStorage.isEncryptionAvailable()
     })
     const dashboardDeltaStore = new DashboardDeltaStore({ rootDir: dashboardRoot })
+    const browserPlatformStore = new BrowserPlatformStore({ rootDir: dashboardRoot })
     const dashboardSidebarStateStore = new DashboardSidebarStateStore(userData)
     // v3 — one team workspace shared by every card (ticket 04). The secret stays
     // encrypted here; cards only ever see the pinned channel list.
@@ -587,6 +592,11 @@ if (!gotSingleInstanceLock) {
       listTeamWorkspaceCandidates,
       viewedStore: dashboardViewedStore
     })
+    registerBrowserSourcesIpc({
+      platformStore: browserPlatformStore,
+      viewManager: browserSourceViewManager,
+      getMainWindow: () => mainWindow
+    })
     void runWorkspaceMigration()
     dashboardScheduler.start()
     registerAppIpc({
@@ -601,6 +611,7 @@ if (!gotSingleInstanceLock) {
         const win = mainWindow
         if (win && !win.isDestroyed()) {
           browserViewManager.setEmbedVisible(win, authenticated && !lock.isLocked())
+          browserSourceViewManager.setEmbedVisible(win, authenticated && !lock.isLocked())
         }
       }
     })

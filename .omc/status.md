@@ -1,5 +1,18 @@
 # Status Ledger
 
+## Browser Sources — Phase 2 Add Platform System (2026-10-26, branch `feat/browser-sources`)
+- `npm run typecheck`: PASS (node + web, exit 0)
+- `npm test`: PASS — **63 files, 505/505** tests (exit 0, no regressions)
+- Implemented Add Platform system:
+  - File-backed `BrowserPlatformStore` with atomic file writes at `join(options.rootDir, 'browser-platforms.json')`.
+  - Built-in presets for Slack, Teams, WhatsApp, Discord, Upwork, and Custom Links.
+  - Strict HTTPS validation for external platform URLs (blocks insecure schemes or empty names).
+  - Platform reordering and safe deletion (clearing isolated session data from partition storage).
+  - Main-process IPC handlers registered via `browser-sources.ipc.ts` with real-time status change push.
+  - Preload bridge: `window.api.browserSources.{list, add, update, remove, reorder, activate, deactivate, onStatusChanged}`.
+  - UI components: `AddPlatformModal.tsx` and `BrowserPlatformsRail.tsx` embedded directly into the sidebar rail.
+- Test suite: `tests/unit/browser-platform-store.test.ts` (7/7 tests passing).
+
 ## Browser Sources — Phase 1 Embedded Views Shell (2026-10-26, branch `feat/browser-sources`)
 - `npm run typecheck`: PASS (node + web, exit 0)
 - `npm test`: PASS — **62 files, 498/498** tests (exit 0, no regressions)
