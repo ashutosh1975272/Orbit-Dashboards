@@ -24,8 +24,21 @@ afterEach(async () => {
   dirs.length = 0
 })
 
-async function readJson(path: string): Promise<Record<string, any>> {
-  return JSON.parse(await readFile(path, 'utf8')) as Record<string, any>
+/** The shape the three vault files are asserted against, so no `any` is needed. */
+type VaultFile = {
+  manualTokens?: Record<string, string>
+  workspace?: {
+    tokenPlain?: string
+    tokenEnc?: string
+    status?: string
+    channels?: unknown[]
+  }
+  global?: { apiKeyPlain?: string; apiKeyEnc?: string }
+  projects?: Record<string, { apiKeyPlain?: string; apiKeyEnc?: string }>
+}
+
+async function readJson(path: string): Promise<VaultFile> {
+  return JSON.parse(await readFile(path, 'utf8')) as VaultFile
 }
 
 describe('D7 — a secret is never left readable on disk', () => {
@@ -51,7 +64,7 @@ describe('D7 — a secret is never left readable on disk', () => {
 
     expect(await store.migrateLegacyPlaintext()).toBe(1)
     const onDisk = await readJson(file)
-    expect(onDisk.manualTokens.K).not.toBe('xoxp-legacy123')
+    expect(onDisk.manualTokens?.K).not.toBe('xoxp-legacy123')
     expect(JSON.stringify(onDisk)).not.toContain('xoxp-legacy123')
     expect(await store.getManualToken('K')).toBe('xoxp-legacy123')
     expect(await store.migrateLegacyPlaintext()).toBe(0)
@@ -81,10 +94,12 @@ describe('D7 — a secret is never left readable on disk', () => {
 
     expect(await store.migrateLegacyPlaintext()).toBe(1)
     const onDisk = await readJson(file)
-    expect(onDisk.workspace.tokenPlain).toBeUndefined()
-    expect(onDisk.workspace.tokenEnc).toBe(Buffer.from('xoxp-team-legacy', 'utf8').toString('base64'))
-    expect(onDisk.workspace.status).toBe('needs-reconnect')
-    expect(onDisk.workspace.channels).toHaveLength(1)
+    expect(onDisk.workspace?.tokenPlain).toBeUndefined()
+    expect(onDisk.workspace?.tokenEnc).toBe(
+      Buffer.from('xoxp-team-legacy', 'utf8').toString('base64')
+    )
+    expect(onDisk.workspace?.status).toBe('needs-reconnect')
+    expect(onDisk.workspace?.channels).toHaveLength(1)
     const connection = await store.getConnection()
     expect(connection?.token).toBe('xoxp-team-legacy')
     expect(await store.migrateLegacyPlaintext()).toBe(0)

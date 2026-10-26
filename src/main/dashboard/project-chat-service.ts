@@ -169,7 +169,19 @@ export class ProjectChatService {
     return join(this.rootDir, `${projectId}.json`)
   }
 
+  /** Chat files are per project: an id with no project must not touch them. */
+  private async assertProjectKnown(projectId: string): Promise<void> {
+    if (!PROJECT_ID_RE.test(projectId)) {
+      throw new ProjectChatError('PROJECT_NOT_FOUND', 'Invalid project id.')
+    }
+    const project = (await this.monitorStore.listProjects()).find((p) => p.id === projectId)
+    if (!project) {
+      throw new ProjectChatError('PROJECT_NOT_FOUND', 'This project no longer exists.')
+    }
+  }
+
   async loadHistory(projectId: string): Promise<DashboardProjectChatMessage[]> {
+    await this.assertProjectKnown(projectId)
     try {
       const raw = await readFile(this.filePath(projectId), 'utf8')
       const parsed: unknown = JSON.parse(raw)
@@ -184,6 +196,7 @@ export class ProjectChatService {
   }
 
   async clearHistory(projectId: string): Promise<void> {
+    await this.assertProjectKnown(projectId)
     await mkdir(this.rootDir, { recursive: true })
     await writeFile(this.filePath(projectId), '[]', 'utf8')
   }
@@ -203,6 +216,7 @@ export class ProjectChatService {
     projectId: string,
     message: DashboardProjectChatMessage
   ): Promise<void> {
+    await this.assertProjectKnown(projectId)
     const history = await this.loadHistory(projectId)
     history.push(message)
     await this.saveHistory(projectId, history)
