@@ -420,7 +420,8 @@ if (!gotSingleInstanceLock) {
         monitorStore: dashboardMonitorStore,
         deltaStore: dashboardDeltaStore,
         getLastInsight: (projectId: string) => insightEngine.existingInsight(projectId),
-        getNewMessageCount: (projectId: string) => dashboardEngine.newMessageCountFor(projectId)
+        getNewMessageCount: (projectId: string) => dashboardEngine.newMessageCountFor(projectId),
+        getLastViewedAt: (projectId: string) => dashboardViewedStore.get(projectId)
       })
     const getDigest = async (): Promise<DashboardDigest | null> => refreshDigestNow()
 

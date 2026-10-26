@@ -151,7 +151,7 @@ describe('Client projects page', () => {
     expect(screen.getByRole('button', { name: /^Inactive 24h\+\s*0$/ })).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: /^Inactive 24h\+/ }))
-    expect(screen.getByText(/No inactive projects/)).toBeTruthy()
+    expect(screen.getByText('Nothing matches this filter.')).toBeTruthy()
     expect(localStorage.getItem('orbit.filter')).toBe('inactive')
 
     fireEvent.click(screen.getByRole('button', { name: /^Urgent/ }))
@@ -196,7 +196,22 @@ describe('Client projects page', () => {
     fireEvent.click(recentCard)
 
     await waitFor(() => expect(container.querySelector('.ws-head')).not.toBeNull())
-    expect(Element.prototype.scrollIntoView).toHaveBeenCalled()
+    await waitFor(() => expect(Element.prototype.scrollIntoView).toHaveBeenCalled())
+  })
+
+  it('opens the clicked card from Compact by switching to Mixed', async () => {
+    installApi()
+    resetStore()
+    const { container } = render(<DashboardView />)
+    await screen.findByTestId('dashboard-view')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Compact' }))
+    expect(container.querySelector('.ws-head')).toBeNull()
+
+    fireEvent.click(screen.getByTestId('dash-card-0'))
+    await waitFor(() => expect(container.querySelector('.ws-head')).not.toBeNull())
+    await waitFor(() => expect(localStorage.getItem('orbit.view')).toBe('mixed'))
+    expect(screen.getByRole('button', { name: 'Mixed' }).getAttribute('aria-pressed')).toBe('true')
   })
 
   it('renders the Recent rail with the pinned marker and opens on click', async () => {
@@ -211,7 +226,20 @@ describe('Client projects page', () => {
     expect(card.textContent).toContain('Reply owed')
     expect(card.textContent).toContain('3h')
     expect(container.querySelector('.dash-recent-pin')).not.toBeNull()
+    expect(container.querySelector('.dash-recent-new')).toBeNull()
     fireEvent.click(card)
     expect(onOpen).toHaveBeenCalledWith('demo-rich')
+  })
+
+  it('marks a Recent card that changed since the last visit', () => {
+    const { container } = render(
+      <RecentStrip
+        items={[{ ...RECENT, newMessages: 2 }]}
+        pinnedIds={new Set()}
+        onOpen={() => undefined}
+      />
+    )
+    expect(container.querySelector('.dash-recent-new')).not.toBeNull()
+    expect(screen.getByLabelText('New since your last visit')).toBeTruthy()
   })
 })

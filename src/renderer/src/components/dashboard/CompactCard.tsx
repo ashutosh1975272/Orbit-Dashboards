@@ -32,6 +32,8 @@ const MOOD_LABEL: Record<string, string> = {
   tense: 'Tense'
 }
 
+const RING_CIRCUMFERENCE = 2 * Math.PI * 15
+
 function fmtAge(iso: string | null | undefined): string {
   if (!iso) return '—'
   const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60_000))
@@ -110,6 +112,7 @@ export default function CompactCard({
     justChanged,
     nextStep,
     progress,
+    pace,
     paceLabel,
     daysTotal,
     week,
@@ -175,28 +178,32 @@ export default function CompactCard({
 
       <div className="proj-row-body">
         <div className="proj-row-head">
-          {onTogglePin ? (
-            <ProjectPinButton
-              pinned={pinned}
-              projectName={name}
-              onToggle={onTogglePin}
-              className="proj-pin-inline"
-            />
-          ) : null}
-          <span className="proj-row-name" title={name}>
-            {name}
-          </span>
-          <span className="proj-row-ws" title={workspaceName}>
-            {workspaceName}
-          </span>
-          {clientName && clientName !== workspaceName ? (
-            <span className="proj-row-client" title={clientName}>
-              {clientName}
+          <div className="proj-row-identity">
+            {onTogglePin ? (
+              <ProjectPinButton
+                pinned={pinned}
+                projectName={name}
+                onToggle={onTogglePin}
+                className="proj-pin-inline"
+              />
+            ) : null}
+            <span className="proj-row-name" title={name}>
+              {name}
             </span>
-          ) : null}
-          {statusLabel ? <span className="proj-row-status">{statusLabel}</span> : null}
-          {needsReply ? <span className="proj-flag">Needs reply</span> : null}
-          {inactive ? <span className="proj-flag is-muted">Inactive 24h+</span> : null}
+            <span className="proj-row-tags">
+              <span className="proj-row-ws" title={workspaceName}>
+                {workspaceName}
+              </span>
+              {clientName && clientName !== workspaceName ? (
+                <span className="proj-row-client" title={clientName}>
+                  {clientName}
+                </span>
+              ) : null}
+              {statusLabel ? <span className="proj-row-status">{statusLabel}</span> : null}
+              {needsReply ? <span className="proj-flag">Needs reply</span> : null}
+              {inactive ? <span className="proj-flag is-muted">Inactive 24h+</span> : null}
+            </span>
+          </div>
 
           <span className="proj-row-head-actions">
             <button
@@ -299,12 +306,15 @@ export default function CompactCard({
           </span>
         </div>
 
-        <span className={`proj-row-line${situationLine ? '' : ' is-empty'}`}>
+        <span
+          className={`proj-row-line${situationLine ? '' : ' is-empty'}`}
+          title={situationLine || 'No summary yet'}
+        >
           {situationLine || 'No summary yet'}
         </span>
 
         {justChanged ? (
-          <span className="proj-row-changed">
+          <span className="proj-row-changed" title={justChanged}>
             <b>Just changed</b> {justChanged}
           </span>
         ) : null}
@@ -369,26 +379,55 @@ export default function CompactCard({
 
       <div className="proj-row-side">
         <span
-          className={`proj-meter${progress === null ? ' is-unknown' : ''}`}
+          className={`proj-progress${progress === null ? ' is-unknown' : ''}`}
           title={
             progress === null
               ? 'Progress not stated in chat'
               : `${progress}% complete. ${paceLabel}`
           }
         >
-          <span className="proj-meter-bar">
-            <span
-              style={{
-                width: progress === null ? '0%' : `${Math.min(100, Math.max(0, progress))}%`
-              }}
-            />
+          <span className="proj-ring">
+            <svg viewBox="0 0 36 36" aria-hidden>
+              <circle className="proj-ring-track" cx="18" cy="18" r="15" />
+              {progress === null ? null : (
+                <circle
+                  className="proj-ring-fill"
+                  cx="18"
+                  cy="18"
+                  r="15"
+                  strokeDasharray={RING_CIRCUMFERENCE}
+                  strokeDashoffset={
+                    RING_CIRCUMFERENCE * (1 - Math.min(100, Math.max(0, progress)) / 100)
+                  }
+                />
+              )}
+            </svg>
+            <span className="proj-ring-num">{progress === null ? '—' : `${progress}%`}</span>
           </span>
-          <span className="proj-meter-num">{progress === null ? '—' : `${progress}%`}</span>
+          {progress === null ? (
+            <span className="proj-progress-hint">Not enough info</span>
+          ) : null}
         </span>
 
-        <span className="proj-pace" title={paceLabel}>
-          {daysTotal ? `${summary.daysUsed ?? 0} of ${daysTotal} days` : 'No dates'}
-        </span>
+        {daysTotal ? (
+          <>
+            <span className="proj-pace" title={paceLabel}>
+              {summary.daysUsed ?? 0} of {daysTotal} days
+            </span>
+            {progress !== null ? (
+              <span className={`proj-pace-verdict is-${pace}`}>{paceLabel}</span>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <span className="proj-pace" title={paceLabel}>
+              No dates
+            </span>
+            <button type="button" className="proj-add-dates" onClick={onSettings}>
+              Add dates
+            </button>
+          </>
+        )}
 
         {weekCounts.some((day) => day.count > 0) ? (
           <span className="proj-week" aria-label="Last 7 days activity">

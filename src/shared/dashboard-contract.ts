@@ -342,6 +342,8 @@ export interface RecentActivity {
   delta?: string
   /** hours since last message (for inactive filter) */
   hoursSinceLastMessage: number
+  /** meaningful messages that arrived after the owner last viewed this card */
+  newMessages?: number
 }
 
 export type DashboardSyncProgressPayload = {

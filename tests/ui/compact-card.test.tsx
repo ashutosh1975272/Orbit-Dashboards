@@ -42,6 +42,7 @@ function renderCard(
   props: Partial<{
     onToggle: () => void
     onTogglePin: () => void
+    onSettings: () => void
     pinned: boolean
   }> = {}
 ): void {
@@ -50,7 +51,7 @@ function renderCard(
       summary={summary(overrides)}
       onToggle={props.onToggle ?? noop}
       onSync={noop}
-      onSettings={noop}
+      onSettings={props.onSettings ?? noop}
       onRemove={noop}
       syncing={false}
       pinned={props.pinned}
@@ -64,6 +65,7 @@ describe('CompactCard progress', () => {
     renderCard({ progress: null })
     const meter = screen.getByTitle(/Progress not stated in chat/)
     expect(meter.textContent).toContain('—')
+    expect(meter.textContent).toContain('Not enough info')
     expect(meter.textContent).not.toContain('%')
   })
 
@@ -71,6 +73,16 @@ describe('CompactCard progress', () => {
     renderCard({ progress: 50 })
     const meter = screen.getByTitle(/50% complete/)
     expect(meter.textContent).toContain('50%')
+  })
+
+  it('shows the pace verdict only when dates and progress both exist', () => {
+    renderCard({ progress: 40, daysUsed: 12, daysTotal: 30, paceLabel: 'On pace' })
+    expect(screen.getByText('12 of 30 days')).toBeTruthy()
+    expect(screen.getByText('On pace')).toBeTruthy()
+
+    cleanup()
+    renderCard({ progress: 40 })
+    expect(screen.queryByText('On pace')).toBeNull()
   })
 })
 
@@ -103,6 +115,16 @@ describe('CompactCard tiers', () => {
     expect(screen.queryByText(/Reply /)).toBeNull()
     expect(screen.queryByText(/deliverables/)).toBeNull()
     expect(screen.queryByText('No messages this week')).toBeTruthy()
+  })
+
+  it('opens Settings from Add dates without expanding the card', () => {
+    const onToggle = vi.fn()
+    const onSettings = vi.fn()
+    renderCard({}, { onToggle, onSettings })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add dates' }))
+    expect(onSettings).toHaveBeenCalledTimes(1)
+    expect(onToggle).not.toHaveBeenCalled()
   })
 
   it('pins from the card header without toggling the card', () => {

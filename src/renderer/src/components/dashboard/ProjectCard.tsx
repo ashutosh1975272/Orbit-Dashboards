@@ -29,6 +29,8 @@ interface ProjectCardProps {
   onMoveDown?: () => void
   /** Memo guard: pin order changes must refresh the action closures. */
   pinOrderKey?: string
+  /** Memo guard: view-mode changes must refresh the toggle closure. */
+  pageMode?: 'compact' | 'expanded' | 'mixed'
 }
 
 function ProjectCardInner({
@@ -113,6 +115,7 @@ export default memo(ProjectCardInner, (prev, next) => {
     prev.expanded === next.expanded &&
     prev.pinned === next.pinned &&
     prev.pinOrderKey === next.pinOrderKey &&
+    prev.pageMode === next.pageMode &&
     prev.canMoveUp === next.canMoveUp &&
     prev.canMoveDown === next.canMoveDown &&
     prev.index === next.index &&

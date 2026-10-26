@@ -118,6 +118,8 @@ export default function DashboardView(): React.ReactElement | null {
   const [dropId, setDropId] = useState<string | null>(null)
   const [syncRun, setSyncRun] = useState<{ total: number; done: number } | null>(null)
   const lastProgressRef = useRef<DashboardSyncProgressPayload | null>(null)
+  const pointerDrag = useRef<{ id: string; pointerId: number } | null>(null)
+  const pointerDrop = useRef<string | null>(null)
 
   useEffect(() => {
     void loadSnapshot()
@@ -380,6 +382,51 @@ export default function DashboardView(): React.ReactElement | null {
     void setPinnedOrder(next)
   }
 
+  const pinnedUnder = (x: number, y: number): string | null => {
+    const slot = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-pinned-id]')
+    return slot?.dataset.pinnedId ?? null
+  }
+
+  const startPinDrag = (event: React.PointerEvent<HTMLButtonElement>, id: string): void => {
+    if (event.button !== 0) return
+    pointerDrag.current = { id, pointerId: event.pointerId }
+    pointerDrop.current = null
+    setDragId(id)
+    setDropId(null)
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+  }
+
+  const movePinDrag = (event: React.PointerEvent<HTMLButtonElement>): void => {
+    if (!pointerDrag.current) return
+    event.preventDefault()
+    const target = pinnedUnder(event.clientX, event.clientY)
+    if (target !== pointerDrop.current) {
+      pointerDrop.current = target
+      setDropId(target)
+    }
+    if (event.clientY < 90) window.scrollBy({ top: -18 })
+    else if (window.innerHeight - event.clientY < 90) window.scrollBy({ top: 18 })
+  }
+
+  const endPinDrag = (event: React.PointerEvent<HTMLButtonElement>): void => {
+    const drag = pointerDrag.current
+    if (!drag) return
+    pointerDrag.current = null
+    const target = pinnedUnder(event.clientX, event.clientY) ?? pointerDrop.current
+    pointerDrop.current = null
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture?.(event.pointerId)
+    }
+    dropPin(drag.id, target ?? drag.id)
+  }
+
+  const cancelPinDrag = (): void => {
+    pointerDrag.current = null
+    pointerDrop.current = null
+    setDragId(null)
+    setDropId(null)
+  }
+
   const openFromRecent = (projectId: string): void => {
     const entry = entryById.get(projectId)
     if (entry && !matchesFilter(filter, entry)) changeFilter('all')
@@ -391,15 +438,28 @@ export default function DashboardView(): React.ReactElement | null {
   }
 
   const toggleCard = (projectId: string): void => {
-    const willCollapse = expandedIds.has(projectId)
-    setExpandedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(projectId)) next.delete(projectId)
-      else next.add(projectId)
-      return next
-    })
-    if (willCollapse) {
+    // A single click in Compact or Expanded must not be swallowed by the
+    // page-wide mode: move to Mixed so the clicked card is the one that changes.
+    if (viewMode === 'expanded') {
+      handleViewChange('mixed')
+      setExpandedIds((prev) => {
+        const next = new Set(prev)
+        next.delete(projectId)
+        return next
+      })
       setSettingsTarget((prev) => (prev?.projectId === projectId ? null : prev))
+    } else {
+      const willCollapse = expandedIds.has(projectId)
+      if (!willCollapse && viewMode === 'compact') handleViewChange('mixed')
+      setExpandedIds((prev) => {
+        const next = new Set(prev)
+        if (next.has(projectId)) next.delete(projectId)
+        else next.add(projectId)
+        return next
+      })
+      if (willCollapse) {
+        setSettingsTarget((prev) => (prev?.projectId === projectId ? null : prev))
+      }
     }
     const el = document.getElementById(`dash-card-anchor-${projectId}`)
     if (el) {
@@ -427,6 +487,7 @@ export default function DashboardView(): React.ReactElement | null {
           onMoveUp={() => movePin(id, -1)}
           onMoveDown={() => movePin(id, 1)}
           pinOrderKey={pinnedOrder.join('|')}
+          pageMode={viewMode}
           initialTab={settingsTarget?.projectId === id ? 'settings' : undefined}
           tabNonce={settingsTarget?.projectId === id ? settingsTarget.nonce : 0}
           initialGuideSection={focusGuideSection[id]}
@@ -582,42 +643,22 @@ export default function DashboardView(): React.ReactElement | null {
                 return (
                   <div
                     key={id}
+                    data-pinned-id={id}
                     className={`dash-pinned-slot${dragId === id ? ' is-dragging' : ''}${
                       dropId === id && dragId !== id ? ' is-drop-target' : ''
                     }`}
-                    onDragOver={(event) => {
-                      event.preventDefault()
-                      event.dataTransfer.dropEffect = 'move'
-                      setDropId(id)
-                      if (event.clientY < 90) window.scrollBy({ top: -24 })
-                      else if (window.innerHeight - event.clientY < 90) {
-                        window.scrollBy({ top: 24 })
-                      }
-                    }}
-                    onDragLeave={(event) => {
-                      if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-                        setDropId((current) => (current === id ? null : current))
-                      }
-                    }}
-                    onDrop={(event) => {
-                      event.preventDefault()
-                      dropPin(dragId, id)
-                    }}
                   >
                     <button
                       type="button"
                       className="dash-grip"
-                      draggable
                       aria-label={`Reorder ${entry.summary.name}`}
                       title="Drag to reorder"
-                      onDragStart={(event) => {
-                        setDragId(id)
-                        event.dataTransfer.effectAllowed = 'move'
-                        event.dataTransfer.setData('text/plain', id)
-                      }}
-                      onDragEnd={() => {
-                        setDragId(null)
-                        setDropId(null)
+                      onPointerDown={(event) => startPinDrag(event, id)}
+                      onPointerMove={movePinDrag}
+                      onPointerUp={endPinDrag}
+                      onPointerCancel={cancelPinDrag}
+                      onLostPointerCapture={() => {
+                        if (pointerDrag.current) cancelPinDrag()
                       }}
                       onKeyDown={(event) => {
                         if (!event.altKey) return
@@ -684,11 +725,7 @@ export default function DashboardView(): React.ReactElement | null {
                 </button>
               </div>
             ) : filteredEntries.length === 0 ? (
-              <p className="dash-filter-empty">
-                {filter === 'urgent'
-                  ? 'Nothing is urgent right now.'
-                  : 'No inactive projects — every card has a message in the last 24 hours.'}
-              </p>
+              <p className="dash-filter-empty">Nothing matches this filter.</p>
             ) : null}
           </div>
         </section>

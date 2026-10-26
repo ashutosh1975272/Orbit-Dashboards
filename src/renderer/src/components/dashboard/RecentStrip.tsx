@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type React from 'react'
 import type { RecentActivity } from '../../../../shared/dashboard-contract'
 import { recentReason } from './dashboard-page-selectors'
@@ -35,6 +36,33 @@ export default function RecentStrip({
   pinnedIds,
   onOpen
 }: RecentStripProps): React.ReactElement | null {
+  const railRef = useRef<HTMLDivElement>(null)
+  const [edges, setEdges] = useState({ left: false, right: false })
+
+  const measure = useCallback(() => {
+    const rail = railRef.current
+    if (!rail) return
+    const max = rail.scrollWidth - rail.clientWidth
+    setEdges({ left: rail.scrollLeft > 2, right: max - rail.scrollLeft > 2 })
+  }, [])
+
+  useEffect(() => {
+    const rail = railRef.current
+    if (!rail) {
+      setEdges({ left: false, right: false })
+      return
+    }
+    measure()
+    rail.addEventListener('scroll', measure, { passive: true })
+    const observer =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure)
+    observer?.observe(rail)
+    return () => {
+      rail.removeEventListener('scroll', measure)
+      observer?.disconnect()
+    }
+  }, [measure, items])
+
   const seen = new Set<string>()
   const visible = items
     .filter((item) => {
@@ -44,12 +72,58 @@ export default function RecentStrip({
     })
     .slice(0, 6)
   if (visible.length === 0) return null
+
+  const scrollByPage = (direction: -1 | 1): void => {
+    railRef.current?.scrollBy({ left: direction * 520, behavior: 'smooth' })
+  }
+
   return (
     <section className="dash-section dash-recent" aria-labelledby="dash-recent-title">
       <div className="dash-section-head">
         <h2 id="dash-recent-title">Recent</h2>
+        {edges.left || edges.right ? (
+          <div className="dash-recent-nav">
+            <button
+              type="button"
+              className="dash-recent-arrow"
+              disabled={!edges.left}
+              aria-label="Scroll Recent left"
+              onClick={() => scrollByPage(-1)}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path
+                  d="m14 6-6 6 6 6"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="dash-recent-arrow"
+              disabled={!edges.right}
+              aria-label="Scroll Recent right"
+              onClick={() => scrollByPage(1)}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path
+                  d="m10 6 6 6-6 6"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          </div>
+        ) : null}
       </div>
-      <div className="dash-recent-rail">
+      <div
+        className={`dash-recent-rail${edges.left ? ' has-left' : ''}${edges.right ? ' has-right' : ''}`}
+        ref={railRef}
+      >
         {visible.map((item) => {
           const reason = recentReason(item)
           const pinned = pinnedIds.has(item.projectId)
@@ -78,6 +152,13 @@ export default function RecentStrip({
                         <path d="M15.5 3.5 20.5 8.5 17.5 9.5 13.5 13.5 13.5 18.5 5.5 10.5 10.5 10.5 14.5 6.5 15.5 3.5Z" />
                       </svg>
                     </span>
+                  ) : null}
+                  {(item.newMessages ?? 0) > 0 ? (
+                    <span
+                      className="dash-recent-new"
+                      title={`${item.newMessages} new since your last visit`}
+                      aria-label="New since your last visit"
+                    />
                   ) : null}
                   <span className={`dash-recent-status is-${item.status}`}>
                     {STATUS_LABEL[item.status] ?? item.status}
