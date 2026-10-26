@@ -28,6 +28,9 @@ interface EncryptedVault {
   decrypt(b64: string): string
 }
 
+/** A raw Slack token an older build left on disk before saves were blocked. */
+const PLAINTEXT_TOKEN_RE = /^xox[a-zA-Z]-[A-Za-z0-9-]+$/
+
 let vault: EncryptedVault | null = null
 
 async function getVaultOverride(override: EncryptedVault | null): Promise<EncryptedVault> {
@@ -139,27 +142,46 @@ export class MonitorStore {
     await this.write(data)
   }
 
-  /** os-encrypted when safeStorage available (encrypt b64) else plaintext JSON. */
+  /**
+   * Manual tokens are written encrypted or not at all. Without OS encryption the
+   * whole save fails — the metadata is not left behind either, so a rejected
+   * token never half-registers in the UI.
+   */
   async saveManualToken(
     key: string,
     token: string,
     meta?: ManualTokenMeta
   ): Promise<{ plaintext: boolean }> {
-    if (meta) {
-      const data = await this.read()
-      data.manualTokenMeta = { ...(data.manualTokenMeta ?? {}), [key]: meta }
-      await this.write(data)
-    }
     if (!this.encryptionAvailable) {
       throw new Error('OS encryption unavailable')
     }
     const data = await this.read()
+    if (meta) data.manualTokenMeta = { ...(data.manualTokenMeta ?? {}), [key]: meta }
     data.manualTokens = {
       ...data.manualTokens,
       [key]: (await getVaultOverride(this.vaultOverride)).encrypt(token)
     }
     await this.write(data)
     return { plaintext: false }
+  }
+
+  /**
+   * A build before the save path blocked it could leave a Slack token on disk as
+   * plaintext. Once the OS vault is available, seal those entries and re-save.
+   * Returns how many secrets were rewritten; 0 when there was nothing to do.
+   */
+  async migrateLegacyPlaintext(): Promise<number> {
+    if (!this.encryptionAvailable) return 0
+    const vault = await getVaultOverride(this.vaultOverride)
+    const data = await this.read()
+    let moved = 0
+    for (const [key, raw] of Object.entries(data.manualTokens)) {
+      if (!PLAINTEXT_TOKEN_RE.test(raw.trim())) continue
+      data.manualTokens[key] = vault.encrypt(raw.trim())
+      moved += 1
+    }
+    if (moved > 0) await this.write(data)
+    return moved
   }
 
   async getManualToken(key: string): Promise<string | null> {

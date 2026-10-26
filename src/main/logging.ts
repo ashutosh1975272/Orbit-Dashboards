@@ -6,13 +6,17 @@ const TOKEN_PATTERNS = [
   /Bearer\s+[A-Za-z0-9._~+/=-]+/gi
 ]
 
+function redactString(value: string): string {
+  let redacted = value
+  for (const pattern of TOKEN_PATTERNS) {
+    redacted = redacted.replace(pattern, '[REDACTED]')
+  }
+  return redacted
+}
+
 function redact(value: unknown): unknown {
   if (typeof value === 'string') {
-    let redacted = value
-    for (const pattern of TOKEN_PATTERNS) {
-      redacted = redacted.replace(pattern, '[REDACTED]')
-    }
-    return redacted
+    return redactString(value)
   }
 
   if (Array.isArray(value)) {
@@ -37,7 +41,7 @@ function redact(value: unknown): unknown {
 function write(level: LogLevel, message: string, meta?: unknown): void {
   const entry = {
     level,
-    message,
+    message: redactString(message),
     ...(meta !== undefined ? { meta: redact(meta) } : {}),
     ts: new Date().toISOString()
   }

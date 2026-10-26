@@ -196,6 +196,26 @@ export class AiSettingsStore {
     return next
   }
 
+  /**
+   * A key written while the OS vault was unavailable can still be sitting on disk
+   * as plaintext. Once the vault is back, seal every plaintext key and re-save.
+   * Returns how many keys were rewritten.
+   */
+  async migrateLegacyPlaintext(): Promise<number> {
+    if (!this.encryptionAvailable) return 0
+    const data = await this.read()
+    const records: StoredAiSettings[] = [data.global, ...Object.values(data.projects)]
+    let moved = 0
+    for (const record of records) {
+      if (!record.apiKeyPlain) continue
+      record.apiKeyEnc = (await this.activeVault()).encrypt(record.apiKeyPlain)
+      delete record.apiKeyPlain
+      moved += 1
+    }
+    if (moved > 0) await this.write(data)
+    return moved
+  }
+
   private async update(mutator: (data: AiSettingsFile) => void): Promise<void> {
     const run = this.queue.then(async () => {
       const data = await this.read()

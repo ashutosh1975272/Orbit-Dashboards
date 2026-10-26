@@ -258,6 +258,7 @@ if (!gotSingleInstanceLock) {
         teamId: string
         token: string | null
         channels: Array<{ channelId: string; channelName: string }>
+        status: 'connected' | 'needs-reconnect'
       } | null> => {
         const connection = await teamWorkspaceStore.getConnection()
         if (!connection) return null
@@ -267,9 +268,12 @@ if (!gotSingleInstanceLock) {
           profileId: connection.profileId,
           teamId: connection.teamId,
           token,
-          channels: connection.channels
+          channels: connection.channels,
+          status: connection.status
         }
-      }
+      },
+      setStatus: (status: 'connected' | 'needs-reconnect', atIso?: string) =>
+        teamWorkspaceStore.setStatus(status, atIso)
     }
     const listTeamWorkspaceCandidates = async (): Promise<DashboardTeamWorkspaceCandidate[]> => {
       const profiles = await profileStore.list()
@@ -336,6 +340,22 @@ if (!gotSingleInstanceLock) {
       monitorStore: dashboardMonitorStore,
       oauthTokenProvider: { tryGet: (profileId, teamId) => tokenStore.tryGet(profileId, teamId) }
     })
+    // D7 — an older build could write a secret as plaintext before the save path
+    // blocked it. Seal anything it left behind, once, before any sync runs.
+    await Promise.all([
+      dashboardMonitorStore.migrateLegacyPlaintext(),
+      teamWorkspaceStore.migrateLegacyPlaintext(),
+      aiSettingsStore.migrateLegacyPlaintext()
+    ])
+      .then((counts) => {
+        const moved = counts.reduce((total, n) => total + n, 0)
+        if (moved > 0) log.info(`[dashboard] re-encrypted ${moved} legacy plaintext secret(s)`)
+      })
+      .catch((err) => {
+        log.warn(
+          `[dashboard] plaintext re-encryption skipped: ${err instanceof Error ? err.message : err}`
+        )
+      })
     const dashboardHistoryStore = new HistoryStore({ rootDir: dashboardRoot })
     const dashboardViewedStore = new DashboardViewedStore({ rootDir: dashboardRoot })
     const dashboardScheduleStore = new DashboardScheduleStore({ rootDir: dashboardRoot })

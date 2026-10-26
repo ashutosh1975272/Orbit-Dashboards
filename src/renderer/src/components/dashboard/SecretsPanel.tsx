@@ -78,7 +78,7 @@ export default function SecretsPanel({ onClose }: SecretsPanelProps): React.Reac
     setTokenMsg(
       result.valid
         ? `✅ token saved (${tokenKey.trim()})`
-        : `❌ ${result.error ?? 'token rejected'} (saved anyway for later)`
+        : `❌ ${result.error ?? 'token rejected'} — nothing was saved`
     )
     if (result.valid) {
       setTokenKey('')

@@ -16,7 +16,7 @@ export interface StoredTeamWorkspace {
   source: 'oauth' | 'manual'
   /** safeStorage ciphertext (base64). Absent for an OAuth connection. */
   tokenEnc?: string
-  /** Fallback when the OS has no encryption. Absent for an OAuth connection. */
+  /** Legacy only: a token an older build wrote before saves were blocked. */
   tokenPlain?: string
   /** Mask shown in the UI ("••••abcd") — never the raw token. */
   maskedToken: string | null
@@ -84,7 +84,8 @@ const UNCONNECTED: DashboardTeamWorkspace = {
 /**
  * The globally connected "our team" Slack workspace: connection facts plus the
  * pinned channel set. The secret is encrypted with safeStorage; with no OS
- * encryption available it falls back to plaintext, exactly like MonitorStore.
+ * encryption available the connect is refused outright — a token is never
+ * written as plaintext.
  */
 export class TeamWorkspaceStore {
   private readonly filePath: string
@@ -164,8 +165,7 @@ export class TeamWorkspaceStore {
       teamName: input.teamName,
       teamDomain: input.teamDomain ?? undefined,
       source: input.payload.source,
-      ...(encrypted?.enc ? { tokenEnc: encrypted.enc } : {}),
-      ...(encrypted?.plain ? { tokenPlain: encrypted.plain } : {}),
+      ...(encrypted ? { tokenEnc: encrypted } : {}),
       maskedToken: input.maskedToken ?? maskToken(input.token ?? null),
       status: input.status ?? 'connected',
       lastVerifiedAt: now,
@@ -230,9 +230,26 @@ export class TeamWorkspaceStore {
     }
   }
 
-  private async encrypt(token: string): Promise<{ enc?: string; plain?: string }> {
+  private async encrypt(token: string): Promise<string> {
     if (!this.encryptionAvailable) throw new Error('OS encryption unavailable')
-    return { enc: (await this.activeVault()).encrypt(token) }
+    return (await this.activeVault()).encrypt(token)
+  }
+
+  /**
+   * A token an older build left as plaintext is sealed and re-saved once the OS
+   * vault is available. Returns 1 when a record was rewritten, else 0.
+   */
+  async migrateLegacyPlaintext(): Promise<number> {
+    if (!this.encryptionAvailable) return 0
+    const legacy = (await this.read()).workspace?.tokenPlain
+    if (!legacy) return 0
+    const sealed = await this.encrypt(legacy)
+    await this.mutate((current) => {
+      const ws = current.workspace
+      if (!ws?.tokenPlain) return current
+      return { workspace: { ...ws, tokenEnc: sealed, tokenPlain: undefined } }
+    })
+    return 1
   }
 
   private async activeVault(): Promise<EncryptedVault> {
