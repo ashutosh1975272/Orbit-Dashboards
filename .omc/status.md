@@ -1,5 +1,16 @@
 # Status Ledger
 
+## Browser Sources — Phase 1 Embedded Views Shell (2026-10-26, branch `feat/browser-sources`)
+- `npm run typecheck`: PASS (node + web, exit 0)
+- `npm test`: PASS — **62 files, 498/498** tests (exit 0, no regressions)
+- Implemented core Embedded Views Shell:
+  - Isolated partitions via `partitionForBrowserSource(platformId)` yielding `persist:bs-<platformId>`.
+  - Full-bleed embedded view container replacing right pane, attached/detached cleanly via `mainWindow.contentView.addChildView(view)` / `removeChildView`.
+  - Domain navigation allowlist via `isAllowedEmbedDomain`: preserves internal platform routes & corporate SSO redirects in-place; opens external links in system default browser (`shell.openExternal`).
+  - Blocks protocol handler traps (`msteams:`, `slack:`) from triggering native app popups.
+  - Platform status lifecycle model (`Logged in` | `Needs login` | `Adapter broken`) with automated URL and DOM check triggers.
+- Test suite: `tests/unit/browser-sources-shell.test.ts` (8/8 tests passing).
+
 ## Browser Sources — Phase 0 Spike Proof (2026-10-26, branch `feat/browser-sources`)
 - `npm run typecheck`: PASS (node + web, exit 0)
 - `npm test`: PASS — **61 files, 490/490** tests (exit 0, no regressions)
