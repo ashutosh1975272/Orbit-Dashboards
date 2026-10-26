@@ -6,6 +6,7 @@
  * shows, what counts as evidence for each, and what to leave empty when the
  * chat does not say. */
 
+import { log } from '../logging'
 import type { NimChatMessage } from './ai-provider'
 import type {
   InsightBlocker,
@@ -459,7 +460,29 @@ export function mergeInsight(
   const clientQuote = lastClient ? asString(lastClient.quote) : undefined
   const dateEvidence = asString(dates.evidence)
 
-  const nextStatus: InsightStatus = status && STATUSES.includes(status) ? status : base.status
+  const mergedDeliverables = parseDeliverables(parsed.deliverables) ?? base.deliverables
+  const mergedCommitments = parseCommitments(parsed.commitments) ?? base.commitments
+  const mergedDecisions = parseDecisions(parsed.decisions) ?? base.decisions
+  const mergedHighlights = parseHighlights(parsed.highlights) ?? base.highlights
+
+  let nextStatus: InsightStatus = status && STATUSES.includes(status) ? status : base.status
+  // Same honesty rule as progress: changing the status needs at least one
+  // evidence item somewhere in the merged insight.
+  if (
+    previous &&
+    nextStatus !== previous.status &&
+    mergedDeliverables.length +
+      mergedCommitments.length +
+      mergedDecisions.length +
+      mergedHighlights.length ===
+      0
+  ) {
+    log.warn('insight status change rejected: no supporting evidence', {
+      previousStatus: previous.status,
+      proposedStatus: nextStatus
+    })
+    nextStatus = previous.status
+  }
   const nextProgress = progress ?? base.progress
 
   return {
@@ -474,13 +497,18 @@ export function mergeInsight(
       const threshold = Number(process.env.ORBIT_PROGRESS_JUMP_THRESHOLD ?? 25)
       const evidence = (asString(parsed.progressEvidence) ?? '').trim()
       if (previous && Math.abs(nextProgress - previous.progress) > threshold && !evidence) {
+        log.warn('insight progress jump rejected: no progress evidence', {
+          previousProgress: previous.progress,
+          proposedProgress: nextProgress,
+          threshold
+        })
         return previous.progress
       }
       return nextProgress
     })(),
     progressEvidence: asString(parsed.progressEvidence) ?? base.progressEvidence,
     situationLine: asString(parsed.situationLine) ?? base.situationLine,
-    highlights: parseHighlights(parsed.highlights) ?? base.highlights,
+    highlights: mergedHighlights,
     blockers: parseBlockers(parsed.blockers) ?? base.blockers,
     nextStep: asString(parsed.nextStep) ?? base.nextStep,
     dates: {
@@ -512,14 +540,14 @@ export function mergeInsight(
           : base.clientAsk.lastClientMessage,
       openQuestions: asStringArray(clientAsk.openQuestions, 3) ?? base.clientAsk.openQuestions
     },
-    commitments: parseCommitments(parsed.commitments) ?? base.commitments,
-    decisions: parseDecisions(parsed.decisions) ?? base.decisions,
+    commitments: mergedCommitments,
+    decisions: mergedDecisions,
     risks: asStringArray(parsed.risks, 3) ?? base.risks,
     keywords: asStringArray(parsed.keywords, 6) ?? base.keywords,
 
     requirements: parseRequirements(parsed.requirements) ?? base.requirements,
     scope: parseScope(parsed.scope) ?? base.scope,
-    deliverables: parseDeliverables(parsed.deliverables) ?? base.deliverables,
+    deliverables: mergedDeliverables,
     files: parseFiles(parsed.files) ?? base.files,
     people: parsePeople(parsed.people) ?? base.people,
     milestones: parseMilestones(parsed.milestones) ?? base.milestones

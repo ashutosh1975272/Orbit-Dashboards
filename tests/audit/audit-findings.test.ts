@@ -124,14 +124,40 @@ describe('audit findings — expected to expose gaps', () => {
     expect(lines.join('\n')).not.toContain('nvapi-SECRET-1234')
   })
 
-  it('B5: attention rows must carry enough metadata to jump to the Slack message', () => {
+  it('B5: only a row with a real Slack anchor claims it can jump', () => {
     const items = buildWaiting(insight()).items
     expect(items.length).toBeGreaterThan(0)
     for (const item of items) {
       expect(item.source, `${item.kind} has no source`).toBeTruthy()
-      expect(item.channelId, `${item.kind} has no channelId`).toBeTruthy()
-      expect(item.ts, `${item.kind} has no ts`).toBeTruthy()
+      if (item.canJump) {
+        expect(item.channelId).not.toBe('unknown')
+        expect(item.ts, `${item.kind} can jump with no ts`).toBeTruthy()
+        expect(item.ts).toMatch(/^\d{10}\.\d+$/)
+      } else {
+        // an ISO date stuffed into `ts` used to look jumpable and never matched
+        expect(item.ts, `${item.kind} offers a ts it cannot jump to`).toBeUndefined()
+      }
     }
+  })
+
+  it('B5: a row anchored to a real Slack message is jumpable', () => {
+    const base = insight()
+    const anchored = buildWaiting({
+      ...base,
+      clientAsk: {
+        ...base.clientAsk,
+        lastClientMessage: {
+          ...base.clientAsk.lastClientMessage!,
+          ts: '1761234567.000100',
+          channelId: 'C1',
+          permalink: 'https://acme.slack.com/archives/C1/p1761234567000100'
+        }
+      }
+    } as ProjectInsight)
+    const reply = anchored.items.find((item) => item.kind === 'needs-reply')
+    expect(reply?.canJump).toBe(true)
+    expect(reply?.ts).toBe('1761234567.000100')
+    expect(reply?.channelId).toBe('C1')
   })
 
   it('E2: a quiet sync must make zero model calls when not forced', async () => {

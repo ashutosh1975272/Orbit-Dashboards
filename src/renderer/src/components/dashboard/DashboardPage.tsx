@@ -314,11 +314,25 @@ function FreshnessLine({
   )
 }
 
-function SourceChip({ source }: { source: DashboardSource }): React.ReactElement {
+function SourceChip({
+  source,
+  onJump
+}: {
+  source: DashboardSource
+  onJump?: () => void
+}): React.ReactElement {
+  const label = source === 'ours' ? 'Our Slack' : 'Client Slack'
+  const className = `dash-source ${source === 'ours' ? 'is-ours' : 'is-client'}`
+  if (!onJump) return <span className={className}>{label}</span>
   return (
-    <span className={`dash-source ${source === 'ours' ? 'is-ours' : 'is-client'}`}>
-      {source === 'ours' ? 'Our Slack' : 'Client Slack'}
-    </span>
+    <button
+      type="button"
+      className={className}
+      onClick={onJump}
+      title="Open and highlight this message"
+    >
+      {label}
+    </button>
   )
 }
 
@@ -598,10 +612,12 @@ export default function DashboardPage({
               <div className="dash-tile-head">
                 <span>Waiting on you</span>
               </div>
-              {!hasInsight ? (
+              {!hasInsight || !waiting ? (
                 <>
                   <p className="dash-kpi-value is-soft">—</p>
-                  <p className="dash-muted">Not analysed yet</p>
+                  <p className="dash-muted">
+                    {hasInsight ? 'Not enough info' : 'Not analysed yet'}
+                  </p>
                 </>
               ) : (
                 <>
@@ -850,7 +866,11 @@ export default function DashboardPage({
                   </div>
                   {attentionRows.length === 0 ? (
                     <p className="dash-muted">
-                      {hasInsight ? 'Nothing needs you right now.' : 'Not analysed yet.'}
+                      {waiting && hasInsight
+                        ? 'Nothing needs you right now.'
+                        : hasInsight
+                          ? 'Not enough info.'
+                          : 'Not analysed yet.'}
                     </p>
                   ) : (
                     <ul className="dash-list">
@@ -860,7 +880,12 @@ export default function DashboardPage({
                             {KIND_LABEL[item.kind] ?? item.kind}
                           </span>
                           <span className="dash-row-text">{item.text}</span>
-                          {item.source ? <SourceChip source={item.source} /> : null}
+                          {item.source ? (
+                            <SourceChip
+                              source={item.source}
+                              onJump={item.canJump ? () => openAttention(item) : undefined}
+                            />
+                          ) : null}
                           <span className="dash-row-age">{item.atIso ? age(item.atIso) : '—'}</span>
                           {item.channelId ? (
                             <button

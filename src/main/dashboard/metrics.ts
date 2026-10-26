@@ -176,6 +176,26 @@ function waitingKey(text: string): string {
     .replace(/[?.!]+$/, '')
 }
 
+const SLACK_TS_PATTERN = /^\d{10}\.\d+$/
+
+/** Only a real Slack message ts can match a `[data-ts]` row; an ISO date never can. */
+function realSlackTs(ts: string | undefined): string | undefined {
+  return ts && SLACK_TS_PATTERN.test(ts) ? ts : undefined
+}
+
+function canJumpToMessage(
+  source: DashboardSource,
+  channelId: string,
+  ts: string | undefined
+): boolean {
+  return (
+    (source === 'client' || source === 'ours') &&
+    channelId !== '' &&
+    channelId !== 'unknown' &&
+    realSlackTs(ts) !== undefined
+  )
+}
+
 export function buildWaiting(insight: ProjectInsight | null): DashboardMetrics['waiting'] {
   if (!insight) return { count: 0, oldestIso: null, blockers: 0, risks: 0, items: [] }
 
@@ -183,8 +203,9 @@ export function buildWaiting(insight: ProjectInsight | null): DashboardMetrics['
   const anchor = {
     source: (last?.source ?? 'client') as DashboardSource,
     channelId: last?.channelId ?? 'unknown',
-    ts: last?.ts ?? last?.whenIso ?? 'unknown'
+    ts: realSlackTs(last?.ts)
   }
+  const anchorCanJump = canJumpToMessage(anchor.source, anchor.channelId, anchor.ts)
 
   const items: DashboardAttentionItem[] = []
   const seen = new Set<string>()
@@ -195,13 +216,17 @@ export function buildWaiting(insight: ProjectInsight | null): DashboardMetrics['
       : 'The client is waiting on a reply'
     seen.add(waitingKey(replyText))
     count += 1
+    const replySource = (last?.source ?? anchor.source) as DashboardSource
+    const replyChannelId = last?.channelId ?? anchor.channelId
+    const replyTs = realSlackTs(last?.ts)
     items.push({
       kind: 'needs-reply',
       text: truncate(replyText),
       ...(last?.whenIso ? { atIso: last.whenIso } : {}),
-      source: (last?.source ?? anchor.source) as DashboardSource,
-      channelId: last?.channelId ?? anchor.channelId,
-      ts: last?.ts ?? last?.whenIso ?? anchor.ts,
+      source: replySource,
+      channelId: replyChannelId,
+      ...(replyTs ? { ts: replyTs } : {}),
+      canJump: canJumpToMessage(replySource, replyChannelId, replyTs),
       ...(last?.permalink ? { permalink: last.permalink } : {})
     })
   }
@@ -215,7 +240,8 @@ export function buildWaiting(insight: ProjectInsight | null): DashboardMetrics['
       text: truncate(question),
       source: anchor.source as DashboardSource,
       channelId: anchor.channelId,
-      ts: anchor.ts
+      ...(anchor.ts ? { ts: anchor.ts } : {}),
+      canJump: anchorCanJump
     })
   }
   for (const blocker of insight.blockers ?? []) {
@@ -225,7 +251,8 @@ export function buildWaiting(insight: ProjectInsight | null): DashboardMetrics['
       ...(blocker.sinceIso ? { atIso: blocker.sinceIso } : {}),
       source: anchor.source as DashboardSource,
       channelId: anchor.channelId,
-      ts: blocker.sinceIso ?? anchor.ts
+      ...(anchor.ts ? { ts: anchor.ts } : {}),
+      canJump: anchorCanJump
     })
   }
   for (const risk of insight.risks ?? []) {
@@ -234,7 +261,8 @@ export function buildWaiting(insight: ProjectInsight | null): DashboardMetrics['
       text: truncate(risk),
       source: anchor.source as DashboardSource,
       channelId: anchor.channelId,
-      ts: anchor.ts
+      ...(anchor.ts ? { ts: anchor.ts } : {}),
+      canJump: anchorCanJump
     })
   }
 

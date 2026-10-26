@@ -132,7 +132,10 @@ export interface DashboardAttentionItem {
   atIso?: string
   source?: DashboardSource
   channelId?: string
+  /** Real Slack message ts only — never an ISO date (an ISO can't match `[data-ts]`). */
   ts?: string
+  /** True when source + channelId + ts can address a real Slack message row. */
+  canJump?: boolean
   permalink?: string
 }
 
@@ -304,6 +307,8 @@ export interface DashboardDigest {
   atRisk: string[]
   atIso: string
   source: 'ai' | 'local'
+  /** sha256 of the digest inputs; lets refresh skip the provider when unchanged. */
+  inputHash?: string
 }
 
 /** v2.3 — one item per workspace for the "Recent" strip. */
