@@ -1,5 +1,15 @@
 # Status Ledger
 
+## Browser Sources — Phase 0 Spike Proof (2026-10-26, branch `feat/browser-sources`)
+- `npm run typecheck`: PASS (node + web, exit 0)
+- `npm test`: PASS — **61 files, 490/490** tests (exit 0, no regressions)
+- Spike executed via isolated Electron WebContentsView runner across partitions:
+  - `persist:bs-spike-slack`: Slack Web verified (Chrome/Brave UA bypasses unsupported browser and Google SSO blockers, partition session cookies persist across app restarts)
+  - `persist:bs-spike-teams`: Teams Web verified (routes cleanly to MSAL auth / `/v2/` endpoint, cookies persist)
+  - `persist:bs-spike-whatsapp`: WhatsApp Web verified (loads container; hardcoded strictly read-only policy with ban-risk warning modal)
+  - `persist:bs-spike-custom`: Custom link (Upwork) verified (loads cleanly in tab-less embedded view)
+- Artifact: `.omc/plans/browser-sources-spike.md` created with compatibility matrix and navigation popup findings
+
 ## Project Card — Remove Ask Agent from Project Card (2026-10-26)
 - `npm run typecheck`: PASS (node + web, exit 0)
 - `npm test`: PASS — **61 files, 490/490** tests (exit 0, no regressions)
