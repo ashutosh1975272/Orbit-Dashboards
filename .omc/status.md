@@ -1,5 +1,15 @@
 # Status Ledger
 
+## Audit P0 / correctness fixes — all ten items shipped (2026-10-26, commits `eef3223`, `25c3369`, `6089b72`, `966e173`)
+- `pnpm typecheck` (node + web): PASS (exit 0)
+- `pnpm vitest run`: PASS — **59 files, 462/462** (exit 0). `vitest.audit.config.ts` deleted; `tests/audit/**` runs in the default suite
+- `pnpm run build`: PASS — renderer 91 modules, CSS 149.00 kB, JS 1,060.02 kB (exit 0)
+- lint on every file this work changed: **0 errors** (the 21 errors a directory scan reports live in `sidebar-state.ts`, `AccordionSection.tsx`, `RightSidebar.tsx`, `dashboard-team-workspace-store.test.ts`, `dashboard-two-source-sync.test.ts` — untouched by this work)
+- new/rewritten tests: `logging` (4), `audit-encryption-migration` (5), `audit-prompt-injection` (8), `dashboard-waiting-jump` (5), `dashboard-waiting-honest` (5), `dashboard-digest-hash` (3), `audit-slack-throttle` (5), `audit-sync-cycle-memo` (2), `audit-team-reconnect` (3), `audit-project-chat-membership` (6), plus the two E2 and rewritten B5 cases in `tests/audit/audit-findings.test.ts`
+- full per-item evidence table (file:line + test name + commit): `.omc/plans/audit-fixes.md` "Shipped"
+- known flake, not a product bug: `tests/ui/app-workspace-closes-dashboard.test.tsx` waits on the async `app.getSettings` strip; under 59 parallel workers it can exceed the 1 s `findBy*` default. Its wait is raised to 5 s on the in-flight ticket-08 branch of that file.
+- deferred on purpose (they belong to coordinated sync, not to an audit fix): `conversations.replies` on reply-count change, staggered scheduling, per-cycle observability record, shared `auth.test` / `conversations.list` / users caches
+
 ## Expanded Dashboard — Phase 5 tests, demo fixtures and live proof (2026-10-26, commit `f94b587`)
 - `npm run typecheck` (node + web): PASS (exit 0)
 - `npm test`: PASS — 48 files, **411/411** (exit 0); new `tests/ui/dashboard-page.test.tsx` **12/12**: rich (court chip + tooltip rule, Activity totals `Client · 52` / `Ours · 25` / `77 in 14d`, Time/Mood, six latest rows + source chips + `takeMessageJump` targets `200.9`/`100.3`, `View all` → `s:client`, attention 5 rows + `2 open` + source jump, new-since 6 rows, latest-3 asks order, people/channels, setup hidden, chip hand-off) and sparse (`—` fallbacks, no Activity/duo/Latest/People/attention/new-since regions, `1 of 5` setup, disabled ask + Open settings)
@@ -188,16 +198,17 @@
 - commits this session: 5 (4539c37, 2c6114f, d2ed260, da654c7, f46c2d5)
 
 ## Items
-- A1 Logging: DONE (src/main/logging.ts; tests/audit included)
-- A2 Encryption: PARTIAL (block implemented; legacy migration not; UI errors not verified)
-- A3 Injection: PARTIAL (prompt lines + progress guard; end-to-end injection test not added)
-- A4 Fabrication: DONE (insights.ts; nullable types)
-- A5 Dashboard honesty: DONE (duplicate banner removed; compact card progress is manual/evidenced or `—`, tested in `baf60fa`)
-- A6 Jump to message: PARTIAL (metadata attached; SourceChip click not implemented)
-- A7 LLM gating: PARTIAL (forced zero-new fixed; digest refresh not gated)
-- A8 Reconnect: NOT DONE
-- A9 Rate limit: NOT DONE
-- A10 chat-service: PARTIAL (project existence already validated)
+## Audit items — state after `eef3223` / `25c3369` / `6089b72` / `966e173` (2026-10-26)
+- A1 Logging: DONE (message + metadata redaction; audit tests in the default suite)
+- A2 Encryption: DONE (save blocked while the vault is unavailable + legacy plaintext re-sealed at startup)
+- A3 Injection: DONE (locked prompt, progress guard, new status guard, both logged, 8 tests)
+- A4 Fabrication: DONE (nullable dates/whenIso, `quoteIsReal`, no ISO date in `ts`)
+- A5 Dashboard honesty: DONE ("Not enough info" tiles + empty state, single error line)
+- A6 Jump to message: DONE (`canJump` + clickable SourceChip → `requestMessageJump`, scroll and flash)
+- A7 LLM gating: DONE (zero-new ⇒ zero calls; daily re-check default OFF; digest gated on `inputHash`)
+- A8 Reconnect: DONE (`setStatus` on auth failures only, badge in Slack settings, scopes warned for both token sources)
+- A9 Rate limit: DONE (per-token gate + Retry-After hold, HTTP 429 honoured, one fetch per (token, channel, cursor) per cycle)
+- A10 chat-service: DONE (membership check on load/clear/append/start)
 - B1 Single resolver: PARTIAL (ConfigService exists; sync/chat not fully unified)
 - B2 ours source: PARTIAL (sync channels precedence done; chat not)
 - B3-B8: NOT DONE

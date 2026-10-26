@@ -31,6 +31,36 @@ Item status below was verified against the code today (file:line), not from the 
 - **Batch 3** — UI honesty + navigation: items 5, 6, 7.
 - **Batch 4** — transport + isolation: items 8, 9, 10.
 
-## Open questions for you
-- Team-workspace reconnect: is a badge on the card + the text in Team Slack settings enough, or do you also want a global banner on the Dashboard overview?
-- Per-token concurrency cap value: I default to **2 in flight per token** (Slack tier limits are per-workspace); say a number if you'd rather 1.
+## Shipped (2026-10-26) — every item, with the evidence
+Gates on the final tree: `pnpm typecheck` clean · `pnpm vitest run` **59 files / 462 tests
+passed** · `pnpm run build` ok · `npx eslint` on all files changed here: **0 errors**
+(the 21 remaining errors in this directory scan sit in files this work did not touch:
+`sidebar-state.ts`, `AccordionSection.tsx`, `RightSidebar.tsx`,
+`dashboard-team-workspace-store.test.ts`, `dashboard-two-source-sync.test.ts`).
+
+| # | Item | Commit | Where | Test |
+|---|------|--------|-------|------|
+| 1 | H4 logging redaction | `eef3223` | `logging.ts` `redactString()` + message redaction | `tests/unit/logging.test.ts` (4) |
+| 2 | D7 encryption at rest | `eef3223` | `migrateLegacyPlaintext()` in the three stores, called at startup (`index.ts`) | `tests/unit/audit-encryption-migration.test.ts` (5) |
+| 3 | H1 prompt injection | `25c3369` | locked prompt `insights.ts:100` / `digest.ts:56`; progress + new **status** guard, both `log.warn` | `tests/unit/audit-prompt-injection.test.ts` (8) |
+| 4 | F3 fabrication | `25c3369` | ISO-in-`ts` removed from every `buildWaiting` row (`metrics.ts:179-270`) | `tests/unit/dashboard-waiting-jump.test.ts` (5) |
+| 5 | B8 dashboard honesty | `25c3369` | tiles + empty state fall back to "Not enough info"; single `errorLine`; `CompactCard.tsx:146-160` shows "—" for unevidenced progress | `tests/ui/dashboard-waiting-honest.test.tsx` (5) |
+| 6 | B5/C3 jump to message | `25c3369` | contract `canJump` (`dashboard-contract.ts:135-138`), clickable `SourceChip` → `requestMessageJump` + `c:<source>:<channel>` (`DashboardPage.tsx:454-467`) | jump tests above + `dashboard-waiting-honest` chip tests |
+| 7 | E2 LLM gating | `25c3369` | digest `inputHash` gate (`digest.ts:117-160`); zero-new-messages ⇒ 0 calls; `dailyRecheck.enabled` default **false** (`schedule-store.ts:18`, `scheduler.ts:260`) | `tests/unit/dashboard-digest-hash.test.ts` (3) + E2 cases in `tests/audit/audit-findings.test.ts` |
+| 8 | D8 reconnect status | `6089b72` | `isSlackAuthFailure()` → `markTeamStatus()` in the sync path; badge in `TeamSlackSettings.tsx`; scope warning now covers OAuth tokens (`dashboard.ipc.ts:415-420`) | `tests/unit/audit-team-reconnect.test.ts` (3) |
+| 9 | D10 rate limit | `6089b72` | `slack-throttle.ts` per-token gate (2 in flight, Retry-After hold); HTTP 429 honoured; cycle memo keyed `(tokenKey, channel, cursor)` (`sync-engine.ts:185-249`) | `tests/unit/audit-slack-throttle.test.ts` (5), `tests/unit/audit-sync-cycle-memo.test.ts` (2) |
+| 10 | chat-service projectId | `966e173` | `assertProjectKnown()` on load/clear/append (`project-chat-service.ts:173-181`) | `tests/unit/audit-project-chat-membership.test.ts` (6) |
+
+**Not in scope here** (deliberately left to the scheduled work, listed so nobody re-litigates it):
+`conversations.replies` is never called by the sync path, staggered/jittered scheduling, a
+per-cycle observability record, and a shared `auth.test` cache — all of these belong to the
+coordinated-sync plan rather than to an audit fix.
+
+## Open questions for you — answered by what shipped
+- Team-workspace reconnect: shipped as the **badge in Slack settings** (`TeamSlackSettings.tsx`)
+  only; no extra global Dashboard banner was added, because `errorLine` already surfaces the
+  failure on the affected card and a second banner is the duplicate item 5 asked to remove.
+  Say the word if you still want the global banner.
+- Per-token concurrency: shipped at **2 in flight** (`slack-throttle.ts:6`). The coordinator
+  brief asks for 3–4; that is a one-constant change and is listed as an open question in the
+  coordinated-sync plan rather than decided twice.
