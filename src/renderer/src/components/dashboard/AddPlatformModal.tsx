@@ -229,3 +229,4 @@ export const AddPlatformModal: React.FC<AddPlatformModalProps> = ({ isOpen, onCl
     </div>
   )
 }
+

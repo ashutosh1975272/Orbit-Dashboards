@@ -277,3 +277,4 @@ export class BrowserPlatformStore {
     await this.queue
   }
 }
+

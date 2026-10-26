@@ -36,3 +36,4 @@ export interface BrowserSourceStatusEvent {
   lastCheckedAt: string
   errorMessage?: string
 }
+

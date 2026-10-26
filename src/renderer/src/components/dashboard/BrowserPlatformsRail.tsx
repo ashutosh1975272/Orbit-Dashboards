@@ -183,3 +183,4 @@ export const BrowserPlatformsRail: React.FC<BrowserPlatformsRailProps> = ({
     </div>
   )
 }
+

@@ -139,3 +139,4 @@ describe('BrowserPlatformStore (BS-2)', () => {
     expect(list[0].id).toBe(p2.id)
   })
 })
+

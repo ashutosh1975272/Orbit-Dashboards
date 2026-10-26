@@ -4,9 +4,11 @@
  * if the message is not in the loaded page, the reader still lands in the
  * channel.
  */
+import type { DashboardSource } from '../../../../shared/dashboard-contract'
+
 export interface MessageJumpTarget {
   projectId: string
-  source: 'client' | 'ours'
+  source: DashboardSource
   channelId: string
   ts: string
 }
@@ -24,7 +26,7 @@ export function clearMessageJump(): void {
 /** Consumes the target only when it belongs to this project/source/channel. */
 export function takeMessageJump(
   projectId: string,
-  source: 'client' | 'ours',
+  source: DashboardSource,
   channelId: string | undefined
 ): string | null {
   if (!pending || !channelId) return null
