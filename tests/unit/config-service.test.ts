@@ -8,6 +8,7 @@ import { AiSettingsStore } from '../../src/main/dashboard/ai-settings-store'
 import { ConfigService } from '../../src/main/dashboard/config-service'
 import { MonitorStore } from '../../src/main/dashboard/monitor-store'
 import { TeamWorkspaceStore } from '../../src/main/dashboard/team-workspace-store'
+import { WorkspaceMappingStore } from '../../src/main/dashboard/workspace-mapping-store'
 
 const dirs: string[] = []
 afterEach(async () => {
@@ -20,6 +21,7 @@ async function harness(): Promise<{
   ai: AiSettingsService
   monitor: MonitorStore
   team: TeamWorkspaceStore
+  mapping: WorkspaceMappingStore
 }> {
   const root = await mkdtemp(join(tmpdir(), 'dash-config-service-'))
   dirs.push(root)
@@ -30,13 +32,15 @@ async function harness(): Promise<{
   })
   const monitor = new MonitorStore({ rootDir: root, encryptionAvailable: true, vault: fakeVault })
   const team = new TeamWorkspaceStore({ rootDir: root, encryptionAvailable: true, vault: fakeVault })
+  const mapping = new WorkspaceMappingStore({ rootDir: root })
   const config = new ConfigService({
     aiSettings: ai,
     teamWorkspace: team,
     monitorStore: monitor,
+    workspaceMapping: mapping,
     oauthTokenProvider: { tryGet: async () => null }
   })
-  return { config, ai, monitor, team }
+  return { config, ai, monitor, team, mapping }
 }
 
 async function seedProject(monitor: MonitorStore, id: string): Promise<void> {

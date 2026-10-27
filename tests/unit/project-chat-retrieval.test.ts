@@ -56,7 +56,9 @@ function settings(input: {
       workspaceName: 'Acme',
       teamId: 'T1',
       channels: input.clientChannels,
-      source: 'project'
+      source: 'project',
+      mappedWorkspaceId: null,
+      mappedWorkspaceName: null
     },
     ourSlack: {
       token: input.ourChannels?.length ? 'xoxp-ours' : null,

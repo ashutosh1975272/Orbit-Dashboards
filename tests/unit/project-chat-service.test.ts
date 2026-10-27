@@ -60,7 +60,9 @@ function settings(overrides: Partial<ResolvedAiSettings> = {}): ResolvedProjectS
       workspaceName: 'Acme',
       teamId: 'T1',
       channels: [{ channelId: 'C1', channelName: 'client-dev' }],
-      source: 'project'
+      source: 'project',
+      mappedWorkspaceId: null,
+      mappedWorkspaceName: null
     },
     ourSlack: {
       token: null,

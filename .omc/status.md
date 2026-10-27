@@ -1,6 +1,19 @@
 # Status Ledger
 
-## SRC-2 — ⚙ Settings button on platform rows (2026-10-27, branch `feat/browser-sources`, commit pending)
+## SRC-3 — Workspace → Cards mapping (2026-10-27, branch `feat/browser-sources`, commit pending)
+- `npm run typecheck`: PASS (node, exit 0). Web typecheck has pre-existing errors in untracked `CardSettingsModal.tsx` (not from this change).
+- `npm test`: PASS — **65 files, 543/543** tests (exit 0, no regressions)
+- Created `src/main/dashboard/workspace-mapping-store.ts` — JSON-backed store at `workspace-mappings.json` with `listMappings`, `getMapping`, `getWorkspaceForProject`, `saveMapping`, `deleteMapping`, `cleanupDeletedProjects`. Deleted project IDs auto-dropped.
+- Added IPC channels: `DashboardWorkspaceMappingList/Get/Save/Delete`, `DashboardGetProjects` (`src/shared/ipc-contract.ts`)
+- Added `workspaceMapping` dep to `ConfigService` (`config-service.ts`) — `resolveSettings` now returns `client.mappedWorkspaceId` / `client.mappedWorkspaceName`
+- Added `workspaceMapping` dep to `DashboardSyncEngine` (`sync-engine.ts`) — `storedWorkspaces`/`syncProject` use mapped workspace ID for token resolution; unmapped cards keep reading their own `teamId` (no behavior change)
+- Registered mapping IPC handlers in `dashboard.ipc.ts` — save validates against existing project IDs; broadcast config changed on save
+- Wired `WorkspaceMappingStore` in `main/index.ts` — instantiated, passed to ConfigService + sync engine + IPC
+- Preload bridge: `window.api.dashboard.{listWorkspaceMappings, getWorkspaceMapping, saveWorkspaceMapping, deleteWorkspaceMapping, getProjects}`
+- `PlatformSettingsPanel.tsx` — Slack panel now has Section A (connected workspaces with "Mapped to N cards" / "Not mapped" badges), Section B (workspace → multi-card checkbox mapping with search, save/clear), Section C (note). Teams/WhatsApp show "Soon".
+- CSS: `.slack-settings-*` classes for workspace list, mapping section, project checkboxes, badges, actions
+
+## SRC-2 — ⚙ Settings button on platform rows (2026-10-27, branch `feat/browser-sources`, commit `9b7bba2`)
 - `npm run typecheck`: PASS (node + web, exit 0)
 - `npm test`: PASS — **61 files, 490/490** tests (exit 0, no regressions)
 - Added `⚙` settings button to each Slack/Teams/WhatsApp row in ProfileSidebar (`ProfileSidebar.tsx:606-617`)

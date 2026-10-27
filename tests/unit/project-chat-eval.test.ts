@@ -56,7 +56,9 @@ const settings: ResolvedProjectSettings = {
     workspaceName: 'Acme',
     teamId: 'T1',
     channels: [{ channelId: 'C1', channelName: 'client-dev' }],
-    source: 'project'
+    source: 'project',
+    mappedWorkspaceId: null,
+    mappedWorkspaceName: null
   },
   ourSlack: { token: null, workspaceName: null, teamId: null, channels: [], source: 'none' },
   ai

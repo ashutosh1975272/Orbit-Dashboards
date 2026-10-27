@@ -10,7 +10,8 @@ import type {
   Profile,
   ProfileSessionStatusPayload,
   ViewportBounds,
-  WorkspaceThemePayload
+  WorkspaceThemePayload,
+  WorkspaceMapping
 } from '../shared/types'
 import type {
   DashboardAiModelsResult,
@@ -355,7 +356,34 @@ const api: IpcApi = {
         payload
       ) as Promise<DashboardTeamWorkspace>,
     clearTeamWorkspace: () =>
-      ipcRenderer.invoke(IpcChannels.DashboardTeamWorkspaceClear) as Promise<DashboardTeamWorkspace>
+      ipcRenderer.invoke(IpcChannels.DashboardTeamWorkspaceClear) as Promise<DashboardTeamWorkspace>,
+    listWorkspaceMappings: () =>
+      ipcRenderer.invoke(IpcChannels.DashboardWorkspaceMappingList) as Promise<
+        WorkspaceMapping[]
+      >,
+    getWorkspaceMapping: (workspaceId: string) =>
+      ipcRenderer.invoke(
+        IpcChannels.DashboardWorkspaceMappingGet,
+        workspaceId
+      ) as Promise<string[] | null>,
+    saveWorkspaceMapping: (payload: {
+      workspaceId: string
+      projectIds: string[]
+    }) =>
+      ipcRenderer.invoke(IpcChannels.DashboardWorkspaceMappingSave, payload) as Promise<void>,
+    deleteWorkspaceMapping: (workspaceId: string) =>
+      ipcRenderer.invoke(
+        IpcChannels.DashboardWorkspaceMappingDelete,
+        workspaceId
+      ) as Promise<boolean>,
+    getProjects: () =>
+      ipcRenderer.invoke(IpcChannels.DashboardGetProjects) as Promise<Array<{
+        id: string
+        name: string
+        clientName: string
+        teamId: string
+        profileId: string
+      }>>,
   }
 }
 

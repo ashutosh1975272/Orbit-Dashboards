@@ -268,3 +268,10 @@ export function sidebarAppLabel(appId: AppId): string {
 export function appSupportsWorkspaces(appId: AppId): boolean {
   return appId === 'slack' || appId === 'teams'
 }
+
+/** Workspace → cards mapping (persisted in workspace-mappings.json). */
+export interface WorkspaceMapping {
+  workspaceId: string
+  projectIds: string[]
+  updatedAt: string
+}

@@ -14,6 +14,7 @@ import type {
 import type { DashboardDeltaStore, DashboardStoredMessage } from './delta-store'
 import type { InsightHistoryEntry } from './history-store'
 import type { MonitorStore } from './monitor-store'
+import type { WorkspaceMappingStore } from './workspace-mapping-store'
 import { summarizeProject } from './summary-engine'
 import { computeMetrics } from './metrics'
 
@@ -87,6 +88,8 @@ export interface DashboardSyncEngineDeps {
   manualTokenProvider?: ManualTokenProvider
   /** v3 — our team workspace (optional; a card still syncs its client workspace alone). */
   teamWorkspace?: TeamWorkspaceReader
+  /** Phase 3 — workspace → cards mapping store (optional; cards sync their client workspace alone until mapped). */
+  workspaceMapping?: WorkspaceMappingStore
   pollerFactory?: () => DashboardPoller
   onProgress?: (payload: DashboardSyncProgressPayload) => void
   /** diagnostics (never secrets) */
@@ -107,6 +110,7 @@ export class DashboardSyncEngine {
   private readonly oauthTokenProvider: OAuthTokenProvider
   private readonly manualTokenProvider?: ManualTokenProvider
   private readonly teamWorkspace: TeamWorkspaceReader | undefined
+  private readonly workspaceMapping: WorkspaceMappingStore | undefined
   private readonly pollerFactory: () => DashboardPoller
   private readonly log: (msg: string) => void
   private readonly insightReader: InsightReader | undefined
@@ -125,6 +129,7 @@ export class DashboardSyncEngine {
     this.oauthTokenProvider = deps.oauthTokenProvider
     this.manualTokenProvider = deps.manualTokenProvider
     this.teamWorkspace = deps.teamWorkspace
+    this.workspaceMapping = deps.workspaceMapping
     this.pollerFactory = deps.pollerFactory ?? (() => new SlackPoller())
     this.log = deps.log ?? (() => undefined)
     this.insightReader = deps.insightReader
@@ -285,11 +290,21 @@ export class DashboardSyncEngine {
   private async storedWorkspaces(
     project: DashboardProject
   ): Promise<{ workspaces: StoredWorkspace[]; error: string | null }> {
+    // Phase 3: if project is mapped to a workspace, use that workspace ID instead
+    // of the project's own teamId. Channels come from the project's own monitors.
+    let teamId = project.teamId
+    let profileId = project.profileId
+    if (this.workspaceMapping) {
+      const mappedWorkspace = await this.workspaceMapping.getWorkspaceForProject(project.id)
+      if (mappedWorkspace) {
+        teamId = mappedWorkspace
+      }
+    }
     const workspaces: StoredWorkspace[] = [
       {
         source: 'client',
-        profileId: project.profileId,
-        teamId: project.teamId,
+        profileId,
+        teamId,
         monitors: project.monitors
       }
     ]
@@ -340,6 +355,15 @@ export class DashboardSyncEngine {
     const project = projects.find((p) => p.id === projectId)
     if (!project) return null
 
+    // Phase 3: if project is mapped to a workspace, use that workspace ID
+    // for token resolution instead of project.teamId. Channels stay as the
+    // project's own monitors.
+    let syncTeamId = project.teamId
+    if (this.workspaceMapping) {
+      const mappedWorkspace = await this.workspaceMapping.getWorkspaceForProject(project.id)
+      if (mappedWorkspace) syncTeamId = mappedWorkspace
+    }
+
     this.progress({
       syncing: true,
       projectId,
@@ -350,7 +374,10 @@ export class DashboardSyncEngine {
     })
 
     try {
-      const token = await this.tokenFor(project)
+      const token = await this.tokenFor({
+        ...project,
+        teamId: syncTeamId
+      })
       if (!token) {
         throw new Error(
           project.tokenSource === 'manual'
@@ -363,7 +390,7 @@ export class DashboardSyncEngine {
         {
           source: 'client',
           profileId: project.profileId,
-          teamId: project.teamId,
+          teamId: syncTeamId,
           token,
           monitors: project.monitors
         },

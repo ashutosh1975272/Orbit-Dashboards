@@ -11,6 +11,7 @@ import type {
 } from '../../shared/dashboard-contract'
 import type { AiSettingsService, ResolvedAiSettings } from './ai-settings'
 import type { MonitorStore } from './monitor-store'
+import type { WorkspaceMappingStore } from './workspace-mapping-store'
 import { maskToken, type TeamWorkspaceStore } from './team-workspace-store'
 
 export interface ResolvedProjectSettings {
@@ -20,6 +21,9 @@ export interface ResolvedProjectSettings {
     teamId: string
     channels: DashboardMonitor[]
     source: 'project' | 'none'
+    /** Workspace this project is mapped to (null if unmapped). */
+    mappedWorkspaceId: string | null
+    mappedWorkspaceName: string | null
   }
   ourSlack: {
     token: string | null
@@ -35,6 +39,7 @@ export interface ConfigServiceOptions {
   aiSettings: AiSettingsService
   teamWorkspace: TeamWorkspaceStore
   monitorStore: MonitorStore
+  workspaceMapping: WorkspaceMappingStore
   oauthTokenProvider: {
     tryGet(profileId: string, teamId: string): Promise<string | null>
   }
@@ -44,12 +49,14 @@ export class ConfigService {
   private readonly aiSettings: AiSettingsService
   private readonly teamWorkspace: TeamWorkspaceStore
   private readonly monitorStore: MonitorStore
+  private readonly workspaceMapping: WorkspaceMappingStore
   private readonly oauthTokenProvider: ConfigServiceOptions['oauthTokenProvider']
 
   constructor(options: ConfigServiceOptions) {
     this.aiSettings = options.aiSettings
     this.teamWorkspace = options.teamWorkspace
     this.monitorStore = options.monitorStore
+    this.workspaceMapping = options.workspaceMapping
     this.oauthTokenProvider = options.oauthTokenProvider
   }
 
@@ -105,13 +112,26 @@ export class ConfigService {
       project?.ourSlackChannels ??
       (project?.ourSlackTokenKey ? [] : (globalOurSlack?.channels ?? []))
 
+    // Resolve mapping: which workspace is this project mapped to?
+    let mappedWorkspaceId: string | null = null
+    let mappedWorkspaceName: string | null = null
+    if (project) {
+      const mappedWorkspace = await this.workspaceMapping.getWorkspaceForProject(project.id)
+      if (mappedWorkspace) {
+        mappedWorkspaceId = mappedWorkspace
+        mappedWorkspaceName = project.teamId === mappedWorkspace ? (project.teamName ?? null) : mappedWorkspace
+      }
+    }
+
     return {
       client: {
         token: clientToken,
         workspaceName: project?.teamName ?? null,
         teamId: project?.teamId ?? '',
         channels: project?.monitors ?? [],
-        source: project ? 'project' : 'none'
+        source: project ? 'project' : 'none',
+        mappedWorkspaceId,
+        mappedWorkspaceName
       },
       ourSlack: {
         token: ourSlackToken,

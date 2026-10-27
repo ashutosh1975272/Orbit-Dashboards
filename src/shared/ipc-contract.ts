@@ -67,6 +67,7 @@ import type {
   ViewportBounds,
   WorkspacePayload,
   WorkspaceThemePayload,
+  WorkspaceMapping,
   StartGoogleAuthPayload
 } from './types'
 
@@ -176,6 +177,11 @@ export const IpcChannels = {
   DashboardTeamWorkspaceConnect: 'dashboard:team-workspace-connect',
   DashboardTeamWorkspaceChannels: 'dashboard:team-workspace-channels',
   DashboardTeamWorkspaceClear: 'dashboard:team-workspace-clear',
+  DashboardWorkspaceMappingList: 'dashboard:workspace-mapping-list',
+  DashboardWorkspaceMappingGet: 'dashboard:workspace-mapping-get',
+  DashboardWorkspaceMappingSave: 'dashboard:workspace-mapping-save',
+  DashboardWorkspaceMappingDelete: 'dashboard:workspace-mapping-delete',
+  DashboardGetProjects: 'dashboard:get-projects'
 } as const
 
 export type IpcChannel = (typeof IpcChannels)[keyof typeof IpcChannels]
@@ -363,6 +369,14 @@ export interface IpcApi {
       payload: DashboardTeamWorkspaceChannelsPayload
     ) => Promise<DashboardTeamWorkspace>
     clearTeamWorkspace: () => Promise<DashboardTeamWorkspace>
+    listWorkspaceMappings: () => Promise<WorkspaceMapping[]>
+    getWorkspaceMapping: (workspaceId: string) => Promise<string[] | null>
+    saveWorkspaceMapping: (payload: {
+      workspaceId: string
+      projectIds: string[]
+    }) => Promise<void>
+    deleteWorkspaceMapping: (workspaceId: string) => Promise<boolean>
+    getProjects: () => Promise<{ id: string; name: string; clientName: string; teamId: string; profileId: string }[]>
   }
 }
 
@@ -419,6 +433,7 @@ export type {
   UnpinWorkspacePayload,
   ValidateTokenResultPayload,
   ViewportBounds,
+  WorkspaceMapping,
   WorkspacePayload,
   WorkspaceThemePayload
 }

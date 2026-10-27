@@ -21,6 +21,7 @@ import { registerSlackDataIpc } from './ipc/slack-data.ipc'
 import { registerDashboardIpc } from './ipc/dashboard.ipc'
 import { DashboardDeltaStore } from './dashboard/delta-store'
 import { MonitorStore } from './dashboard/monitor-store'
+import { WorkspaceMappingStore } from './dashboard/workspace-mapping-store'
 import { DashboardInsightSyncEngine } from './dashboard/sync-engine'
 import { DashboardScheduler } from './dashboard/scheduler'
 import { DashboardSidebarStateStore } from './dashboard/sidebar-state'
@@ -244,6 +245,7 @@ if (!gotSingleInstanceLock) {
       rootDir: dashboardRoot,
       encryptionAvailable: (await import('electron')).safeStorage.isEncryptionAvailable()
     })
+    const workspaceMappingStore = new WorkspaceMappingStore({ rootDir: dashboardRoot })
     const dashboardDeltaStore = new DashboardDeltaStore({ rootDir: dashboardRoot })
     const dashboardSidebarStateStore = new DashboardSidebarStateStore(userData)
     // v3 — one team workspace shared by every card (ticket 04). The secret stays
@@ -338,6 +340,7 @@ if (!gotSingleInstanceLock) {
       aiSettings,
       teamWorkspace: teamWorkspaceStore,
       monitorStore: dashboardMonitorStore,
+      workspaceMapping: workspaceMappingStore,
       oauthTokenProvider: { tryGet: (profileId, teamId) => tokenStore.tryGet(profileId, teamId) }
     })
     // D7 — an older build could write a secret as plaintext before the save path
@@ -393,6 +396,7 @@ if (!gotSingleInstanceLock) {
     const dashboardEngine = new DashboardInsightSyncEngine({
       monitorStore: dashboardMonitorStore,
       deltaStore: dashboardDeltaStore,
+      workspaceMapping: workspaceMappingStore,
       oauthTokenProvider: { tryGet: (profileId, teamId) => tokenStore.tryGet(profileId, teamId) },
       manualTokenProvider: {
         getManualToken: (key: string) => dashboardMonitorStore.getManualToken(key)
@@ -585,6 +589,7 @@ if (!gotSingleInstanceLock) {
       configService,
       teamWorkspace: teamWorkspaceStore,
       listTeamWorkspaceCandidates,
+      workspaceMapping: workspaceMappingStore,
       viewedStore: dashboardViewedStore
     })
 

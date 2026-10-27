@@ -37,6 +37,7 @@ import type { AiSettingsService } from '../dashboard/ai-settings'
 import type { DashboardSyncEngine } from '../dashboard/sync-engine'
 import type { DashboardScheduler } from '../dashboard/scheduler'
 import type { MonitorStore } from '../dashboard/monitor-store'
+import type { WorkspaceMappingStore } from '../dashboard/workspace-mapping-store'
 import type { DashboardChatService } from '../dashboard/chat-service'
 import { SlackPoller } from '../dashboard/slack-poller'
 import { listChannels } from '../slack/slack-api-client'
@@ -75,6 +76,8 @@ export interface DashboardIpcDeps {
   teamWorkspace?: TeamWorkspaceStore
   /** v3 — workspaces the app can already reach, offered when connecting ours */
   listTeamWorkspaceCandidates?: () => Promise<DashboardTeamWorkspaceCandidate[]>
+  /** Phase 3 — workspace → cards mapping store */
+  workspaceMapping?: WorkspaceMappingStore
   /** Phase A — when a card's Dashboard was last looked at */
   viewedStore?: DashboardViewedStore
 }
@@ -462,6 +465,49 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
       return next
     })
   }
+
+  // Phase 3 — workspace → cards mapping IPC
+  if (deps.workspaceMapping) {
+    handleInvoke(
+      IpcChannels.DashboardWorkspaceMappingList,
+      async (): Promise<{ workspaceId: string; projectIds: string[]; updatedAt: string }[]> =>
+        deps.workspaceMapping!.listMappings()
+    )
+    handleInvoke(
+      IpcChannels.DashboardWorkspaceMappingGet,
+      async (workspaceId: string): Promise<string[] | null> =>
+        deps.workspaceMapping!.getMapping(workspaceId)
+    )
+    handleInvoke(
+      IpcChannels.DashboardWorkspaceMappingSave,
+      async (payload: { workspaceId: string; projectIds: string[] }): Promise<void> => {
+        const projects = await deps.monitorStore.listProjects()
+        const validProjectIds = projects.map((p) => p.id)
+        await deps.workspaceMapping!.saveMapping(payload.workspaceId, payload.projectIds, validProjectIds)
+        await broadcastConfigChanged()
+      }
+    )
+    handleInvoke(
+      IpcChannels.DashboardWorkspaceMappingDelete,
+      async (workspaceId: string): Promise<boolean> =>
+        deps.workspaceMapping!.deleteMapping(workspaceId)
+    )
+  }
+
+  // Phase 3 — list lightweight project info for mapping UI
+  handleInvoke(
+    IpcChannels.DashboardGetProjects,
+    async (): Promise<Array<{ id: string; name: string; clientName: string; teamId: string; profileId: string }>> => {
+      const projects = await deps.monitorStore.listProjects()
+      return projects.map((p) => ({
+        id: p.id,
+        name: p.name,
+        clientName: p.clientName,
+        teamId: p.teamId,
+        profileId: p.profileId
+      }))
+    }
+  )
 
   // v2.8 — one effective config resolver for Slack + AI.
   if (deps.configService) {
