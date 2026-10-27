@@ -1,5 +1,26 @@
 # Status Ledger
 
+## SET-2 to SET-5 — Card Settings Redesign & Master Verification Complete (2026-10-27, branch `feat/settings-redesign-v2`, commit `2807c9b`)
+- `npm run typecheck`: PASS — 0 errors (Node & Web).
+- `pnpm test`: PASS — **68 files, 565/565 tests passed** (exit 0, 0 failures, 0 regressions).
+- Standardized fields, typography (14px body, 13px helper, 13px semibold labels) and spacing.
+- Searchable `AiModelCombobox` with provider-based grouping (`nvidia/`, `meta/`, `google/`, `mistralai/`, etc.), keyboard navigation (Up/Down/Enter/Esc), search filtering, and inherit toggle.
+- Monospace token chip `.proj-token-chip` with stripped backticks (`••••4char`), zero exposure of full token in DOM.
+- Unified single effective summary card, eliminated duplicate "Inheriting global config" string.
+- All 48 items in Section 10 (`ST-01` through `ST-48`) of `orbit-master-verification.md` verified and marked PASS with full evidence.
+- Full build (`electron-vite build`) clean success.
+
+## SET-1 — Settings Shell, Tab Navigation & Single Scroll (2026-10-27, branch `feat/settings-redesign-v2`, commit `1a415e1`)
+- `npm run typecheck`: PASS — 0 errors (node & web).
+- `npm test`: PASS — **67 files, 561/561 passed** (exit 0, no regressions).
+- Shell structure rewritten:
+  - Sticky header (`<Project> · Settings`, subheader, responsive tab bar).
+  - 6 dedicated tabs: `General`, `AI`, `Channels`, `Schedule`, `Sidebar layout`, `Danger zone`.
+  - Single scroll container: eliminated double page scroll; sticky header stays pinned at top, sticky footer pins actions at bottom.
+  - High-contrast text selection: added global `::selection` styling with `--accent-btn` background and white text; enabled `user-select: text` on inputs/chips and `user-select: none` on outer chrome.
+- Component tests added: `tests/ui/project-settings-tab.test.tsx` (4 tests covering shell, tab bar, single scroll, and tab switching).
+- Evidence captured at 1280px & 900px, tab switching, and select-all contrast in `.omc/screenshots/settings/`.
+
 ## SRC-5 — Integration + Safety Check (2026-10-27, branch `feat/browser-sources`, commit pending)
 - `npm run typecheck`: PASS (node, exit 0). Web typecheck has pre-existing errors in untracked `CardSettingsModal.tsx` (not from this change).
 - `npm test`: PASS — **66 files, 557/557** tests (exit 0, no regressions)
