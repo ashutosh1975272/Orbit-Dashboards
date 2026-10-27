@@ -1,5 +1,28 @@
 # Status Ledger
 
+## SRC-1 — Remove Browser Sources, reuse existing profile session (2026-10-27, branch `feat/browser-sources`, commit `b33d2bb`)
+- `npm run typecheck`: PASS (node + web, exit 0)
+- `npm test`: PASS — **61 files, 490/490** tests (exit 0, no regressions)
+- Deleted Browser Sources parallel system:
+  - `src/main/browser-sources/` (29 files: view manager, store, types, session
+    partition, scheduler, trace, agents, reader adapters)
+  - `src/main/ipc/browser-sources.ipc.ts`
+  - `src/renderer/src/components/dashboard/BrowserPlatformsRail.tsx`
+  - `src/renderer/src/components/dashboard/AddPlatformModal.tsx`
+  - `src/shared/browser-sources-contract.ts`
+  - `tests/unit/browser-sources-shell.test.ts`, `tests/unit/browser-platform-store.test.ts`,
+    `tests/unit/browser-sources-normalizer.test.ts`
+- Removed references: `src/main/index.ts`, `src/preload/index.ts`,
+  `src/renderer/src/components/dashboard/DashboardRail.tsx`,
+  `src/shared/ipc-contract.ts`
+- Reused existing session: Google email section + Slack/Teams/WhatsApp rows
+  unchanged; partition `persist:profile-<id>-slack` (same as Google login)
+  reused — no new login flow, no UA/fingerprint spoofing, no new partitions
+- `persist:bs-*` data preserved in backup branch
+  `browser-sources-full-backup` (ae31044) — nothing silently deleted
+- Sidebar "BROWSER SOURCES" section removed; Slack/Teams/WhatsApp rows remain
+  as main entry points
+
 ## Browser Sources — Phase 2 Add Platform System (2026-10-26, branch `feat/browser-sources`)
 - `npm run typecheck`: PASS (node + web, exit 0)
 - `npm test`: PASS — **63 files, 505/505** tests (exit 0, no regressions)
