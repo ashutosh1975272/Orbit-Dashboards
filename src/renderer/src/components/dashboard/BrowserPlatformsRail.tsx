@@ -8,6 +8,7 @@ import { AddPlatformModal } from './AddPlatformModal'
 interface BrowserPlatformsRailProps {
   activePlatformId?: string | null
   onSelectPlatform: (platform: BrowserPlatformConfig) => void
+  onPlatformRemoved?: (id: string) => void
 }
 
 function getPlatformIcon(type: string): string {
@@ -27,41 +28,32 @@ function getPlatformIcon(type: string): string {
   }
 }
 
+function statusClass(status: string): string {
+  if (status === 'logged_in') return 'is-logged-in'
+  if (status === 'adapter_broken') return 'is-broken'
+  if (status === 'paused') return 'is-paused'
+  return 'is-needs-login'
+}
+
+function statusLabel(status: string): string {
+  if (status === 'logged_in') return 'Logged in'
+  if (status === 'adapter_broken') return 'Adapter broken'
+  if (status === 'paused') return 'Paused'
+  return 'Needs login'
+}
+
 function StatusIndicator({ status }: { status: string }): React.JSX.Element {
-  if (status === 'logged_in') {
-    return (
-      <span
-        className="w-2 h-2 rounded-full bg-emerald-400 inline-block shrink-0 shadow-sm shadow-emerald-500/50"
-        title="Logged in"
-        aria-label="Logged in"
-      />
-    )
-  }
-  if (status === 'adapter_broken') {
-    return (
-      <span
-        className="w-2 h-2 rounded-full bg-rose-500 inline-block shrink-0 shadow-sm shadow-rose-500/50"
-        title="Adapter broken"
-        aria-label="Adapter broken"
-      />
-    )
-  }
-  return (
-    <span
-      className="w-2 h-2 rounded-full bg-amber-400 inline-block shrink-0 shadow-sm shadow-amber-400/50"
-      title="Needs login"
-      aria-label="Needs login"
-    />
-  )
+  const label = statusLabel(status)
+  return <span className={`bs-status ${statusClass(status)}`} title={label} aria-label={label} />
 }
 
 export const BrowserPlatformsRail: React.FC<BrowserPlatformsRailProps> = ({
   activePlatformId,
-  onSelectPlatform
+  onSelectPlatform,
+  onPlatformRemoved
 }) => {
   const [platforms, setPlatforms] = useState<BrowserPlatformConfig[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [menuPlatformId, setMenuPlatformId] = useState<string | null>(null)
 
   const reloadPlatforms = async (): Promise<void> => {
     if (typeof window.api?.browserSources?.list === 'function') {
@@ -75,28 +67,55 @@ export const BrowserPlatformsRail: React.FC<BrowserPlatformsRailProps> = ({
   }
 
   useEffect(() => {
-    void reloadPlatforms()
+    let cancelled = false
+    window.api?.browserSources
+      ?.list?.()
+      .then((list) => {
+        if (!cancelled) setPlatforms(list)
+      })
+      .catch(() => {
+        /* ignore */
+      })
 
     const unsub = window.api?.browserSources?.onStatusChanged?.((event) => {
       setPlatforms((prev) =>
         prev.map((p) =>
           p.id === event.platformId
-            ? { ...p, authStatus: event.authStatus, lastCheckedAt: event.lastCheckedAt }
+            ? {
+                ...p,
+                authStatus: event.authStatus,
+                lastCheckedAt: event.lastCheckedAt,
+                errorMessage: event.errorMessage
+              }
             : p
         )
       )
     })
 
     return () => {
+      cancelled = true
       unsub?.()
     }
   }, [])
 
+  const handleOpenModal = (): void => {
+    setIsModalOpen(true)
+    // Native WebContentsViews paint above the renderer, so hide the active
+    // source while the modal is open instead of letting it cover the dialog.
+    void window.api?.browserSources?.setEmbedVisible?.(false)
+  }
+
+  const handleCloseModal = (): void => {
+    setIsModalOpen(false)
+    if (activePlatformId) {
+      void window.api?.browserSources?.setEmbedVisible?.(true)
+    }
+  }
+
   const handleAddPlatform = async (input: AddBrowserPlatformInput): Promise<void> => {
     if (typeof window.api?.browserSources?.add === 'function') {
-      const added = await window.api.browserSources.add(input)
+      await window.api.browserSources.add(input)
       await reloadPlatforms()
-      onSelectPlatform(added)
     }
   }
 
@@ -110,20 +129,20 @@ export const BrowserPlatformsRail: React.FC<BrowserPlatformsRailProps> = ({
     if (typeof window.api?.browserSources?.remove === 'function') {
       await window.api.browserSources.remove(id, true)
       await reloadPlatforms()
-      if (menuPlatformId === id) setMenuPlatformId(null)
+      if (activePlatformId === id) {
+        onPlatformRemoved?.(id)
+      }
     }
   }
 
   return (
-    <div className="dash-browser-sources mt-3 pt-3 border-t border-border-dark/40" data-testid="browser-platforms-rail">
-      <div className="flex items-center justify-between px-3 py-1 mb-1">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-dark">
-          Browser Sources
-        </span>
+    <div className="dash-browser-sources" data-testid="browser-platforms-rail">
+      <div className="bs-rail-head">
+        <span className="bs-rail-title">Browser Sources</span>
         <button
           type="button"
-          onClick={() => setIsModalOpen(true)}
-          className="text-xs text-muted-dark hover:text-accent font-semibold px-1.5 py-0.5 rounded transition-colors"
+          onClick={handleOpenModal}
+          className="bs-add-btn"
           data-testid="add-platform-btn"
           title="Add Browser Source (Slack, Teams, WhatsApp, Custom Link)"
         >
@@ -131,56 +150,54 @@ export const BrowserPlatformsRail: React.FC<BrowserPlatformsRailProps> = ({
         </button>
       </div>
 
-      <div className="space-y-0.5">
+      <div className="bs-list">
         {platforms.map((p) => {
           const isActive = activePlatformId === p.id
           return (
             <div
               key={p.id}
-              className={`group relative flex items-center justify-between px-3 py-1.5 rounded-md cursor-pointer transition-colors ${
-                isActive
-                  ? 'bg-accent/15 text-white font-medium'
-                  : 'text-text-dark/80 hover:bg-white/5 hover:text-white'
-              }`}
+              className={`bs-row${isActive ? ' is-active' : ''}`}
               onClick={() => onSelectPlatform(p)}
               data-testid={`browser-platform-${p.id}`}
+              role="button"
+              tabIndex={0}
+              aria-current={isActive ? 'true' : undefined}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  onSelectPlatform(p)
+                }
+              }}
             >
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-sm" aria-hidden>
-                  {getPlatformIcon(p.type)}
-                </span>
-                <span className="text-xs truncate">{p.name}</span>
-              </div>
+              <span className="bs-row-icon" aria-hidden>
+                {getPlatformIcon(p.type)}
+              </span>
+              <span className="bs-row-name">{p.name}</span>
 
-              <div className="flex items-center gap-2 shrink-0">
+              <span className="bs-row-actions">
                 <StatusIndicator status={p.authStatus} />
                 <button
                   type="button"
                   onClick={(e) => void handleRemove(p.id, e)}
-                  className="opacity-0 group-hover:opacity-100 text-muted-dark hover:text-rose-400 text-xs px-1 transition-opacity"
+                  className="bs-remove"
                   title="Remove platform"
-                  aria-label="Remove platform"
+                  aria-label={`Remove ${p.name}`}
                 >
                   ✕
                 </button>
-              </div>
+              </span>
             </div>
           )
         })}
 
         {platforms.length === 0 && (
-          <div className="px-3 py-2 text-[11px] text-muted-dark/70 italic">
+          <div className="bs-empty">
             No browser sources added. Click &quot;+ Add&quot; to connect client web sessions.
           </div>
         )}
       </div>
 
-      <AddPlatformModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onAdd={handleAddPlatform}
-      />
+      <AddPlatformModal isOpen={isModalOpen} onClose={handleCloseModal} onAdd={handleAddPlatform} />
     </div>
   )
 }
-

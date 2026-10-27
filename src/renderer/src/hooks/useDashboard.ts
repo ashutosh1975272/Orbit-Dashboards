@@ -23,12 +23,15 @@ interface DashboardState {
   dashRailExpanded: boolean
   /** v2.3 — the "Recent" strip (one item per workspace, importance ranked) */
   recent: RecentActivity[]
+  /** browser-source embedded view currently owning the main column */
+  activeBrowserSourceId: string | null
 
   openDashboard: (appId?: 'slack') => void
   closeDashboard: () => void
   openWizard: (projectId?: string) => void
   closeWizard: () => void
   setDashRailExpanded: (expanded: boolean) => void
+  setActiveBrowserSource: (id: string | null) => void
 
   loadSnapshot: () => Promise<void>
   loadRecent: () => Promise<void>
@@ -53,6 +56,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   dashboardAppId: null,
   snapshot: null,
   recent: [],
+  activeBrowserSourceId: null,
   loading: false,
   syncingProjectIds: [],
   progress: null,
@@ -60,11 +64,13 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   wizardOpenFor: null,
   dashRailExpanded: false,
 
-  openDashboard: (appId = 'slack') => set({ dashboardOpen: true, dashboardAppId: appId }),
+  openDashboard: (appId = 'slack') =>
+    set({ dashboardOpen: true, dashboardAppId: appId, activeBrowserSourceId: null }),
   closeDashboard: () => set({ dashboardOpen: false }),
   openWizard: (projectId) => set({ wizardOpenFor: { projectId: projectId ?? null } }),
   closeWizard: () => set({ wizardOpenFor: null }),
   setDashRailExpanded: (expanded) => set({ dashRailExpanded: expanded }),
+  setActiveBrowserSource: (id) => set({ activeBrowserSourceId: id }),
 
   loadSnapshot: async () => {
     const state = get()

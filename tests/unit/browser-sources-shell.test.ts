@@ -49,8 +49,12 @@ describe('Browser Sources Shell (BS-1)', () => {
 
     it('allows Custom base domain and SSO redirects', () => {
       const customUrl = 'https://app.acmecorp.internal/dashboard'
-      expect(isAllowedEmbedDomain('https://app.acmecorp.internal/tasks', 'custom', customUrl)).toBe(true)
-      expect(isAllowedEmbedDomain('https://accounts.google.com/signin', 'custom', customUrl)).toBe(true)
+      expect(isAllowedEmbedDomain('https://app.acmecorp.internal/tasks', 'custom', customUrl)).toBe(
+        true
+      )
+      expect(isAllowedEmbedDomain('https://accounts.google.com/signin', 'custom', customUrl)).toBe(
+        true
+      )
       expect(isAllowedEmbedDomain('https://unrelated-domain.org', 'custom', customUrl)).toBe(false)
     })
   })
@@ -102,6 +106,7 @@ describe('Browser Sources Shell (BS-1)', () => {
           loadURL: vi.fn().mockResolvedValue(undefined),
           setZoomFactor: vi.fn(),
           setWindowOpenHandler: vi.fn(),
+          close: vi.fn(),
           on: vi.fn()
         },
         setBounds: vi.fn()
@@ -119,11 +124,12 @@ describe('Browser Sources Shell (BS-1)', () => {
       } as BrowserPlatformConfig)
 
       // Activate p1
-      manager.activate(
-        { id: 'p1' } as any,
-        mockMainWindow,
-        { x: 300, y: 0, width: 800, height: 600 }
-      )
+      manager.activate({ id: 'p1' } as any, mockMainWindow, {
+        x: 300,
+        y: 0,
+        width: 800,
+        height: 600
+      })
 
       expect(manager.getActivePlatformId()).toBe('p1')
       expect(mockMainWindow.contentView.addChildView).toHaveBeenCalledWith(mockView1)
@@ -141,7 +147,7 @@ describe('Browser Sources Shell (BS-1)', () => {
       // Destroy
       manager.destroy('p1', mockMainWindow)
       expect(manager.getView('p1')).toBeUndefined()
+      expect(mockView1.webContents.close).toHaveBeenCalledTimes(1)
     })
   })
 })
-

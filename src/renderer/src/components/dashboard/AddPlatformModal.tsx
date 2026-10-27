@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type {
   AddBrowserPlatformInput,
   BrowserPlatformType
@@ -75,6 +76,16 @@ export const AddPlatformModal: React.FC<AddPlatformModalProps> = ({ isOpen, onCl
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  useEffect(() => {
+    if (!isOpen) return
+
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [isOpen, onClose])
+
   if (!isOpen) return null
 
   const handleSelectPreset = (preset: (typeof PRESETS)[0]): void => {
@@ -109,40 +120,43 @@ export const AddPlatformModal: React.FC<AddPlatformModalProps> = ({ isOpen, onCl
         url: trimmedUrl
       })
       onClose()
-    } catch (err: any) {
-      setError(err?.message || 'Failed to add platform')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to add platform')
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-      role="dialog"
-      aria-modal="true"
-      data-testid="add-platform-modal"
+      className="bs-modal-backdrop"
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
     >
-      <div className="w-full max-w-lg rounded-xl border border-border-dark bg-[#181a20] p-6 shadow-2xl text-text-dark space-y-5">
-        <div className="flex items-center justify-between border-b border-border-dark pb-3">
+      <div
+        className="bs-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="bs-modal-title"
+        data-testid="add-platform-modal"
+      >
+        <div className="bs-modal-head">
           <div>
-            <h2 className="text-lg font-semibold text-white">Add Browser Source</h2>
-            <p className="text-xs text-muted-dark">
-              Tab-less native web session for reading client messages & updates
+            <h2 id="bs-modal-title" className="bs-modal-title">
+              Add Browser Source
+            </h2>
+            <p className="bs-modal-sub">
+              Tab-less native web session for reading client messages &amp; updates
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-muted-dark hover:text-white transition-colors text-lg px-2"
-            aria-label="Close"
-          >
+          <button type="button" onClick={onClose} className="bs-modal-close" aria-label="Close">
             ✕
           </button>
         </div>
 
-        {/* Preset choices */}
-        <div className="grid grid-cols-2 gap-2.5">
+        <div className="bs-preset-grid">
           {PRESETS.map((p) => {
             const isSelected = selectedType === p.type
             return (
@@ -150,83 +164,77 @@ export const AddPlatformModal: React.FC<AddPlatformModalProps> = ({ isOpen, onCl
                 key={p.type}
                 type="button"
                 onClick={() => handleSelectPreset(p)}
-                className={`flex items-start gap-2.5 p-3 rounded-lg border text-left transition-all ${
-                  isSelected
-                    ? 'border-accent bg-accent/10 shadow-sm'
-                    : 'border-border-dark/60 bg-[#121418] hover:border-border-dark hover:bg-[#15171d]'
-                }`}
+                aria-pressed={isSelected}
+                className={`bs-preset${isSelected ? ' is-selected' : ''}`}
               >
-                <span className="text-xl" aria-hidden>
+                <span className="bs-preset-icon" aria-hidden>
                   {p.icon}
                 </span>
-                <div className="min-w-0">
-                  <div className="text-sm font-medium text-white truncate">{p.title}</div>
-                  <div className="text-[11px] text-muted-dark line-clamp-1">{p.description}</div>
-                </div>
+                <span className="bs-preset-copy">
+                  <span className="bs-preset-title">{p.title}</span>
+                  <span className="bs-preset-desc">{p.description}</span>
+                </span>
               </button>
             )
           })}
         </div>
 
-        {/* WhatsApp Callout */}
         {selectedType === 'whatsapp' && (
-          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200/90 leading-relaxed">
+          <div className="bs-callout">
             <strong>Strict Read-Only Mode:</strong> WhatsApp Web adapter is permanently read-only.
             No automated writing or sending tools will be registered to minimize ban risks.
           </div>
         )}
 
-        {/* Form fields */}
-        <form onSubmit={handleSubmit} className="space-y-4 pt-1">
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-muted-dark mb-1">
+        <form onSubmit={handleSubmit} className="bs-form">
+          <div className="bs-field">
+            <label className="bs-label" htmlFor="bs-platform-name">
               Platform Name
             </label>
             <input
+              id="bs-platform-name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Acme Client Slack"
-              className="w-full px-3 py-2 rounded-lg bg-[#0e1014] border border-border-dark text-sm text-white focus:outline-none focus:border-accent"
+              className="bs-input"
+              autoFocus
               required
             />
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-muted-dark mb-1">
+          <div className="bs-field">
+            <label className="bs-label" htmlFor="bs-platform-url">
               URL (HTTPS)
             </label>
             <input
+              id="bs-platform-url"
               type="url"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://app.slack.com/client/..."
-              className="w-full px-3 py-2 rounded-lg bg-[#0e1014] border border-border-dark text-sm text-white font-mono focus:outline-none focus:border-accent"
+              className="bs-input bs-input-mono"
               required
             />
           </div>
 
-          {error && <div className="text-xs text-rose-400 font-medium">{error}</div>}
+          {error && (
+            <div className="bs-error" role="alert">
+              {error}
+            </div>
+          )}
 
-          <div className="flex items-center justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-lg border border-border-dark text-xs text-muted-dark hover:text-white hover:bg-white/5 transition-colors"
-            >
+          <div className="bs-modal-actions">
+            <button type="button" onClick={onClose} className="bs-btn bs-btn-secondary">
               Cancel
             </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="px-4 py-2 rounded-lg bg-accent text-white text-xs font-medium hover:bg-accent/90 transition-colors disabled:opacity-50"
-            >
+            <button type="submit" disabled={isSubmitting} className="bs-btn bs-btn-primary">
               {isSubmitting ? 'Adding…' : 'Add Platform'}
             </button>
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
-

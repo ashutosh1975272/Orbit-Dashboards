@@ -1,9 +1,4 @@
-import {
-  WebContentsView,
-  shell,
-  type BrowserWindow,
-  type Rectangle
-} from 'electron'
+import { WebContentsView, shell, type BrowserWindow, type Rectangle } from 'electron'
 import { log } from '../logging'
 import type {
   BrowserPlatformConfig,
@@ -95,6 +90,30 @@ export class BrowserSourceViewManager {
   }
 
   private wireNavigation(config: BrowserPlatformConfig, view: WebContentsView): void {
+    view.webContents.on('will-navigate', (event, url) => {
+      if (url.startsWith('msteams:') || url.startsWith('slack:')) {
+        event.preventDefault()
+        void view.webContents.loadURL(config.url)
+        return
+      }
+
+      if (!url.startsWith('http')) {
+        event.preventDefault()
+        return
+      }
+
+      if (!isAllowedEmbedDomain(url, config.type, config.url)) {
+        event.preventDefault()
+        log.info('browser source in-page navigation redirected to default browser', {
+          platformId: config.id,
+          url
+        })
+        if (typeof shell?.openExternal === 'function') {
+          void shell.openExternal(url)
+        }
+      }
+    })
+
     view.webContents.setWindowOpenHandler(({ url }) => {
       if (url.startsWith('msteams:') || url.startsWith('slack:')) {
         log.info('blocked protocol scheme in browser source; loading in web view', {
@@ -140,7 +159,10 @@ export class BrowserSourceViewManager {
     })
   }
 
-  async evaluateAuthStatus(config: BrowserPlatformConfig, view: WebContentsView): Promise<BrowserSourceAuthStatus> {
+  async evaluateAuthStatus(
+    config: BrowserPlatformConfig,
+    view: WebContentsView
+  ): Promise<BrowserSourceAuthStatus> {
     try {
       const currentUrl = view.webContents.getURL() || ''
 
@@ -149,7 +171,10 @@ export class BrowserSourceViewManager {
           this.emitStatus(config.id, 'logged_in')
           return 'logged_in'
         }
-        if (currentUrl.includes('slack.com/signin') || currentUrl.includes('slack.com/get-started')) {
+        if (
+          currentUrl.includes('slack.com/signin') ||
+          currentUrl.includes('slack.com/get-started')
+        ) {
           this.emitStatus(config.id, 'needs_login')
           return 'needs_login'
         }
@@ -170,26 +195,33 @@ export class BrowserSourceViewManager {
           this.emitStatus(config.id, 'logged_in')
           return 'logged_in'
         }
-        if (currentUrl.includes('login.microsoftonline.com') || currentUrl.includes('teams.microsoft.com/landing')) {
+        if (
+          currentUrl.includes('login.microsoftonline.com') ||
+          currentUrl.includes('teams.microsoft.com/landing')
+        ) {
           this.emitStatus(config.id, 'needs_login')
           return 'needs_login'
         }
       } else if (config.type === 'whatsapp') {
         if (currentUrl.includes('web.whatsapp.com')) {
-          const hasQr = await view.webContents.executeJavaScript(
-            `Boolean(document.querySelector('canvas[aria-label*="QR"]') || document.querySelector('[data-ref] canvas'))`,
-            true
-          ).catch(() => false)
+          const hasQr = await view.webContents
+            .executeJavaScript(
+              `Boolean(document.querySelector('canvas[aria-label*="QR"]') || document.querySelector('[data-ref] canvas'))`,
+              true
+            )
+            .catch(() => false)
 
           if (hasQr) {
             this.emitStatus(config.id, 'needs_login')
             return 'needs_login'
           }
 
-          const hasChats = await view.webContents.executeJavaScript(
-            `Boolean(document.querySelector('#pane-side') || document.querySelector('[data-testid="chat-list"]'))`,
-            true
-          ).catch(() => false)
+          const hasChats = await view.webContents
+            .executeJavaScript(
+              `Boolean(document.querySelector('#pane-side') || document.querySelector('[data-testid="chat-list"]'))`,
+              true
+            )
+            .catch(() => false)
 
           if (hasChats) {
             this.emitStatus(config.id, 'logged_in')
@@ -301,7 +333,7 @@ export class BrowserSourceViewManager {
 
     try {
       if (!view.webContents.isDestroyed()) {
-        void view.webContents.loadURL('about:blank')
+        view.webContents.close()
       }
     } catch {
       /* ignore */

@@ -311,6 +311,7 @@ function App(): React.JSX.Element {
   const browserAuthBusy = authPhase === 'google' || authPhase === 'slack'
   const dashboardOpen = useDashboardStore((s) => s.dashboardOpen)
   const closeDashboard = useDashboardStore((s) => s.closeDashboard)
+  const activeBrowserSourceId = useDashboardStore((s) => s.activeBrowserSourceId)
   const showDashboard = dashboardOpen && !browserAuthBusy
   const wizardOpen = useDashboardStore((s) => s.wizardOpenFor) != null
   const splitOn =
@@ -323,6 +324,7 @@ function App(): React.JSX.Element {
     activeProfile &&
     activeAppId &&
     !dashboardOpen &&
+    !activeBrowserSourceId &&
     !wizardOpen &&
     !browserAuthBusy &&
     !locked &&
@@ -334,6 +336,22 @@ function App(): React.JSX.Element {
   useEffect(() => {
     void window.api.profiles.setEmbedVisible(showEmbed)
   }, [showEmbed])
+
+  const browserSourceVisible = Boolean(
+    adminAuthenticated &&
+    activeBrowserSourceId &&
+    !dashboardOpen &&
+    !wizardOpen &&
+    !browserAuthBusy &&
+    !locked &&
+    !settingsOpen &&
+    !cmdkOpen &&
+    !showOnboarding
+  )
+
+  useEffect(() => {
+    void window.api?.browserSources?.setEmbedVisible?.(browserSourceVisible)
+  }, [browserSourceVisible])
 
   useEffect(() => {
     if (!splitOn || !activeProfileId || !activeAppId || !splitSecondary) {

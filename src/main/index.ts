@@ -203,6 +203,7 @@ if (!gotSingleInstanceLock) {
 
     mainWindow.on('closed', () => {
       browserViewManager.destroyAll()
+      browserSourceViewManager.destroyAll()
       mainWindow = null
     })
 
@@ -768,6 +769,8 @@ if (!gotSingleInstanceLock) {
     })
 
     app.on('before-quit', () => {
+      browserViewManager.destroyAll()
+      browserSourceViewManager.destroyAll()
       dashboardScheduler.stop()
       lock.stopIdleWatch()
       if (sleepTimer) clearInterval(sleepTimer)

@@ -9,6 +9,7 @@ import { createServer } from 'node:net'
 import { join } from 'node:path'
 import { app, screen, session as electronSession, type BrowserWindow } from 'electron'
 import { log } from '../logging'
+import { chromeProfileHasGoogleSession, chromeProfileHasSlackSession } from './chrome-cookie-probe'
 
 export type ChromeSystemLoginPhase = 'signing-in-google' | 'signing-in-slack'
 
@@ -792,8 +793,6 @@ export async function runChromeSystemLogin(
     })
     // Soft-success only when Cookies DB still shows a session after export failed.
     if (imported === 0) {
-      const { chromeProfileHasGoogleSession, chromeProfileHasSlackSession } =
-        await import('./chrome-cookie-probe')
       const ok =
         phase === 'signing-in-slack'
           ? chromeProfileHasSlackSession(profileDir)
