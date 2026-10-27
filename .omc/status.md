@@ -1,6 +1,17 @@
 # Status Ledger
 
-## SRC-3 — Workspace → Cards mapping (2026-10-27, branch `feat/browser-sources`, commit pending)
+## SRC-4 — "+ Add" page (2026-10-27, branch `feat/browser-sources`, commit pending)
+- `npm run typecheck`: PASS (node, exit 0). Web typecheck has pre-existing errors in untracked `CardSettingsModal.tsx` (not from this change).
+- `npm test`: PASS — **65 files, 543/543** tests (exit 0, no regressions)
+- Added `+ Add` button to each profile's app rows in ProfileSidebar (`ProfileSidebar.tsx`) — below Slack/Teams/WhatsApp rows, opens AddPlatformPage
+- Created `AddPlatformPage.tsx` — big modal (~950px wide) with 3 sections:
+  1. "Connected workspaces": signed-in Slack/Teams workspaces as cards with icon, name, domain, "Mapped to N cards" / "Not mapped" badge, "Map to cards" button
+  2. "Available platforms": Slack, Teams, WhatsApp (supported, with Connect/Connected/Needs login status); Upwork, Discord, Google Chat ("Soon" badge, disabled)
+  3. "Custom link": name + URL (https only) input + Add link button; note "View only. Automation aur scraping is link par available nahi."
+- CSS: `.add-platform-*`, `.add-workspace-*`, `.add-custom-*` classes; `.nav-add-section`, `.nav-add-btn` for sidebar button
+- Wired in `App.tsx`: `addPlatformOpen` state, `AddPlatformPage` render, `onAddPlatform` handler
+
+## SRC-3 — Workspace → Cards mapping (2026-10-27, branch `feat/browser-sources`, commit `6fc81dd`)
 - `npm run typecheck`: PASS (node, exit 0). Web typecheck has pre-existing errors in untracked `CardSettingsModal.tsx` (not from this change).
 - `npm test`: PASS — **65 files, 543/543** tests (exit 0, no regressions)
 - Created `src/main/dashboard/workspace-mapping-store.ts` — JSON-backed store at `workspace-mappings.json` with `listMappings`, `getMapping`, `getWorkspaceForProject`, `saveMapping`, `deleteMapping`, `cleanupDeletedProjects`. Deleted project IDs auto-dropped.

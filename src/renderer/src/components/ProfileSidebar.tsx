@@ -49,6 +49,8 @@ interface ProfileSidebarProps {
   onDismissError: () => void
   /** Open the platform settings panel for a given profile + app. */
   onPlatformSettings: (profileId: string, appId: AppId) => void
+  /** Open the "+ Add" page for adding platforms / custom links. */
+  onAddPlatform: () => void
   /** Optional slot rendered after the Recents strip (dashboard entry point). */
   dashboardSlot?: React.ReactNode
 }
@@ -301,6 +303,7 @@ export const ProfileSidebar = memo(function ProfileSidebar({
   onUnpin,
   onDismissError,
   onPlatformSettings,
+  onAddPlatform,
   dashboardSlot
 }: ProfileSidebarProps): React.JSX.Element {
   const [profileExpanded, setProfileExpanded] = useState<Record<string, boolean>>({})
@@ -639,6 +642,18 @@ export const ProfileSidebar = memo(function ProfileSidebar({
           })
         )}
       </ul>
+
+      <div className="nav-add-section">
+        <button
+          type="button"
+          className="nav-add-btn"
+          onClick={onAddPlatform}
+          title="Add platform or custom link"
+          aria-label="Add platform or custom link"
+        >
+          + Add
+        </button>
+      </div>
 
       <p className="sidebar-status" onClick={onDismissError} role="status">
         {statusLine}

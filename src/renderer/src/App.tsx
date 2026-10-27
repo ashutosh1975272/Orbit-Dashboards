@@ -18,6 +18,7 @@ import { SettingsPanel } from './components/SettingsPanel'
 import { SidebarPanelIcon } from './components/SidebarPanelIcon'
 import { SlackViewport } from './components/SlackViewport'
 import { PlatformSettingsPanel } from './components/dashboard/PlatformSettingsPanel'
+import { AddPlatformPage } from './components/dashboard/AddPlatformPage'
 import { sidebarToastFor } from './lib/sidebar-toast'
 import { modKey, modShift } from './lib/shortcut-label'
 import { useProfileStore } from './hooks/useProfiles'
@@ -80,6 +81,7 @@ function App(): React.JSX.Element {
     profileId: string
     appId: AppId
   } | null>(null)
+  const [addPlatformOpen, setAddPlatformOpen] = useState(false)
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS)
   const [locked, setLocked] = useState(false)
   const [unlocking, setUnlocking] = useState(false)
@@ -781,6 +783,7 @@ function App(): React.JSX.Element {
               onPlatformSettings={(profileId, appId) => {
                 setPlatformSettings({ profileId, appId })
               }}
+              onAddPlatform={() => setAddPlatformOpen(true)}
             />
             <div
               className="sidebar-resizer"
@@ -964,6 +967,10 @@ function App(): React.JSX.Element {
           appId={platformSettings.appId}
           onClose={() => setPlatformSettings(null)}
         />
+      ) : null}
+
+      {addPlatformOpen ? (
+        <AddPlatformPage open={true} onClose={() => setAddPlatformOpen(false)} />
       ) : null}
 
       {showOnboarding && !locked ? (
