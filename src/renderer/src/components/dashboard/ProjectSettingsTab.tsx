@@ -368,8 +368,11 @@ export default function ProjectSettingsTab({
                     </p>
                     {tokenStatus.maskedToken ? (
                       <p className="ws-settings-token-line">
-                        Token: <code className="selectable">{tokenStatus.maskedToken.replace(/`/g, '')}</code> (full token stays encrypted in this
-                        app)
+                        Token:{' '}
+                        <span className="proj-token-chip selectable">
+                          {tokenStatus.maskedToken.replace(/[`'"]/g, '')}
+                        </span>{' '}
+                        (full token stays encrypted in this app)
                       </p>
                     ) : null}
                     {tokenStatus.scopes ? (
