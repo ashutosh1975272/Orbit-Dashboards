@@ -356,28 +356,6 @@ const api: IpcApi = {
       ) as Promise<DashboardTeamWorkspace>,
     clearTeamWorkspace: () =>
       ipcRenderer.invoke(IpcChannels.DashboardTeamWorkspaceClear) as Promise<DashboardTeamWorkspace>
-  },
-  browserSources: {
-    list: () => ipcRenderer.invoke(IpcChannels.BrowserSourceList),
-    add: (input) => ipcRenderer.invoke(IpcChannels.BrowserSourceAdd, input),
-    update: (id, patch) => ipcRenderer.invoke(IpcChannels.BrowserSourceUpdate, { id, patch }),
-    remove: (id, clearSession) =>
-      ipcRenderer.invoke(IpcChannels.BrowserSourceRemove, { id, clearSession }),
-    reorder: (orderedIds) => ipcRenderer.invoke(IpcChannels.BrowserSourceReorder, { orderedIds }),
-    activate: (platformId, bounds) =>
-      ipcRenderer.invoke(IpcChannels.BrowserSourceActivate, { platformId, bounds }),
-    deactivate: () => ipcRenderer.invoke(IpcChannels.BrowserSourceDeactivate),
-    updateBounds: (bounds) => ipcRenderer.invoke(IpcChannels.BrowserSourceUpdateBounds, bounds),
-    setEmbedVisible: (visible) =>
-      ipcRenderer.invoke(IpcChannels.BrowserSourceSetEmbedVisible, { visible }),
-    onStatusChanged: (callback) => {
-      const listener = (
-        _event: Electron.IpcRendererEvent,
-        payload: any
-      ): void => callback(payload)
-      ipcRenderer.on(IpcChannels.BrowserSourceStatusChanged, listener)
-      return () => ipcRenderer.removeListener(IpcChannels.BrowserSourceStatusChanged, listener)
-    }
   }
 }
 
