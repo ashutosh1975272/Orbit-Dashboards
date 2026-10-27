@@ -8,7 +8,7 @@ async function capture() {
   const screenshotsDir = '/home/lap-19/Desktop/Company-Project-dashboard/slack-dashboard-main/.omc/screenshots/settings'
   await mkdir(screenshotsDir, { recursive: true })
 
-  const cdpPort = 9297
+  const cdpPort = 9298
   const electronEnv = { ...process.env }
   delete electronEnv.ELECTRON_RUN_AS_NODE
 
@@ -182,3 +182,4 @@ capture().then(() => process.exit(0)).catch(e => {
   console.error(e)
   process.exit(1)
 })
+

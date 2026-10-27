@@ -5,6 +5,7 @@ import type {
   AiSettingsSource,
   DashboardAiSettingsView
 } from '../../../../shared/dashboard-contract'
+import { AiModelCombobox } from './AiModelCombobox'
 
 const SOURCE_LABEL: Record<AiSettingsSource, string> = {
   project: 'project override',
@@ -274,11 +275,9 @@ export default function AiSettingsForm({ projectId }: AiSettingsFormProps): Reac
       ) : null}
 
       {isProject && useGlobal && view ? (
-        <p className="ai-settings-inherited" data-testid="ai-inherited">
-          <b>Inheriting global config</b> {view.effective.chatModel} ·{' '}
-          {KEY_SOURCE_LABEL[view.effective.keySource]}
-          {view.effective.apiKeyMask ? ` ${view.effective.apiKeyMask}` : ''}
-        </p>
+        <div style={{ padding: '6px 0', fontSize: '13px', color: 'var(--text-muted)' }}>
+          Using global key: <span className="proj-token-chip">{view.global.apiKeyMask || '••••'}</span> · Global model: <span style={{ color: 'var(--text)' }}>{view.global.model || 'nvidia/nemotron-3.5-super-vl-120b-a12b'}</span>
+        </div>
       ) : null}
 
       {projectOverrideActive && view ? (
@@ -310,53 +309,35 @@ export default function AiSettingsForm({ projectId }: AiSettingsFormProps): Reac
 
       <label className="ai-settings-field">
         <span>Chat model</span>
-        <div className="ai-settings-inline">
-          <select
-            value={model}
-            disabled={!editable || loading || saving}
-            onChange={(e) => setModel(e.target.value)}
-          >
-            <option value="">{isProject ? 'Inherit from global' : 'Use built-in default'}</option>
-            {modelOptions.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            className="dash-subtle"
-            disabled={loadingModels || !editable}
-            onClick={() => {
-              setLoadingModels(true)
-              setModelsError(null)
-              void loadModels()
-            }}
-          >
-            {loadingModels ? 'Loading…' : '⟳ Models'}
-          </button>
-        </div>
+        <AiModelCombobox
+          value={model}
+          options={modelOptions}
+          inheritLabel={isProject ? 'Inherit from global' : 'Use built-in default'}
+          disabled={!editable || loading || saving}
+          onChange={(newVal) => setModel(newVal)}
+          onRefresh={() => {
+            setLoadingModels(true)
+            setModelsError(null)
+            void loadModels()
+          }}
+          refreshing={loadingModels}
+          data-testid="chat-model-combobox"
+        />
         {modelsError ? <small className="ai-settings-hint is-error">{modelsError}</small> : null}
       </label>
 
       <label className="ai-settings-field">
         <span>Embedding model</span>
-        <select
+        <AiModelCombobox
           value={embeddingModel}
+          options={embeddingOptions}
+          inheritLabel={isProject ? 'Inherit from global' : 'Use built-in embedding default'}
           disabled={!editable || loading || saving}
-          onChange={(e) => setEmbeddingModel(e.target.value)}
-        >
-          <option value="">
-            {isProject ? 'Inherit from global' : 'Use built-in embedding default'}
-          </option>
-          {embeddingOptions.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
-        <small className="ai-settings-hint">
-          Used when the agent indexes this project’s messages. Changing it requires a re-index.
+          onChange={(newVal) => setEmbeddingModel(newVal)}
+          data-testid="embedding-model-combobox"
+        />
+        <small className="ai-settings-hint" style={{ color: 'var(--warn)' }}>
+          ⚠ Used when the agent indexes this project’s messages. Changing it requires a re-index.
         </small>
       </label>
 
