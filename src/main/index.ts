@@ -587,6 +587,7 @@ if (!gotSingleInstanceLock) {
       listTeamWorkspaceCandidates,
       viewedStore: dashboardViewedStore
     })
+
     void runWorkspaceMigration()
     dashboardScheduler.start()
     registerAppIpc({

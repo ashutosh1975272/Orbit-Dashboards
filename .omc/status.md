@@ -1,5 +1,82 @@
 # Status Ledger
 
+## SRC-2 — ⚙ Settings button on platform rows (2026-10-27, branch `feat/browser-sources`, commit pending)
+- `npm run typecheck`: PASS (node + web, exit 0)
+- `npm test`: PASS — **61 files, 490/490** tests (exit 0, no regressions)
+- Added `⚙` settings button to each Slack/Teams/WhatsApp row in ProfileSidebar (`ProfileSidebar.tsx:606-617`)
+  - Hover-visible, tooltip "Settings", aria-label "Settings"
+  - `e.stopPropagation()` so clicking ⚙ doesn't also select the app
+- Added status dot per row (`ProfileSidebar.tsx:590-599`)
+  - Connected (green) when `sessionStatus === 'signed-in'`
+  - Needs login (gray) when `sessionStatus === 'not-signed-in'`
+  - Signing in… (amber spinner) for `signing-in-*` states
+  - No fake status — all derived from real `profile.apps[appId].sessionStatus`
+- Added `onPlatformSettings` prop to ProfileSidebar (`ProfileSidebar.tsx:51`)
+- Created `PlatformSettingsPanel.tsx` (`src/renderer/src/components/dashboard/PlatformSettingsPanel.tsx`)
+  - Title: "<Platform> settings" (uses `appLabel` from shared types)
+  - Slack panel: connected workspaces list from `availableWorkspaces`, each with icon/monogram, name, domain, "Not mapped" badge, refresh button, status dot
+  - Teams/WhatsApp panel: "Soon" badge + "Coming soon" note, status dot
+  - Click backdrop to close
+- Wired up in `App.tsx`: `platformSettings` state, `PlatformSettingsPanel` render, `onPlatformSettings` handler
+- CSS added: `.nav-app-row`, `.nav-app-settings`, `.platform-status-dot`, panel backdrop/panel/workspace list styles (`main.css:877+`)
+
+## SRC-1 — Remove Browser Sources, reuse existing profile session (2026-10-27, branch `feat/browser-sources`, commit `b33d2bb`)
+- `npm run typecheck`: PASS (node + web, exit 0)
+- `npm test`: PASS — **61 files, 490/490** tests (exit 0, no regressions)
+- Deleted Browser Sources parallel system:
+  - `src/main/browser-sources/` (29 files: view manager, store, types, session
+    partition, scheduler, trace, agents, reader adapters)
+  - `src/main/ipc/browser-sources.ipc.ts`
+  - `src/renderer/src/components/dashboard/BrowserPlatformsRail.tsx`
+  - `src/renderer/src/components/dashboard/AddPlatformModal.tsx`
+  - `src/shared/browser-sources-contract.ts`
+  - `tests/unit/browser-sources-shell.test.ts`, `tests/unit/browser-platform-store.test.ts`,
+    `tests/unit/browser-sources-normalizer.test.ts`
+- Removed references: `src/main/index.ts`, `src/preload/index.ts`,
+  `src/renderer/src/components/dashboard/DashboardRail.tsx`,
+  `src/shared/ipc-contract.ts`
+- Reused existing session: Google email section + Slack/Teams/WhatsApp rows
+  unchanged; partition `persist:profile-<id>-slack` (same as Google login)
+  reused — no new login flow, no UA/fingerprint spoofing, no new partitions
+- `persist:bs-*` data preserved in backup branch
+  `browser-sources-full-backup` (ae31044) — nothing silently deleted
+- Sidebar "BROWSER SOURCES" section removed; Slack/Teams/WhatsApp rows remain
+  as main entry points
+
+## Browser Sources — Phase 2 Add Platform System (2026-10-26, branch `feat/browser-sources`)
+- `npm run typecheck`: PASS (node + web, exit 0)
+- `npm test`: PASS — **63 files, 505/505** tests (exit 0, no regressions)
+- Implemented Add Platform system:
+  - File-backed `BrowserPlatformStore` with atomic file writes at `join(options.rootDir, 'browser-platforms.json')`.
+  - Built-in presets for Slack, Teams, WhatsApp, Discord, Upwork, and Custom Links.
+  - Strict HTTPS validation for external platform URLs (blocks insecure schemes or empty names).
+  - Platform reordering and safe deletion (clearing isolated session data from partition storage).
+  - Main-process IPC handlers registered via `browser-sources.ipc.ts` with real-time status change push.
+  - Preload bridge: `window.api.browserSources.{list, add, update, remove, reorder, activate, deactivate, onStatusChanged}`.
+  - UI components: `AddPlatformModal.tsx` and `BrowserPlatformsRail.tsx` embedded directly into the sidebar rail.
+- Test suite: `tests/unit/browser-platform-store.test.ts` (7/7 tests passing).
+
+## Browser Sources — Phase 1 Embedded Views Shell (2026-10-26, branch `feat/browser-sources`)
+- `npm run typecheck`: PASS (node + web, exit 0)
+- `npm test`: PASS — **62 files, 498/498** tests (exit 0, no regressions)
+- Implemented core Embedded Views Shell:
+  - Isolated partitions via `partitionForBrowserSource(platformId)` yielding `persist:bs-<platformId>`.
+  - Full-bleed embedded view container replacing right pane, attached/detached cleanly via `mainWindow.contentView.addChildView(view)` / `removeChildView`.
+  - Domain navigation allowlist via `isAllowedEmbedDomain`: preserves internal platform routes & corporate SSO redirects in-place; opens external links in system default browser (`shell.openExternal`).
+  - Blocks protocol handler traps (`msteams:`, `slack:`) from triggering native app popups.
+  - Platform status lifecycle model (`Logged in` | `Needs login` | `Adapter broken`) with automated URL and DOM check triggers.
+- Test suite: `tests/unit/browser-sources-shell.test.ts` (8/8 tests passing).
+
+## Browser Sources — Phase 0 Spike Proof (2026-10-26, branch `feat/browser-sources`)
+- `npm run typecheck`: PASS (node + web, exit 0)
+- `npm test`: PASS — **61 files, 490/490** tests (exit 0, no regressions)
+- Spike executed via isolated Electron WebContentsView runner across partitions:
+  - `persist:bs-spike-slack`: Slack Web verified (Chrome/Brave UA bypasses unsupported browser and Google SSO blockers, partition session cookies persist across app restarts)
+  - `persist:bs-spike-teams`: Teams Web verified (routes cleanly to MSAL auth / `/v2/` endpoint, cookies persist)
+  - `persist:bs-spike-whatsapp`: WhatsApp Web verified (loads container; hardcoded strictly read-only policy with ban-risk warning modal)
+  - `persist:bs-spike-custom`: Custom link (Upwork) verified (loads cleanly in tab-less embedded view)
+- Artifact: `.omc/plans/browser-sources-spike.md` created with compatibility matrix and navigation popup findings
+
 ## Project Card — Remove Ask Agent from Project Card (2026-10-26)
 - `npm run typecheck`: PASS (node + web, exit 0)
 - `npm test`: PASS — **61 files, 490/490** tests (exit 0, no regressions)

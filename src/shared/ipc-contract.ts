@@ -175,7 +175,7 @@ export const IpcChannels = {
   DashboardTeamWorkspaceCandidates: 'dashboard:team-workspace-candidates',
   DashboardTeamWorkspaceConnect: 'dashboard:team-workspace-connect',
   DashboardTeamWorkspaceChannels: 'dashboard:team-workspace-channels',
-  DashboardTeamWorkspaceClear: 'dashboard:team-workspace-clear'
+  DashboardTeamWorkspaceClear: 'dashboard:team-workspace-clear',
 } as const
 
 export type IpcChannel = (typeof IpcChannels)[keyof typeof IpcChannels]

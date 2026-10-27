@@ -10,7 +10,7 @@ export type DashboardMood = 'good' | 'neutral' | 'tense'
 export type DashboardSyncState = 'idle' | 'syncing' | 'error'
 
 /** Where a stored message came from: the card's client workspace, or our own. */
-export type DashboardSource = 'client' | 'ours'
+export type DashboardSource = 'client' | 'ours' | `browser:${string}`
 
 export type DashboardTeamWorkspaceSource = 'oauth' | 'manual' | 'none'
 
