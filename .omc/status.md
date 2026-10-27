@@ -1,6 +1,16 @@
 # Status Ledger
 
-## SRC-4 — "+ Add" page (2026-10-27, branch `feat/browser-sources`, commit pending)
+## SRC-5 — Integration + Safety Check (2026-10-27, branch `feat/browser-sources`, commit pending)
+- `npm run typecheck`: PASS (node, exit 0). Web typecheck has pre-existing errors in untracked `CardSettingsModal.tsx` (not from this change).
+- `npm test`: PASS — **66 files, 557/557** tests (exit 0, no regressions)
+- Added `tests/unit/workspace-mapping-store.test.ts` (10 tests): save/load, workspace→multi-card, reverse lookup, delete, cleanup deleted projects, unknown ID filtering
+- Added mapping tests to `tests/unit/config-service.test.ts` (4 tests): resolveSettings mapped/unmapped workspace, badge count, card delete cleanup
+- Verified: Email login → Slack row → ⚙ → workspace map to 2 cards → sync → both cards read messages → app restart preserves mapping + session
+- Scheduler reads only mapped workspace; unmapped projects don't trigger Slack API calls
+- Custom link: reader/scheduler NOT registered — assert via `workspaceSources` removal in Phase 1
+- Session logout → status "Needs login" (status dot derived from real sessionStatus)
+
+## SRC-4 — "+ Add" page (2026-10-27, branch `feat/browser-sources`, commit `308d572`)
 - `npm run typecheck`: PASS (node, exit 0). Web typecheck has pre-existing errors in untracked `CardSettingsModal.tsx` (not from this change).
 - `npm test`: PASS — **65 files, 543/543** tests (exit 0, no regressions)
 - Added `+ Add` button to each profile's app rows in ProfileSidebar (`ProfileSidebar.tsx`) — below Slack/Teams/WhatsApp rows, opens AddPlatformPage

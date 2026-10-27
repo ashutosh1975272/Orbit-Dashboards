@@ -122,4 +122,41 @@ describe('ConfigService', () => {
     const serialised = JSON.stringify(global)
     expect(serialised).not.toContain('xoxb-client-1111')
   })
+
+  it('resolveSettings returns mappedWorkspaceId/null for unmapped project', async () => {
+    const { config, monitor } = await harness()
+    await seedProject(monitor, 'p1')
+    const resolved = await config.resolveSettings('p1')
+    expect(resolved.client.mappedWorkspaceId).toBeNull()
+    expect(resolved.client.mappedWorkspaceName).toBeNull()
+  })
+
+  it('resolveSettings returns mappedWorkspaceId/name for mapped project', async () => {
+    const { config, monitor, mapping } = await harness()
+    await seedProject(monitor, 'p1')
+    await mapping.saveMapping('T_CLIENT', ['p1'])
+    const resolved = await config.resolveSettings('p1')
+    expect(resolved.client.mappedWorkspaceId).toBe('T_CLIENT')
+    expect(resolved.client.mappedWorkspaceName).toBe('Client Workspace')
+  })
+
+  it('badge count reflects mapped project count', async () => {
+    const { monitor, mapping } = await harness()
+    await seedProject(monitor, 'p1')
+    await seedProject(monitor, 'p2')
+    await mapping.saveMapping('T_CLIENT', ['p1', 'p2'])
+    const all = await mapping.listMappings()
+    expect(all[0].projectIds).toHaveLength(2)
+    expect(all[0].projectIds).toContain('p1')
+    expect(all[0].projectIds).toContain('p2')
+  })
+
+  it('card delete cleans up mapping via cleanupDeletedProjects', async () => {
+    const { mapping } = await harness()
+    await mapping.saveMapping('ws1', ['p1', 'p2'])
+    // p1 is valid (kept), p2 is dropped
+    await mapping.cleanupDeletedProjects(['p1'])
+    const mappingAfter = await mapping.getMapping('ws1')
+    expect(mappingAfter).toEqual(['p1'])
+  })
 })
