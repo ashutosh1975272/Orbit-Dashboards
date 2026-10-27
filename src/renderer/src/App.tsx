@@ -17,6 +17,7 @@ import { useDashboardStore } from './hooks/useDashboard'
 import { SettingsPanel } from './components/SettingsPanel'
 import { SidebarPanelIcon } from './components/SidebarPanelIcon'
 import { SlackViewport } from './components/SlackViewport'
+import { PlatformSettingsPanel } from './components/dashboard/PlatformSettingsPanel'
 import { sidebarToastFor } from './lib/sidebar-toast'
 import { modKey, modShift } from './lib/shortcut-label'
 import { useProfileStore } from './hooks/useProfiles'
@@ -75,6 +76,10 @@ function App(): React.JSX.Element {
   )
   const [cmdkOpen, setCmdkOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [platformSettings, setPlatformSettings] = useState<{
+    profileId: string
+    appId: AppId
+  } | null>(null)
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS)
   const [locked, setLocked] = useState(false)
   const [unlocking, setUnlocking] = useState(false)
@@ -773,6 +778,9 @@ function App(): React.JSX.Element {
                 void unpinWorkspace(profileId, appId, teamId)
               }}
               onDismissError={clearError}
+              onPlatformSettings={(profileId, appId) => {
+                setPlatformSettings({ profileId, appId })
+              }}
             />
             <div
               className="sidebar-resizer"
@@ -948,6 +956,15 @@ function App(): React.JSX.Element {
           })
         }}
       />
+
+      {platformSettings ? (
+        <PlatformSettingsPanel
+          open={true}
+          profileId={platformSettings.profileId}
+          appId={platformSettings.appId}
+          onClose={() => setPlatformSettings(null)}
+        />
+      ) : null}
 
       {showOnboarding && !locked ? (
         <div className="onboarding-backdrop">

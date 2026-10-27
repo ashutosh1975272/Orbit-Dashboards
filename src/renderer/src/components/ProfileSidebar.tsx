@@ -47,8 +47,23 @@ interface ProfileSidebarProps {
   onPinFromAvailable: (profileId: string, appId: AppId, teamId: string) => void
   onUnpin: (profileId: string, appId: AppId, teamId: string) => void
   onDismissError: () => void
+  /** Open the platform settings panel for a given profile + app. */
+  onPlatformSettings: (profileId: string, appId: AppId) => void
   /** Optional slot rendered after the Recents strip (dashboard entry point). */
   dashboardSlot?: React.ReactNode
+}
+
+function platformStatusDot(sessionStatus: AppSessionStatus): {
+  label: string
+  kind: 'connected' | 'needs-login' | 'signing-in'
+} {
+  if (sessionStatus === 'signed-in') {
+    return { label: 'Connected', kind: 'connected' }
+  }
+  if (sessionStatus === 'not-signed-in') {
+    return { label: 'Needs login', kind: 'needs-login' }
+  }
+  return { label: 'Signing in…', kind: 'signing-in' }
 }
 
 function isBusy(status: AppSessionStatus): boolean {
@@ -285,6 +300,7 @@ export const ProfileSidebar = memo(function ProfileSidebar({
   onPinFromAvailable,
   onUnpin,
   onDismissError,
+  onPlatformSettings,
   dashboardSlot
 }: ProfileSidebarProps): React.JSX.Element {
   const [profileExpanded, setProfileExpanded] = useState<Record<string, boolean>>({})
@@ -554,29 +570,53 @@ export const ProfileSidebar = memo(function ProfileSidebar({
                             onOpenInSplit(profile.id, appId)
                           }}
                         >
-                          <button
-                            type="button"
-                            className="nav-app-select"
-                            onClick={() => {
-                              onSelectApp(profile.id, appId)
-                              if (signedIn && supportsWorkspaces) {
-                                setAppExpanded((prev) => ({
-                                  ...prev,
-                                  [`${profile.id}:${appId}`]: true
-                                }))
-                              }
-                            }}
-                            title="Right-click: open in split"
-                          >
-                            <AppIcon appId={appId} className="nav-app-icon" size={12} />
-                            <span className="nav-app-label">{sidebarAppLabel(appId)}</span>
-                            <AppStatusMark status={session.sessionStatus} />
-                            {formatUnreadBadge(unreadCounts[unreadKey(profile.id, appId)] ?? 0) ? (
-                              <span className="unread-badge" aria-label="Unread">
-                                {formatUnreadBadge(unreadCounts[unreadKey(profile.id, appId)] ?? 0)}
-                              </span>
-                            ) : null}
-                          </button>
+                          <div className="nav-app-row">
+                            <button
+                              type="button"
+                              className="nav-app-select"
+                              onClick={() => {
+                                onSelectApp(profile.id, appId)
+                                if (signedIn && supportsWorkspaces) {
+                                  setAppExpanded((prev) => ({
+                                    ...prev,
+                                    [`${profile.id}:${appId}`]: true
+                                  }))
+                                }
+                              }}
+                              title="Right-click: open in split"
+                            >
+                              <AppIcon appId={appId} className="nav-app-icon" size={12} />
+                              <span className="nav-app-label">{sidebarAppLabel(appId)}</span>
+                              <AppStatusMark status={session.sessionStatus} />
+                              {(() => {
+                                const st = platformStatusDot(session.sessionStatus)
+                                return (
+                                  <span
+                                    className={`platform-status-dot platform-status-${st.kind}`}
+                                    title={st.label}
+                                    aria-label={st.label}
+                                  />
+                                )
+                              })()}
+                              {formatUnreadBadge(unreadCounts[unreadKey(profile.id, appId)] ?? 0) ? (
+                                <span className="unread-badge" aria-label="Unread">
+                                  {formatUnreadBadge(unreadCounts[unreadKey(profile.id, appId)] ?? 0)}
+                                </span>
+                              ) : null}
+                            </button>
+                            <button
+                              type="button"
+                              className="nav-app-settings"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                onPlatformSettings(profile.id, appId)
+                              }}
+                              title="Settings"
+                              aria-label="Settings"
+                            >
+                              ⚙
+                            </button>
+                          </div>
 
                           {appOpen && signedIn && supportsWorkspaces ? (
                             <WorkspaceBranch

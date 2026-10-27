@@ -1,5 +1,25 @@
 # Status Ledger
 
+## SRC-2 — ⚙ Settings button on platform rows (2026-10-27, branch `feat/browser-sources`, commit pending)
+- `npm run typecheck`: PASS (node + web, exit 0)
+- `npm test`: PASS — **61 files, 490/490** tests (exit 0, no regressions)
+- Added `⚙` settings button to each Slack/Teams/WhatsApp row in ProfileSidebar (`ProfileSidebar.tsx:606-617`)
+  - Hover-visible, tooltip "Settings", aria-label "Settings"
+  - `e.stopPropagation()` so clicking ⚙ doesn't also select the app
+- Added status dot per row (`ProfileSidebar.tsx:590-599`)
+  - Connected (green) when `sessionStatus === 'signed-in'`
+  - Needs login (gray) when `sessionStatus === 'not-signed-in'`
+  - Signing in… (amber spinner) for `signing-in-*` states
+  - No fake status — all derived from real `profile.apps[appId].sessionStatus`
+- Added `onPlatformSettings` prop to ProfileSidebar (`ProfileSidebar.tsx:51`)
+- Created `PlatformSettingsPanel.tsx` (`src/renderer/src/components/dashboard/PlatformSettingsPanel.tsx`)
+  - Title: "<Platform> settings" (uses `appLabel` from shared types)
+  - Slack panel: connected workspaces list from `availableWorkspaces`, each with icon/monogram, name, domain, "Not mapped" badge, refresh button, status dot
+  - Teams/WhatsApp panel: "Soon" badge + "Coming soon" note, status dot
+  - Click backdrop to close
+- Wired up in `App.tsx`: `platformSettings` state, `PlatformSettingsPanel` render, `onPlatformSettings` handler
+- CSS added: `.nav-app-row`, `.nav-app-settings`, `.platform-status-dot`, panel backdrop/panel/workspace list styles (`main.css:877+`)
+
 ## SRC-1 — Remove Browser Sources, reuse existing profile session (2026-10-27, branch `feat/browser-sources`, commit `b33d2bb`)
 - `npm run typecheck`: PASS (node + web, exit 0)
 - `npm test`: PASS — **61 files, 490/490** tests (exit 0, no regressions)
