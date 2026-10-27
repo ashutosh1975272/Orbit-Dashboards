@@ -23,6 +23,16 @@ h1, h2, h3, h4, strong, b {
   color: inherit;
 }
 
+/* Global high-contrast selection for light and dark themes */
+::selection {
+  background: var(--accent-btn, #6E56E8);
+  color: #FFFFFF;
+}
+::-moz-selection {
+  background: var(--accent-btn, #6E56E8);
+  color: #FFFFFF;
+}
+
 :root,
 :root[data-theme='dark'] {
   color-scheme: dark;
@@ -6169,27 +6179,181 @@ body.is-resizing-nav { cursor: col-resize; user-select: none; }
 .ws-settings {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  max-width: 860px;
+  height: 100%;
+  max-width: 960px;
+  background: var(--bg);
+  color: var(--text);
+  user-select: none;
 }
-.ws-settings-section {
-  background: var(--bg-card);
-  border: 1px solid var(--border-panel);
-  border-radius: var(--radius-panel);
-  padding: 16px 18px;
+
+.ws-settings-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
 }
-.ws-settings-head {
-  margin-bottom: 12px;
+
+/* Sticky Header with Title and Tabs */
+.ws-settings-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 24px 0;
+  user-select: none;
 }
-.ws-settings-head h4 {
-  margin: 0 0 4px;
+
+.ws-settings-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.ws-settings-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ws-settings-title .proj-name {
+  color: var(--accent);
+}
+
+.ws-settings-sub {
+  margin: 0;
   font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Tab Bar */
+.ws-settings-tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.ws-settings-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.ws-settings-tab-btn {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 10px 16px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.ws-settings-tab-btn:hover {
+  color: var(--text);
+  background: var(--hover);
+  border-top-left-radius: 6px;
+  border-top-right-radius: 6px;
+}
+
+.ws-settings-tab-btn.is-active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* Single Scroll Content Container */
+.ws-settings-content {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* User Selection Permissions */
+.ws-settings input,
+.ws-settings textarea,
+.ws-settings select,
+.ws-settings code,
+.ws-settings pre,
+.ws-settings .selectable {
+  user-select: text;
+}
+
+/* Sticky Footer */
+.ws-settings-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.25);
+  user-select: none;
+}
+
+.ws-settings-footer-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.ws-settings-unsaved-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--warn);
+  display: inline-block;
+}
+
+.ws-settings-footer-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ws-settings-section {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  padding: 20px 22px;
+}
+
+.ws-settings-section.is-danger {
+  border-color: rgba(248, 113, 113, 0.35);
+  background: rgba(248, 113, 113, 0.04);
+}
+
+.ws-settings-head {
+  margin-bottom: 16px;
+}
+
+.ws-settings-head h4 {
+  margin: 0 0 6px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--text);
 }
+
 .ws-settings-head p {
   margin: 0;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.5;
   color: var(--text-muted);
 }
