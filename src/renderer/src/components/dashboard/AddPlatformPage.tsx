@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { AppId } from '../../../shared/types'
-import { appLabel } from '../../../shared/types'
+import { AppId } from '../../../../shared/types'
 import { useProfileStore } from '../../hooks/useProfiles'
 
 interface AddPlatformPageProps {
@@ -89,7 +88,7 @@ export function AddPlatformPage({
     appId: AppId
     projectCount: number
   }>>([])
-  const [mappings, setMappings] = useState<{ workspaceId: string; projectIds: string[] }[]>([])
+  const [_mappings, setMappings] = useState<{ workspaceId: string; projectIds: string[] }[]>([])
 
   const loadData = useCallback(async () => {
     const allWorkspaces: Array<{
@@ -103,7 +102,7 @@ export function AddPlatformPage({
 
     for (const profile of profiles) {
       for (const appId of ['slack', 'teams'] as AppId[]) {
-        const session = (profile.apps as ProfileAppSession)[appId]
+        const session = (profile.apps as unknown as ProfileAppSession)[appId]
         if (session?.sessionStatus === 'signed-in') {
           for (const ws of session.availableWorkspaces) {
             allWorkspaces.push({
@@ -140,7 +139,7 @@ export function AddPlatformPage({
   const platformStatus = (appId: AppId): 'connected' | 'needs-login' | 'signing-in' => {
     const profile = profiles[0]
     if (!profile) return 'needs-login'
-    const session = (profile.apps as Record<AppId, { sessionStatus: string }>)[appId]
+    const session = (profile.apps as unknown as Record<AppId, { sessionStatus: string }>)[appId]
     if (session?.sessionStatus === 'signed-in') return 'connected'
     if (session?.sessionStatus === 'not-signed-in') return 'needs-login'
     return 'signing-in'

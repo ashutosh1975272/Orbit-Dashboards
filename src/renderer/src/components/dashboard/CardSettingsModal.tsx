@@ -1,6 +1,6 @@
 import type React from 'react'
 import { useState, useCallback } from 'react'
-import type { SidebarLayout, LayoutMode, DEFAULT_LAYOUT, SIDEBAR_REGISTRY, SIDEBAR_LAYOUT_STORAGE_KEY, normalizeLayout } from './sidebar-layout'
+import { SidebarLayout, LayoutMode, DEFAULT_LAYOUT, SIDEBAR_REGISTRY, SIDEBAR_LAYOUT_STORAGE_KEY, normalizeLayout } from './sidebar-layout'
 
 interface CardSettingsModalProps {
   open: boolean
@@ -38,6 +38,12 @@ function saveLayout(projectId: string, layout: SidebarLayout): void {
 
 const ICON_MAP: Record<string, React.ReactNode> = {
   dashboard: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="M3 9l18-18"/></svg>,
+  xomni: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 2v20M2 12h20"/></svg>,
+  slack: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14.5 8c-1.4 0-2.7.9-3.2 2.1l-1.4-2.3C9.5 5.2 8.2 4 6.7 4S3.9 5.2 3.4 7.3c-.5 1.2-.6 2.6-.2 3.8l2.4-1.8c.3-.4.8-.6 1.3-.6 1.3 0 2.4 1.1 2.4 2.4 0 1.4-1.1 2.5-2.4 2.5-0.5 0-1-.2-1.3-.6L1 15c.4 1.2.3 2.6-.2 3.8-0.5 1.2-.3 2.6.5 3.8 1.2 1.8 2.9 2.9 4.8 2.9 1.4 0 2.7-0.3 3.9-1l1.4 2.3c0.5 1.2 1.8 2 3.2 2 1.3 0 2.6-0.7 3.2-2l1.4-2.3c0.5-1.2 0.3-2.6-0.2-3.8-0.5-1.2-1.5-2.2-2.7-2.2-1.3 0-2.4 1-2.4 2.4 0 1.4 1.1 2.5 2.4 2.5 0.5 0 1 0.2 1.3 0.6l2.4 1.8c-0.4-1.2-0.3-2.6 0.2-3.8 0.5-1.2 1.5-2.2 2.7-2.2 1.3 0 2.4-1 2.4-2.4 0-1.4-1.1-2.5-2.4-2.5z"/></svg>,
+  info: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>,
+  viz: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="4"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="4"/></svg>,
+  settings: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33-1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+}
 
 export default function CardSettingsModal({
   open, projectId, projectName, onClose, onSaveLayout
@@ -105,6 +111,7 @@ export default function CardSettingsModal({
         </div>
       </div>
     </div>
+  )
 
 function GeneralTab({ projectName }: { projectName: string }): React.ReactElement {
   return (
@@ -127,7 +134,7 @@ function GeneralTab({ projectName }: { projectName: string }): React.ReactElemen
   )
 }
 
-function ChannelsTab({ projectId }: { projectId: string }): React.ReactElement {
+function ChannelsTab({ }: { projectId: string }): React.ReactElement {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-panel)', borderRadius: '14px', padding: '16px 20px' }}>
@@ -148,6 +155,7 @@ function ChannelsTab({ projectId }: { projectId: string }): React.ReactElement {
       </div>
     </div>
   )
+}
 
 function AdvancedTab(): React.ReactElement {
   return (
@@ -190,15 +198,6 @@ function DangerTab({ projectName, onClose }: { projectName: string; onClose: () 
     </div>
   )
 }
-}
-  )
-}
-  xomni: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 2v20M2 12h20"/></svg>,
-  slack: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14.5 8c-1.4 0-2.7.9-3.2 2.1l-1.4-2.3C9.5 5.2 8.2 4 6.7 4S3.9 5.2 3.4 7.3c-.5 1.2-.6 2.6-.2 3.8l2.4-1.8c.3-.4.8-.6 1.3-.6 1.3 0 2.4 1.1 2.4 2.4 0 1.4-1.1 2.5-2.4 2.5-0.5 0-1-.2-1.3-.6L1 15c.4 1.2.3 2.6-.2 3.8-0.5 1.2-.3 2.6.5 3.8 1.2 1.8 2.9 2.9 4.8 2.9 1.4 0 2.7-0.3 3.9-1l1.4 2.3c0.5 1.2 1.8 2 3.2 2 1.3 0 2.6-0.7 3.2-2l1.4-2.3c0.5-1.2 0.3-2.6-0.2-3.8-0.5-1.2-1.5-2.2-2.7-2.2-1.3 0-2.4 1-2.4 2.4 0 1.4 1.1 2.5 2.4 2.5 0.5 0 1 0.2 1.3 0.6l2.4 1.8c-0.4-1.2-0.3-2.6 0.2-3.8 0.5-1.2 1.5-2.2 2.7-2.2 1.3 0 2.4-1 2.4-2.4 0-1.4-1.1-2.5-2.4-2.5z"/></svg>,
-  info: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>,
-  viz: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="4"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="4"/></svg>,
-  settings: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-}
 
 function sectionIcon(key: string): React.ReactNode {
   return ICON_MAP[key] || <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/></svg>
@@ -212,7 +211,7 @@ interface SidebarLayoutTabProps {
   modeSelected: (mode: LayoutMode) => boolean
 }
 
-function SidebarLayoutTab({ layout, onModeChange, onToggleSection, onReset, modeSelected }: SidebarLayoutTabProps): React.ReactElement {
+function SidebarLayoutTab({ layout, onModeChange, onToggleSection, onReset, modeSelected: _modeSelected }: SidebarLayoutTabProps): React.ReactElement {
   const nonLocked = SIDEBAR_REGISTRY.filter((s) => !s.locked)
   const hidden = new Set(layout.custom.hiddenSections)
 
@@ -294,4 +293,4 @@ function SidebarLayoutTab({ layout, onModeChange, onToggleSection, onReset, mode
     </div>
   )
 }
-      </div>
+}

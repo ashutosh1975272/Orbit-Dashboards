@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { AppId, WorkspaceMapping } from '../../../../shared/types'
+import type { AppId } from '../../../../shared/types'
 import { appLabel } from '../../../../shared/types'
 import { useProfileStore } from '../../hooks/useProfiles'
 
@@ -131,6 +131,7 @@ export function PlatformSettingsPanel({
             selectedWorkspace={selectedWorkspace}
             setSelectedWorkspace={setSelectedWorkspace}
             selectedProjects={selectedProjects}
+            setSelectedProjects={setSelectedProjects}
             toggleProject={toggleProject}
             workspaceMapping={workspaceMapping}
             onSave={handleSave}
@@ -172,6 +173,7 @@ interface SlackSettingsContentProps {
   selectedWorkspace: string | null
   setSelectedWorkspace: (id: string | null) => void
   selectedProjects: Set<string>
+  setSelectedProjects: (projects: Set<string>) => void
   toggleProject: (projectId: string) => void
   workspaceMapping: { workspaceId: string; projectIds: string[] } | undefined
   onSave: () => Promise<void>
@@ -187,6 +189,7 @@ function SlackSettingsContent({
   selectedWorkspace,
   setSelectedWorkspace,
   selectedProjects,
+  setSelectedProjects,
   toggleProject,
   workspaceMapping,
   onSave,
