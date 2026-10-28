@@ -338,6 +338,7 @@ function App(): React.JSX.Element {
     !locked &&
     !settingsOpen &&
     !cmdkOpen &&
+    !platformSettings &&
     !addPlatformOpen &&
     !accountsModalOpen &&
     !showOnboarding
