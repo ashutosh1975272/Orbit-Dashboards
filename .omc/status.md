@@ -1,5 +1,20 @@
 # Status Ledger
 
+## SLK-2 — Slack Reader Core: Passive & Read-Only Scraper (2026-10-28, branch `beta`)
+- `pnpm run typecheck`: PASS — 0 errors (Node & Web).
+- `pnpm test`: PASS — **72 files, 592/592 tests passed** (exit 0, 0 failures, 0 regressions).
+- `electron-vite build`: PASS — clean build of main, preload, and renderer.
+- **Components Built (`src/main/slack-reader/`)**:
+  - `slack-selectors.ts`: Versioned DOM selectors using official `data-qa` attributes and standard fallbacks.
+  - `normalizer.ts`: Normalizes raw DOM elements to `DashboardStoredMessage` with source `'client'`. Extracts valid timestamps or skips missing ones without fabricating fake epoch dates. Message deduplication by `(workspaceId, channelId, ts)`.
+  - `slack-adapter.ts`: Passive, read-only scripts for `detectState` (`logged_in`, `needs_login`, `challenge`, `unknown`), `listChannels`, and `readVisibleMessages`.
+  - `slack-reader-view.ts`: Hidden `WebContentsView` attached to the user's existing partition `persist:profile-<profileId>-slack`. Enforces strict URL navigation allowlist (blocks non-Slack domains).
+- **Safety Grep Verification**:
+  - `grep -rn "setUserAgent\|userAgent\|webdriver\|xoxc\|document.cookie\|localStorage" src/main/slack-reader` -> **0 hits (PASS)**.
+  - `grep -rn "sendMessage\|chat.postMessage\|\.click(\|dispatchEvent\|execCommand\|keyboard\|type(" src/main/slack-reader` -> **0 hits (PASS)**.
+- **Unit Tests Added**:
+  - `tests/unit/slack-reader.test.ts` (8/8 passed).
+
 ## SLK-1 — Multi-Source Model, Additive DashboardProject & Migration (2026-10-28, branch `beta`)
 - `pnpm run typecheck`: PASS — 0 errors (Node & Web).
 - `pnpm test`: PASS — **71 files, 584/584 tests passed** (exit 0, 0 failures, 0 regressions).
