@@ -271,10 +271,13 @@ export function appLabel(appId: AppId): string {
   return 'WhatsApp'
 }
 
-/** The main sidebar calls the Slack workspace entry "Project" because that is
- * where the project workspaces live. Other surfaces keep the real app name. */
-export function sidebarAppLabel(appId: AppId): string {
-  return appId === 'slack' ? 'Project' : appLabel(appId)
+/** The main sidebar calls the Slack workspace entry by its actual workspace name if available,
+ * or "Slack" / "Project" fallback. Other surfaces keep the real app name. */
+export function sidebarAppLabel(appId: AppId, workspaceName?: string): string {
+  if (appId === 'slack') {
+    return workspaceName?.trim() ? workspaceName.trim() : 'Project'
+  }
+  return appLabel(appId)
 }
 
 /** WhatsApp has a single Web session — no workspace tree. */

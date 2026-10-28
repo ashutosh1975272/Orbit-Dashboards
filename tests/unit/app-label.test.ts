@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { appLabel, sidebarAppLabel } from '../../src/shared/types'
 
 describe('sidebar app labels', () => {
-  it('shows Project in place of the Slack app name in the main sidebar', () => {
+  it('shows actual workspace name for slack when provided, else Project fallback', () => {
+    expect(sidebarAppLabel('slack', 'Acme Workspace')).toBe('Acme Workspace')
     expect(sidebarAppLabel('slack')).toBe('Project')
+    expect(sidebarAppLabel('slack', '')).toBe('Project')
   })
 
   it('keeps the other app names unchanged', () => {
