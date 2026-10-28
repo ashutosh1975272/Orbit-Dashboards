@@ -177,6 +177,127 @@
   overflow: hidden;
 }
 
+/* Left vertical navigation layout for Project Settings */
+.ws-settings-layout {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  position: relative;
+}
+
+.ws-settings-nav-sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow-y: auto;
+  overflow-x: hidden;
+  user-select: none;
+}
+
+.ws-settings-nav-sidebar.is-collapsed {
+  width: 56px;
+}
+
+.ws-settings-nav-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.05));
+}
+
+.ws-settings-nav-toggle-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 13px;
+  transition: all 0.15s ease;
+}
+
+.ws-settings-nav-toggle-btn:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.ws-settings-nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  list-style: none;
+  margin: 0;
+}
+
+.ws-settings-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.ws-settings-nav-item:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.ws-settings-nav-item.is-active {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.ws-settings-nav-item.is-danger {
+  color: var(--danger);
+}
+
+.ws-settings-nav-item.is-danger.is-active {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+}
+
+.ws-settings-nav-icon {
+  font-size: 14px;
+  width: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ws-settings-nav-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ws-settings-main-pane {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+  position: relative;
+}
+
 /* Sticky Header with Title and Tabs in single line */
 .ws-settings-header {
   position: sticky;

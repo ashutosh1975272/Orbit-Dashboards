@@ -13,8 +13,15 @@ import {
   DEFAULT_LAYOUT
 } from './sidebar-layout'
 import { useSidebarLayout } from './use-sidebar-layout'
+import {
+  SourceStatusBadge,
+  WorkspacePicker,
+  type ProfileWorkspaceOption
+} from './sources'
+import { useProfileStore } from '../../hooks/useProfiles'
+import type { ProjectSource } from '../../../../shared/dashboard-contract'
 
-export type SettingsTabKey = 'general' | 'ai' | 'channels' | 'schedule' | 'sidebar' | 'danger'
+export type SettingsTabKey = 'general' | 'ai' | 'sources' | 'channels' | 'schedule' | 'sidebar' | 'danger'
 
 interface ProjectSettingsTabProps {
   project: DashboardProject
@@ -26,8 +33,23 @@ export default function ProjectSettingsTab({
   onDelete
 }: ProjectSettingsTabProps): React.ReactElement {
   const [activeTab, setActiveTab] = useState<SettingsTabKey>('ai')
+  const [navCollapsed, setNavCollapsed] = useState(false)
   const [editWorkspace, setEditWorkspace] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+
+  // Sources management state
+  const profiles = useProfileStore((s) => s.profiles)
+  const workspaceOptions: ProfileWorkspaceOption[] = profiles.flatMap((p) =>
+    p.apps.slack.availableWorkspaces.map((w) => ({
+      profileId: p.id,
+      profileEmail: p.customName || p.displayName,
+      workspaceId: w.teamId,
+      workspaceName: w.teamName
+    }))
+  )
+  const [newSourceKey, setNewSourceKey] = useState('')
+  const [addingSource, setAddingSource] = useState(false)
+  const [sourceNotice, setSourceNotice] = useState<string | null>(null)
 
   // Schedule state
   const [startDate, setStartDate] = useState(project.startDate ?? '')
@@ -117,6 +139,69 @@ export default function ProjectSettingsTab({
     endDate !== (project.endDate ?? '') ||
     completion !== (project.manualCompletion != null ? String(project.manualCompletion) : '')
 
+  const navItems: Array<{ key: SettingsTabKey; label: string; icon: string; danger?: boolean }> = [
+    { key: 'general', label: 'General', icon: 'ℹ' },
+    { key: 'ai', label: 'AI Configuration', icon: '✨' },
+    { key: 'sources', label: 'Sources', icon: '🔌' },
+    { key: 'channels', label: 'Channels', icon: '#' },
+    { key: 'schedule', label: 'Schedule', icon: '📅' },
+    { key: 'sidebar', label: 'Sidebar layout', icon: '◫' },
+    { key: 'danger', label: 'Danger zone', icon: '⚠', danger: true }
+  ]
+
+  const handleToggleSourceEnabled = async (sourceId: string, currentEnabled: boolean): Promise<void> => {
+    const updatedSources = (project.sources ?? []).map((s) =>
+      s.id === sourceId ? { ...s, enabled: !currentEnabled } : s
+    )
+    await useDashboardStore.getState().upsertProject({
+      ...project,
+      sources: updatedSources
+    })
+    setSourceNotice(`Source ${currentEnabled ? 'paused' : 'resumed'}`)
+    setTimeout(() => setSourceNotice(null), 3000)
+  }
+
+  const handleAddBrowserSource = async (): Promise<void> => {
+    if (!newSourceKey) return
+    const [profId, teamId] = newSourceKey.split(':')
+    const opt = workspaceOptions.find((o) => `${o.profileId}:${o.workspaceId}` === newSourceKey)
+    const now = new Date().toISOString()
+    const newSource: ProjectSource = {
+      id: `src-browser-${Date.now().toString(36)}`,
+      kind: 'browser',
+      platform: 'slack',
+      profileId: profId,
+      workspaceId: teamId,
+      workspaceName: opt?.workspaceName || 'Slack Workspace',
+      channels: project.monitors.map((m) => ({ id: m.channelId, name: m.channelName })),
+      role: 'client',
+      backfillDays: 7,
+      enabled: true,
+      status: 'connected',
+      createdAt: now,
+      updatedAt: now
+    }
+    const currentSources = project.sources ?? []
+    await useDashboardStore.getState().upsertProject({
+      ...project,
+      sources: [...currentSources, newSource]
+    })
+    setAddingSource(false)
+    setNewSourceKey('')
+    setSourceNotice('Browser source added')
+    setTimeout(() => setSourceNotice(null), 3000)
+  }
+
+  const handleRemoveSource = async (sourceId: string): Promise<void> => {
+    const updatedSources = (project.sources ?? []).filter((s) => s.id !== sourceId)
+    await useDashboardStore.getState().upsertProject({
+      ...project,
+      sources: updatedSources
+    })
+    setSourceNotice('Source removed')
+    setTimeout(() => setSourceNotice(null), 3000)
+  }
+
   return (
     <div className="ws-settings" data-testid="project-settings-tab">
       <div className="ws-settings-shell">
@@ -130,75 +215,45 @@ export default function ProjectSettingsTab({
                 <span className="proj-sub">Settings</span>
               </h2>
             </div>
-
-            <nav className="ws-settings-tabs" role="tablist" aria-label="Settings sections">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === 'general'}
-                className={`ws-settings-tab-btn${activeTab === 'general' ? ' is-active' : ''}`}
-                onClick={() => setActiveTab('general')}
-                data-testid="tab-general"
-              >
-                General
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === 'ai'}
-                className={`ws-settings-tab-btn${activeTab === 'ai' ? ' is-active' : ''}`}
-                onClick={() => setActiveTab('ai')}
-                data-testid="tab-ai"
-              >
-                AI
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === 'channels'}
-                className={`ws-settings-tab-btn${activeTab === 'channels' ? ' is-active' : ''}`}
-                onClick={() => setActiveTab('channels')}
-                data-testid="tab-channels"
-              >
-                Channels
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === 'schedule'}
-                className={`ws-settings-tab-btn${activeTab === 'schedule' ? ' is-active' : ''}`}
-                onClick={() => setActiveTab('schedule')}
-                data-testid="tab-schedule"
-              >
-                Schedule
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === 'sidebar'}
-                className={`ws-settings-tab-btn${activeTab === 'sidebar' ? ' is-active' : ''}`}
-                onClick={() => setActiveTab('sidebar')}
-                data-testid="tab-sidebar"
-              >
-                Sidebar layout
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === 'danger'}
-                className={`ws-settings-tab-btn${activeTab === 'danger' ? ' is-active' : ''}`}
-                onClick={() => setActiveTab('danger')}
-                data-testid="tab-danger"
-                style={{ color: activeTab === 'danger' ? 'var(--danger)' : undefined }}
-              >
-                Danger zone
-              </button>
-            </nav>
           </div>
         </header>
 
-        {/* Single Scroll Container */}
-        <div className="ws-settings-content" data-testid="settings-content">
+        {/* Vertical Layout with Collapsible Nav Sidebar */}
+        <div className="ws-settings-layout">
+          <aside className={`ws-settings-nav-sidebar${navCollapsed ? ' is-collapsed' : ''}`} aria-label="Settings navigation">
+            <div className="ws-settings-nav-toggle">
+              <button
+                type="button"
+                className="ws-settings-nav-toggle-btn"
+                onClick={() => setNavCollapsed((v) => !v)}
+                title={navCollapsed ? 'Expand navigation' : 'Collapse navigation'}
+              >
+                {navCollapsed ? '»' : '«'}
+              </button>
+            </div>
+            <ul className="ws-settings-nav-list" role="tablist">
+              {navItems.map((item) => (
+                <li key={item.key}>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === item.key}
+                    className={`ws-settings-nav-item${activeTab === item.key ? ' is-active' : ''}${item.danger ? ' is-danger' : ''}`}
+                    onClick={() => setActiveTab(item.key)}
+                    data-testid={`tab-${item.key}`}
+                    title={navCollapsed ? item.label : undefined}
+                  >
+                    <span className="ws-settings-nav-icon">{item.icon}</span>
+                    {!navCollapsed && <span className="ws-settings-nav-label">{item.label}</span>}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </aside>
+
+          <div className="ws-settings-main-pane">
+            {/* Single Scroll Container */}
+            <div className="ws-settings-content" data-testid="settings-content">
           {/* TAB: GENERAL */}
           {activeTab === 'general' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -286,6 +341,122 @@ export default function ProjectSettingsTab({
                   </p>
                 </header>
                 <AiSettingsForm projectId={project.id} />
+              </section>
+            </div>
+          )}
+
+          {/* TAB: SOURCES */}
+          {activeTab === 'sources' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <section className="ws-settings-section">
+                <header className="ws-settings-head">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <h4>Connected Sources</h4>
+                      <p>Active token and passive browser automation sources feeding this project.</p>
+                    </div>
+                    {!addingSource && (
+                      <button
+                        type="button"
+                        className="dash-primary"
+                        onClick={() => setAddingSource(true)}
+                        style={{ fontSize: 13, padding: '6px 12px' }}
+                      >
+                        + Add Browser Source
+                      </button>
+                    )}
+                  </div>
+                </header>
+
+                {sourceNotice && (
+                  <div style={{ padding: '8px 12px', background: 'rgba(34, 197, 94, 0.1)', color: '#4ade80', borderRadius: 6, fontSize: 13 }}>
+                    {sourceNotice}
+                  </div>
+                )}
+
+                {addingSource && (
+                  <div style={{ padding: 16, border: '1px solid var(--border)', borderRadius: 8, background: 'var(--surface-subtle)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <h5 style={{ margin: 0, fontSize: 14 }}>Add Logged-in Slack Workspace Source</h5>
+                    <WorkspacePicker
+                      options={workspaceOptions}
+                      selectedKey={newSourceKey}
+                      onChange={(k) => setNewSourceKey(k)}
+                    />
+                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+                      <button type="button" className="dash-subtle" onClick={() => setAddingSource(false)}>
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="dash-primary"
+                        disabled={!newSourceKey}
+                        onClick={() => void handleAddBrowserSource()}
+                      >
+                        Add Source
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {(!project.sources || project.sources.length === 0) && (
+                    <div style={{ padding: 16, border: '1px dashed var(--border)', borderRadius: 8, color: 'var(--text-muted)', fontSize: 13, textAlign: 'center' }}>
+                      Using default project token connection ({project.tokenSource}).
+                    </div>
+                  )}
+
+                  {(project.sources ?? []).map((src) => (
+                    <div
+                      key={src.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '12px 16px',
+                        border: '1px solid var(--border)',
+                        borderRadius: 8,
+                        background: 'var(--surface)'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <SourceStatusBadge status={src.status ?? 'connected'} lastReadAt={src.lastReadAt} />
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>
+                            {src.workspaceName}
+                          </div>
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                            {src.kind === 'browser' ? 'Browser session' : 'Token'} · {src.channels.length} channels monitored
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          type="button"
+                          className="dash-subtle"
+                          style={{ fontSize: 12, padding: '4px 8px' }}
+                          onClick={() => void handleToggleSourceEnabled(src.id, src.enabled !== false)}
+                        >
+                          {src.enabled !== false ? 'Pause' : 'Resume'}
+                        </button>
+                        <button
+                          type="button"
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--danger)',
+                            fontSize: 12,
+                            cursor: 'pointer',
+                            padding: '4px 8px'
+                          }}
+                          onClick={() => void handleRemoveSource(src.id)}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </section>
             </div>
           )}
@@ -514,6 +685,8 @@ export default function ProjectSettingsTab({
               </section>
             </div>
           )}
+            </div>
+          </div>
         </div>
 
         {/* Sticky Footer */}

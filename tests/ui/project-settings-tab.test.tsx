@@ -82,10 +82,11 @@ describe('ProjectSettingsTab shell, navigation and single-scroll layout', () => 
     expect(screen.getByText('Settings')).toBeDefined()
   })
 
-  it('renders all 6 tabs in tab navigation bar', () => {
+  it('renders all 7 tabs including sources in left vertical navigation bar', () => {
     render(<ProjectSettingsTab project={mockProject} />)
     expect(screen.getByTestId('tab-general')).toBeDefined()
     expect(screen.getByTestId('tab-ai')).toBeDefined()
+    expect(screen.getByTestId('tab-sources')).toBeDefined()
     expect(screen.getByTestId('tab-channels')).toBeDefined()
     expect(screen.getByTestId('tab-schedule')).toBeDefined()
     expect(screen.getByTestId('tab-sidebar')).toBeDefined()
