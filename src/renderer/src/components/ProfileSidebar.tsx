@@ -602,12 +602,7 @@ export const ProfileSidebar = memo(function ProfileSidebar({
                               title="Right-click: open in split"
                             >
                               <AppIcon appId={appId} className="nav-app-icon" size={12} />
-                              <span className="nav-app-label">
-                                {sidebarAppLabel(
-                                  appId,
-                                  session.availableWorkspaces[0]?.teamName
-                                )}
-                              </span>
+                              <span className="nav-app-label">{sidebarAppLabel(appId)}</span>
                               <AppStatusMark status={session.sessionStatus} />
                               {(() => {
                                 const st = platformStatusDot(session.sessionStatus)

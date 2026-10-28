@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { appLabel, sanitizeWorkspaceName, sidebarAppLabel } from '../../src/shared/types'
 
 describe('sidebar app labels', () => {
-  it('shows actual workspace name for slack when provided, else Project fallback', () => {
-    expect(sidebarAppLabel('slack', 'Acme Workspace')).toBe('Acme Workspace')
-    expect(sidebarAppLabel('slack')).toBe('Project')
-    expect(sidebarAppLabel('slack', '')).toBe('Project')
+  it('shows Slack for the Slack platform row in the sidebar', () => {
+    expect(sidebarAppLabel('slack')).toBe('Slack')
+    expect(sidebarAppLabel('teams')).toBe('Teams')
+    expect(sidebarAppLabel('whatsapp')).toBe('WhatsApp')
   })
 
   it('sanitizes titles with channel prefixes or slack suffixes', () => {
@@ -13,13 +13,10 @@ describe('sidebar app labels', () => {
       sanitizeWorkspaceName('all-testing-workspace-1 (Channel) - Testing Workspace 1')
     ).toBe('Testing Workspace 1')
     expect(
-      sidebarAppLabel('slack', 'all-testing-workspace-1 (Channel) - Testing Workspace 1')
-    ).toBe('Testing Workspace 1')
-    expect(
-      sidebarAppLabel('slack', 'all-unknown (Channel) - unknown')
+      sanitizeWorkspaceName('all-unknown (Channel) - unknown')
     ).toBe('unknown')
     expect(
-      sidebarAppLabel('slack', 'Acme Team | Slack')
+      sanitizeWorkspaceName('Acme Team | Slack')
     ).toBe('Acme Team')
   })
 

@@ -288,13 +288,7 @@ export function sanitizeWorkspaceName(raw?: string): string {
   return cleaned
 }
 
-/** The main sidebar calls the Slack workspace entry by its actual workspace name if available,
- * or "Slack" / "Project" fallback. Other surfaces keep the real app name. */
-export function sidebarAppLabel(appId: AppId, workspaceName?: string): string {
-  if (appId === 'slack') {
-    const clean = sanitizeWorkspaceName(workspaceName)
-    return clean ? clean : 'Project'
-  }
+export function sidebarAppLabel(appId: AppId): string {
   return appLabel(appId)
 }
 
