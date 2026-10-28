@@ -374,29 +374,39 @@ export class DashboardSyncEngine {
     })
 
     try {
-      const token = await this.tokenFor({
-        ...project,
-        teamId: syncTeamId
-      })
-      if (!token) {
-        throw new Error(
-          project.tokenSource === 'manual'
-            ? 'No manual token saved for this project yet'
-            : 'Workspace not connected via OAuth yet'
-        )
-      }
       const poller = this.pollerFactory()
-      const clientDeltas = await this.syncWorkspace(
-        {
-          source: 'client',
-          profileId: project.profileId,
-          teamId: syncTeamId,
-          token,
-          monitors: project.monitors
-        },
-        poller,
-        historyCache
+      const browserSources = (project.sources ?? []).filter(
+        (s) => s.kind === 'browser' && s.enabled !== false
       )
+      const isBrowserOnly = project.sourcePreference === 'browser_only' && browserSources.length > 0
+
+      let clientDeltas: DashboardChannelDelta[] = []
+
+      if (!isBrowserOnly) {
+        const token = await this.tokenFor({
+          ...project,
+          teamId: syncTeamId
+        })
+        if (token) {
+          clientDeltas = await this.syncWorkspace(
+            {
+              source: 'client',
+              profileId: project.profileId,
+              teamId: syncTeamId,
+              token,
+              monitors: project.monitors
+            },
+            poller,
+            historyCache
+          )
+        } else if (browserSources.length === 0) {
+          throw new Error(
+            project.tokenSource === 'manual'
+              ? 'No manual token saved for this project yet'
+              : 'Workspace not connected via OAuth yet'
+          )
+        }
+      }
 
       // Our team workspace is additive: if it fails, the client sync still
       // counts and the card keeps showing the data it already had.
