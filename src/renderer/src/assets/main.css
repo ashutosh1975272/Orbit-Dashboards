@@ -6180,7 +6180,7 @@ body.is-resizing-nav { cursor: col-resize; user-select: none; }
   display: flex;
   flex-direction: column;
   height: 100%;
-  max-width: 960px;
+  width: 100%;
   background: var(--bg);
   color: var(--text);
   user-select: none;
@@ -6201,7 +6201,7 @@ body.is-resizing-nav { cursor: col-resize; user-select: none; }
   z-index: 20;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  padding: 16px 24px 0;
+  padding: 20px 32px 0;
   user-select: none;
 }
 
@@ -6209,36 +6209,20 @@ body.is-resizing-nav { cursor: col-resize; user-select: none; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
+  max-width: 960px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
-.ws-settings-title {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: var(--text);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.ws-settings-title .proj-name {
-  color: var(--accent);
-}
-
-.ws-settings-sub {
-  margin: 0;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-/* Tab Bar */
 .ws-settings-tabs {
   display: flex;
-  gap: 4px;
+  gap: 6px;
   overflow-x: auto;
   scrollbar-width: none;
+  max-width: 960px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .ws-settings-tabs::-webkit-scrollbar {
@@ -6275,10 +6259,13 @@ body.is-resizing-nav { cursor: col-resize; user-select: none; }
   flex: 1 1 auto;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 24px;
+  padding: 28px 32px 48px;
+  max-width: 960px;
+  width: 100%;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 24px;
 }
 
 /* User Selection Permissions */
@@ -6298,7 +6285,7 @@ body.is-resizing-nav { cursor: col-resize; user-select: none; }
   z-index: 20;
   background: var(--surface);
   border-top: 1px solid var(--border);
-  padding: 14px 24px;
+  padding: 14px 32px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -6312,6 +6299,7 @@ body.is-resizing-nav { cursor: col-resize; user-select: none; }
   align-items: center;
   gap: 10px;
   font-size: 13px;
+  max-width: 960px;
 }
 
 .ws-settings-unsaved-dot {

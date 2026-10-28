@@ -1,6 +1,7 @@
 import type React from 'react'
 import { useState, useCallback } from 'react'
-import { SidebarLayout, LayoutMode, DEFAULT_LAYOUT, SIDEBAR_REGISTRY, SIDEBAR_LAYOUT_STORAGE_KEY, normalizeLayout } from './sidebar-layout'
+import { SidebarLayout, LayoutMode, DEFAULT_LAYOUT, SIDEBAR_REGISTRY } from './sidebar-layout'
+import { loadSidebarLayout, saveSidebarLayout } from './use-sidebar-layout'
 
 interface CardSettingsModalProps {
   open: boolean
@@ -21,19 +22,11 @@ const TABS = [
 type TabKey = (typeof TABS)[number]['key']
 
 function loadLayout(projectId: string): SidebarLayout {
-  try {
-    const raw = localStorage.getItem(`${SIDEBAR_LAYOUT_STORAGE_KEY}:${projectId}`)
-    if (!raw) return { ...DEFAULT_LAYOUT }
-    return normalizeLayout(JSON.parse(raw))
-  } catch {
-    return { ...DEFAULT_LAYOUT }
-  }
+  return loadSidebarLayout(projectId)
 }
 
 function saveLayout(projectId: string, layout: SidebarLayout): void {
-  try {
-    localStorage.setItem(`${SIDEBAR_LAYOUT_STORAGE_KEY}:${projectId}`, JSON.stringify(layout))
-  } catch { /* ignore */ }
+  saveSidebarLayout(projectId, layout)
 }
 
 const ICON_MAP: Record<string, React.ReactNode> = {

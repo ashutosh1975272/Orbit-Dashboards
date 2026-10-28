@@ -1,8 +1,9 @@
 import type React from 'react'
-import { Fragment, useRef } from 'react'
+import { Fragment, useRef, useMemo } from 'react'
 import type { CardView } from './card-view'
 import NavIcon from './nav-icons'
 import { detailMeta } from './guide-model'
+import { useSidebarLayout } from './use-sidebar-layout'
 import {
   INFO_GROUPS,
   NAV_CONNECTORS,
@@ -30,6 +31,7 @@ import {
 } from './workspace-nav'
 
 interface WorkspaceSidebarProps {
+  projectId?: string
   view: CardView
   nav: WorkspaceNavState
   channels: ConnectorChannelLists
@@ -149,6 +151,7 @@ function Row({
 }
 
 export default function WorkspaceSidebar({
+  projectId = '',
   view,
   nav,
   channels,
@@ -162,6 +165,29 @@ export default function WorkspaceSidebar({
 }: WorkspaceSidebarProps): React.ReactElement {
   const collapsed = nav.collapsed
   const asideRef = useRef<HTMLElement>(null)
+  const { layout } = useSidebarLayout(projectId)
+
+  const activeSections = useMemo(() => {
+    if (layout.mode === 'minimal') {
+      return []
+    }
+    if (layout.mode === 'full') {
+      return NAV_SECTIONS
+    }
+    // custom layout mode
+    const hidden = new Set(layout.custom.hiddenSections)
+    const order = layout.custom.sectionOrder
+    const visible = NAV_SECTIONS.filter((s) => !hidden.has(s.key))
+    if (!order || order.length === 0) return visible
+    return [...visible].sort((a, b) => {
+      const idxA = order.indexOf(a.key)
+      const idxB = order.indexOf(b.key)
+      if (idxA === -1 && idxB === -1) return 0
+      if (idxA === -1) return 1
+      if (idxB === -1) return -1
+      return idxA - idxB
+    })
+  }, [layout])
 
   const rowActive = (row: NavRow): boolean =>
     nav.openGroup === sectionOfSelection(row.id) && nav.selection === row.id
@@ -235,7 +261,7 @@ export default function WorkspaceSidebar({
           onClick={() => onOpenGroup('dash')}
         />
 
-        {NAV_SECTIONS.map((section) => {
+        {activeSections.map((section) => {
           const sectionOpen = nav.openSections.includes(section.key)
           const rail = railSectionSelection(nav, section.key)
           // A closed section that owns what the centre shows keeps the accent

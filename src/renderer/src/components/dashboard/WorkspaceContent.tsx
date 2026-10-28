@@ -200,6 +200,7 @@ export default function WorkspaceContent({
     bare = true
   } else if (nav.openGroup === 'settings') {
     body = <ProjectSettingsTab project={project} />
+    bare = true
   } else if (nav.openGroup === 'viz') {
     body = (
       <CentreVisuals

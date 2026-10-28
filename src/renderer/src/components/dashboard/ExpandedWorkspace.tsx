@@ -189,6 +189,7 @@ export default function ExpandedWorkspace({
         style={{ '--ws-nav-w': `${nav.width}px` } as React.CSSProperties}
       >
         <WorkspaceSidebar
+          projectId={project.id}
           view={view}
           nav={nav}
           channels={channelLists}

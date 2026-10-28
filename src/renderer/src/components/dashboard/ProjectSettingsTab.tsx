@@ -9,36 +9,16 @@ import AiSettingsForm from './AiSettingsForm'
 import DashboardWizard from './DashboardWizard'
 import { SidebarLayoutView } from './SidebarLayoutView'
 import {
-  SidebarLayout,
   LayoutMode,
-  DEFAULT_LAYOUT,
-  SIDEBAR_LAYOUT_STORAGE_KEY,
-  normalizeLayout
+  DEFAULT_LAYOUT
 } from './sidebar-layout'
+import { useSidebarLayout } from './use-sidebar-layout'
 
 export type SettingsTabKey = 'general' | 'ai' | 'channels' | 'schedule' | 'sidebar' | 'danger'
 
 interface ProjectSettingsTabProps {
   project: DashboardProject
   onDelete?: (projectId: string) => void
-}
-
-function loadLayout(projectId: string): SidebarLayout {
-  try {
-    const raw = localStorage.getItem(`${SIDEBAR_LAYOUT_STORAGE_KEY}:${projectId}`)
-    if (raw) return normalizeLayout(JSON.parse(raw))
-  } catch {
-    // fallback
-  }
-  return DEFAULT_LAYOUT
-}
-
-function saveLayout(projectId: string, layout: SidebarLayout): void {
-  try {
-    localStorage.setItem(`${SIDEBAR_LAYOUT_STORAGE_KEY}:${projectId}`, JSON.stringify(layout))
-  } catch {
-    // ignore
-  }
 }
 
 export default function ProjectSettingsTab({
@@ -60,7 +40,7 @@ export default function ProjectSettingsTab({
   const [scheduleError, setScheduleError] = useState<string | null>(null)
 
   // Layout state
-  const [layout, setLayout] = useState<SidebarLayout>(() => loadLayout(project.id))
+  const { layout, updateLayout } = useSidebarLayout(project.id)
 
   // Token status
   const [tokenStatus, setTokenStatus] = useState<DashboardChatTokenStatus | null>(null)
@@ -81,9 +61,7 @@ export default function ProjectSettingsTab({
   }, [project.id])
 
   const handleModeChange = (mode: LayoutMode): void => {
-    const next: SidebarLayout = { ...layout, mode }
-    setLayout(next)
-    saveLayout(project.id, next)
+    updateLayout({ ...layout, mode })
   }
 
   const handleToggleSection = (sectionKey: string): void => {
@@ -93,17 +71,14 @@ export default function ProjectSettingsTab({
     } else {
       hidden.add(sectionKey)
     }
-    const next: SidebarLayout = {
+    updateLayout({
       ...layout,
       custom: { ...layout.custom, hiddenSections: Array.from(hidden) }
-    }
-    setLayout(next)
-    saveLayout(project.id, next)
+    })
   }
 
   const handleResetLayout = (): void => {
-    setLayout(DEFAULT_LAYOUT)
-    saveLayout(project.id, DEFAULT_LAYOUT)
+    updateLayout(DEFAULT_LAYOUT)
   }
 
   const saveSchedule = async (): Promise<void> => {
