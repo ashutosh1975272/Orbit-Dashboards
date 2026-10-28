@@ -5,6 +5,7 @@ import {
   APP_IDS,
   appSupportsWorkspaces,
   profileDisplayLabel,
+  sanitizeWorkspaceName,
   sidebarAppLabel
 } from '../../../shared/types'
 import { modKey } from '../lib/shortcut-label'
@@ -120,7 +121,8 @@ function displayWorkspaceName(ws: {
   teamId: string
   lastChannelName?: string
 }): string {
-  const name = ws.teamName?.trim()
+  const sanitized = sanitizeWorkspaceName(ws.teamName)
+  const name = sanitized || ws.teamName?.trim()
   const generic =
     !name ||
     /^(microsoft teams|teams|teams org|organization|teams-home)$/i.test(name) ||
@@ -131,7 +133,7 @@ function displayWorkspaceName(ws: {
     return name
   }
   if (ws.lastChannelName?.trim()) {
-    return ws.lastChannelName.trim()
+    return sanitizeWorkspaceName(ws.lastChannelName.trim()) || ws.lastChannelName.trim()
   }
   if (ws.teamDomain?.trim()) {
     return ws.teamDomain.trim()

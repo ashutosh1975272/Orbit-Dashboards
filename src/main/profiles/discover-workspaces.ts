@@ -31,12 +31,12 @@ export const READ_SLACK_WORKSPACE_NAME_SCRIPT = `(() => {
   }
 
   const title = clean(document.title || '').replace(/\\s*[|—–-]\\s*Slack\\s*$/i, '');
-  const parts = title.split(/\\s*[|—–]\\s*/).map((p) => p.trim()).filter(Boolean);
+  const parts = title.split(/\\s*[|—–-]\\s*/).map((p) => p.trim()).filter(Boolean);
   if (parts.length >= 2) {
     const last = parts[parts.length - 1];
-    if (!bad(last)) return last;
+    if (!bad(last) && !/\\(channel\\)|\\(direct message\\)/i.test(last)) return last;
   }
-  if (!bad(title)) return title;
+  if (!bad(title) && !/\\(channel\\)|\\(direct message\\)/i.test(title)) return title;
   return null;
 })()`
 
@@ -181,9 +181,11 @@ export const DISCOVER_WORKSPACES_SCRIPT = `(() => {
       if (!badName(t)) return t;
     }
     const title = clean(document.title || '').replace(/\\s*[|—–-]\\s*Slack\\s*$/i, '');
-    const parts = title.split(/\\s*[|—–]\\s*/).map((p) => p.trim()).filter(Boolean);
-    if (parts.length >= 2 && !badName(parts[parts.length - 1])) return parts[parts.length - 1];
-    if (!badName(title)) return title;
+    const parts = title.split(/\\s*[|—–-]\\s*/).map((p) => p.trim()).filter(Boolean);
+    if (parts.length >= 2 && !badName(parts[parts.length - 1]) && !/\\(channel\\)|\\(direct message\\)/i.test(parts[parts.length - 1])) {
+      return parts[parts.length - 1];
+    }
+    if (!badName(title) && !/\\(channel\\)|\\(direct message\\)/i.test(title)) return title;
     return null;
   };
 

@@ -271,11 +271,29 @@ export function appLabel(appId: AppId): string {
   return 'WhatsApp'
 }
 
+/** Cleans up raw titles or legacy captured strings like "channel (Channel) - Workspace" into a clean workspace name. */
+export function sanitizeWorkspaceName(raw?: string): string {
+  if (!raw) return ''
+  let cleaned = raw.replace(/\s+/g, ' ').trim()
+  // Strip trailing " | Slack" or " - Slack"
+  cleaned = cleaned.replace(/\s*[|—–-]\s*Slack\s*$/i, '').trim()
+  // Strip Slack channel prefix pattern: "channel (Channel) - WorkspaceName" or "#channel - WorkspaceName"
+  if (cleaned.includes(' - ')) {
+    const parts = cleaned.split(' - ')
+    cleaned = parts[parts.length - 1]!.trim()
+  } else if (cleaned.includes(' | ')) {
+    const parts = cleaned.split(' | ')
+    cleaned = parts[parts.length - 1]!.trim()
+  }
+  return cleaned
+}
+
 /** The main sidebar calls the Slack workspace entry by its actual workspace name if available,
  * or "Slack" / "Project" fallback. Other surfaces keep the real app name. */
 export function sidebarAppLabel(appId: AppId, workspaceName?: string): string {
   if (appId === 'slack') {
-    return workspaceName?.trim() ? workspaceName.trim() : 'Project'
+    const clean = sanitizeWorkspaceName(workspaceName)
+    return clean ? clean : 'Project'
   }
   return appLabel(appId)
 }
