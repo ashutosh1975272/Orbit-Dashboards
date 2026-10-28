@@ -63,6 +63,38 @@ export interface DashboardMonitor {
   channelName: string
 }
 
+export interface ProjectSourceChannel {
+  id: string
+  name: string
+  isPrivate?: boolean
+}
+
+export type ProjectSourceStatus =
+  | 'connected'
+  | 'needs-login'
+  | 'challenge'
+  | 'adapter-broken'
+  | 'paused'
+  | 'running'
+
+export interface ProjectSource {
+  id: string
+  kind: 'token' | 'browser'
+  platform: 'slack'
+  profileId?: string
+  workspaceId: string
+  workspaceName: string
+  channels: ProjectSourceChannel[]
+  role: 'client' | 'ours'
+  enabled: boolean
+  backfillDays: 1 | 7 | 30
+  status?: ProjectSourceStatus
+  lastReadAt?: string
+  lastReadNewCount?: number
+  createdAt: string
+  updatedAt: string
+}
+
 export interface DashboardProject {
   id: string
   /** Display name, e.g. "Acme redesign". */
@@ -81,6 +113,9 @@ export interface DashboardProject {
   /** Slack user id of the token owner (= the freelancer, not the client). */
   selfUserId?: string
   monitors: DashboardMonitor[]
+  /** Additive multi-source model (SLK-1) */
+  sources?: ProjectSource[]
+  sourcePreference?: 'token_first' | 'browser_only'
   /**
    * Our Slack channels this project reads. Empty means none; per-project
    * mapping replaces the legacy global pin set.

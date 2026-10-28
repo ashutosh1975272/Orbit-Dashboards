@@ -1,5 +1,21 @@
 # Status Ledger
 
+## SLK-1 — Multi-Source Model, Additive DashboardProject & Migration (2026-10-28, branch `beta`)
+- `pnpm run typecheck`: PASS — 0 errors (Node & Web).
+- `pnpm test`: PASS — **71 files, 584/584 tests passed** (exit 0, 0 failures, 0 regressions).
+- `electron-vite build`: PASS — clean build of main, preload, and renderer.
+- **Data Model Additions**:
+  - `src/shared/dashboard-contract.ts`:
+    - Defined `ProjectSource`: `{ id, kind: 'token' | 'browser', platform: 'slack', profileId?, workspaceId, workspaceName, channels, role, enabled, backfillDays, status?, lastReadAt?, lastReadNewCount?, createdAt, updatedAt }`.
+    - Added `sources?: ProjectSource[]` and `sourcePreference?: 'token_first' | 'browser_only'` to `DashboardProject`.
+- **Store & Migration (`MonitorStore`)**:
+  - Normalized `sources` to `[]` and `sourcePreference` to `'token_first'` for existing legacy projects without sources.
+  - Enabled saving browser-automated project cards that derive team identity from `sources[0]` without requiring Slack bot token validation.
+- **ConfigService Integration**:
+  - `resolveSettings(projectId)` returns effective `sources` and `sourcePreference` on the resolved client configuration.
+- **Unit Tests Added**:
+  - `tests/unit/project-sources.test.ts` (3/3 passed).
+
 ## LNK-2 to LNK-5 — Accounts & Workspaces Hub, 1-Click Presets & Custom Links (2026-10-28, branch `beta`)
 - `pnpm run typecheck`: PASS — 0 errors (Node & Web).
 - `pnpm test`: PASS — **70 files, 581/581 tests passed** (exit 0, 0 failures, 0 regressions).

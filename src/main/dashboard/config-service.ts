@@ -12,6 +12,7 @@ import type {
 import type { AiSettingsService, ResolvedAiSettings } from './ai-settings'
 import type { MonitorStore } from './monitor-store'
 import type { WorkspaceMappingStore } from './workspace-mapping-store'
+import type { ProjectSource } from '../../shared/dashboard-contract'
 import { maskToken, type TeamWorkspaceStore } from './team-workspace-store'
 
 export interface ResolvedProjectSettings {
@@ -24,6 +25,8 @@ export interface ResolvedProjectSettings {
     /** Workspace this project is mapped to (null if unmapped). */
     mappedWorkspaceId: string | null
     mappedWorkspaceName: string | null
+    sources?: ProjectSource[]
+    sourcePreference?: 'token_first' | 'browser_only'
   }
   ourSlack: {
     token: string | null
@@ -131,7 +134,9 @@ export class ConfigService {
         channels: project?.monitors ?? [],
         source: project ? 'project' : 'none',
         mappedWorkspaceId,
-        mappedWorkspaceName
+        mappedWorkspaceName,
+        sources: project?.sources ?? [],
+        sourcePreference: project?.sourcePreference ?? 'token_first'
       },
       ourSlack: {
         token: ourSlackToken,

@@ -60,7 +60,12 @@ export class MonitorStore {
   }
 
   async listProjects(): Promise<DashboardProject[]> {
-    return (await this.read()).projects
+    const data = await this.read()
+    return data.projects.map((p) => ({
+      ...p,
+      sources: Array.isArray(p.sources) ? p.sources : [],
+      sourcePreference: p.sourcePreference ?? 'token_first'
+    }))
   }
 
   async upsertProject(input: {
@@ -85,31 +90,44 @@ export class MonitorStore {
       incoming.teamId && incoming.teamId !== 'manual'
         ? incoming.teamId
         : (meta?.teamId ?? incoming.teamId)
+
+    // Check if project has valid sources configured (e.g. browser source)
+    const hasSources = Array.isArray(incoming.sources) && incoming.sources.length > 0
+    const primarySource = hasSources ? incoming.sources![0] : undefined
+    const effectiveTeamId = teamId || primarySource?.workspaceId
+    const effectiveTeamName = teamName || primarySource?.workspaceName
+
     // v2.3 — hard rule: a card without a real workspace is never stored.
     // Without it every workspace would share one message bucket.
-    if (!teamId || teamId === 'manual') {
+    if (!effectiveTeamId || effectiveTeamId === 'manual') {
       throw new Error(
         'Workspace unknown — reconnect the connector so the card can be bound to one workspace.'
       )
     }
-    if (existing?.teamName && teamName && existing.teamName !== teamName) {
+    if (existing?.teamName && effectiveTeamName && existing.teamName !== effectiveTeamName && !hasSources) {
       throw new Error(
         `“${existing.name}” belongs to workspace ${existing.teamName}. A card can only watch one workspace — create a separate card instead.`
       )
     }
 
-    // v2.2 — reject channels owned by a different workspace.
+    // v2.2 — reject channels owned by a different workspace (token monitors).
     const owners = data.channelOwners ?? {}
-    for (const monitor of incoming.monitors) {
+    for (const monitor of incoming.monitors ?? []) {
       const owner = owners[monitor.channelId]
-      if (owner && teamId && owner !== teamId) {
+      if (owner && effectiveTeamId && owner !== effectiveTeamId) {
         throw new Error(
           `Channel #${monitor.channelName} belongs to another workspace. One card = one workspace — pick channels from a single workspace.`
         )
       }
     }
 
-    const stamped = { ...incoming, teamName, teamId } as typeof incoming
+    const stamped = {
+      ...incoming,
+      teamName: effectiveTeamName,
+      teamId: effectiveTeamId,
+      sources: Array.isArray(incoming.sources) ? incoming.sources : (existing?.sources ?? []),
+      sourcePreference: incoming.sourcePreference ?? existing?.sourcePreference ?? 'token_first'
+    } as typeof incoming
     if ('id' in stamped && stamped.id) {
       const incomingId = stamped.id
       const found = data.projects.find((p) => p.id === incomingId)
