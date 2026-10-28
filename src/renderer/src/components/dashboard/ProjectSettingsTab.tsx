@@ -123,81 +123,78 @@ export default function ProjectSettingsTab({
         {/* Sticky Header */}
         <header className="ws-settings-header" data-testid="settings-header">
           <div className="ws-settings-title-row">
-            <div>
+            <div className="ws-settings-title-group">
               <h2 className="ws-settings-title">
                 <span className="proj-name">{project.name}</span>
-                <span style={{ opacity: 0.5 }}>·</span>
-                <span>Settings</span>
+                <span className="proj-sep">/</span>
+                <span className="proj-sub">Settings</span>
               </h2>
-              <p className="ws-settings-sub">
-                Model, key, channels and dates for this card.
-              </p>
             </div>
-          </div>
 
-          <nav className="ws-settings-tabs" role="tablist" aria-label="Settings sections">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'general'}
-              className={`ws-settings-tab-btn${activeTab === 'general' ? ' is-active' : ''}`}
-              onClick={() => setActiveTab('general')}
-              data-testid="tab-general"
-            >
-              General
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'ai'}
-              className={`ws-settings-tab-btn${activeTab === 'ai' ? ' is-active' : ''}`}
-              onClick={() => setActiveTab('ai')}
-              data-testid="tab-ai"
-            >
-              AI
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'channels'}
-              className={`ws-settings-tab-btn${activeTab === 'channels' ? ' is-active' : ''}`}
-              onClick={() => setActiveTab('channels')}
-              data-testid="tab-channels"
-            >
-              Channels
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'schedule'}
-              className={`ws-settings-tab-btn${activeTab === 'schedule' ? ' is-active' : ''}`}
-              onClick={() => setActiveTab('schedule')}
-              data-testid="tab-schedule"
-            >
-              Schedule
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'sidebar'}
-              className={`ws-settings-tab-btn${activeTab === 'sidebar' ? ' is-active' : ''}`}
-              onClick={() => setActiveTab('sidebar')}
-              data-testid="tab-sidebar"
-            >
-              Sidebar layout
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'danger'}
-              className={`ws-settings-tab-btn${activeTab === 'danger' ? ' is-active' : ''}`}
-              onClick={() => setActiveTab('danger')}
-              data-testid="tab-danger"
-              style={{ color: activeTab === 'danger' ? 'var(--danger)' : undefined }}
-            >
-              Danger zone
-            </button>
-          </nav>
+            <nav className="ws-settings-tabs" role="tablist" aria-label="Settings sections">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'general'}
+                className={`ws-settings-tab-btn${activeTab === 'general' ? ' is-active' : ''}`}
+                onClick={() => setActiveTab('general')}
+                data-testid="tab-general"
+              >
+                General
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'ai'}
+                className={`ws-settings-tab-btn${activeTab === 'ai' ? ' is-active' : ''}`}
+                onClick={() => setActiveTab('ai')}
+                data-testid="tab-ai"
+              >
+                AI
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'channels'}
+                className={`ws-settings-tab-btn${activeTab === 'channels' ? ' is-active' : ''}`}
+                onClick={() => setActiveTab('channels')}
+                data-testid="tab-channels"
+              >
+                Channels
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'schedule'}
+                className={`ws-settings-tab-btn${activeTab === 'schedule' ? ' is-active' : ''}`}
+                onClick={() => setActiveTab('schedule')}
+                data-testid="tab-schedule"
+              >
+                Schedule
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'sidebar'}
+                className={`ws-settings-tab-btn${activeTab === 'sidebar' ? ' is-active' : ''}`}
+                onClick={() => setActiveTab('sidebar')}
+                data-testid="tab-sidebar"
+              >
+                Sidebar layout
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'danger'}
+                className={`ws-settings-tab-btn${activeTab === 'danger' ? ' is-active' : ''}`}
+                onClick={() => setActiveTab('danger')}
+                data-testid="tab-danger"
+                style={{ color: activeTab === 'danger' ? 'var(--danger)' : undefined }}
+              >
+                Danger zone
+              </button>
+            </nav>
+          </div>
         </header>
 
         {/* Single Scroll Container */}
@@ -444,11 +441,7 @@ export default function ProjectSettingsTab({
           {/* TAB: SIDEBAR LAYOUT */}
           {activeTab === 'sidebar' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <section className="ws-settings-section">
-                <header className="ws-settings-head">
-                  <h4>Sidebar layout</h4>
-                  <p>Choose what appears in this project card&apos;s navigation sidebar.</p>
-                </header>
+              <section className="ws-settings-section" style={{ background: 'transparent', border: 'none', padding: 0 }}>
                 <SidebarLayoutView
                   layout={layout}
                   onModeChange={handleModeChange}
