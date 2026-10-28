@@ -199,6 +199,21 @@ export default function CompactCard({
                   {clientName}
                 </span>
               ) : null}
+              {summary.sourceKind === 'browser' ? (
+                <span
+                  style={{
+                    fontSize: '11px',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    background: 'rgba(99, 102, 241, 0.15)',
+                    color: '#818cf8',
+                    border: '1px solid rgba(99, 102, 241, 0.3)'
+                  }}
+                  title="Messages read via logged-in browser session"
+                >
+                  ⚡ Browser session
+                </span>
+              ) : null}
               {statusLabel ? <span className="proj-row-status">{statusLabel}</span> : null}
               {needsReply ? <span className="proj-flag">Needs reply</span> : null}
               {inactive ? <span className="proj-flag is-muted">Inactive 24h+</span> : null}

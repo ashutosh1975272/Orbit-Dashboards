@@ -249,6 +249,8 @@ export interface CardSummary {
   medianReplySeconds?: number | null
   deliverables?: { done: number; total: number } | null
   ballInCourt?: 'yours' | 'client' | null
+  sourceKind?: 'browser' | 'token'
+  sourceStatus?: string
 }
 
 function fmtAge(iso: string | null): string {
@@ -816,6 +818,12 @@ export function buildCardSummary(snapshot: DashboardProjectSnapshot, index = 0):
         ? (snapshot.metrics?.ourResponse?.medianSeconds ?? null)
         : null,
     deliverables,
-    ballInCourt: ballInCourt(lastClientAt, myLastReplyAt)
+    ballInCourt: ballInCourt(lastClientAt, myLastReplyAt),
+    sourceKind:
+      project.sourcePreference === 'browser_only' ||
+      (project.sources && project.sources.some((s) => s.kind === 'browser'))
+        ? 'browser'
+        : 'token',
+    sourceStatus: project.sources?.[0]?.status ?? 'connected'
   }
 }
