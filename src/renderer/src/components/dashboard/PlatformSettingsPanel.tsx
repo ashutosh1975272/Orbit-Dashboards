@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { AppId } from '../../../../shared/types'
-import { appLabel } from '../../../../shared/types'
+import { appLabel, sanitizeWorkspaceName } from '../../../../shared/types'
 import { useProfileStore } from '../../hooks/useProfiles'
 
 interface PlatformSettingsPanelProps {
@@ -225,13 +225,14 @@ function SlackSettingsContent({
           <ul className="slack-settings-workspace-list">
             {availableWorkspaces.map((ws) => {
               const isSelected = selectedWorkspace === ws.teamId
+              const cleanName = sanitizeWorkspaceName(ws.teamName) || ws.teamName
               const wsMapping = mappings.find((m) => m.workspaceId === ws.teamId)
               const projectCount = wsMapping ? wsMapping.projectIds.length : 0
               return (
                 <li key={ws.teamId} className={`slack-settings-workspace-row${isSelected ? ' is-selected' : ''}`} onClick={() => setSelectedWorkspace(isSelected ? null : ws.teamId)}>
-                  <span className="slack-settings-workspace-icon">{workspaceIcon(ws.teamName)}</span>
+                  <span className="slack-settings-workspace-icon">{workspaceIcon(cleanName)}</span>
                   <div className="slack-settings-workspace-info">
-                    <span className="slack-settings-workspace-name">{ws.teamName}</span>
+                    <span className="slack-settings-workspace-name">{cleanName}</span>
                     {ws.teamDomain && (
                       <span className="slack-settings-workspace-domain">@{ws.teamDomain}</span>
                     )}

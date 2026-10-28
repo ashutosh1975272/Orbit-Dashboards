@@ -194,7 +194,20 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
   )
 
   handleInvoke(IpcChannels.DashboardUpsertProject, async (payload: ProjectUpsertPayload) => {
-    await deps.monitorStore.upsertProject(payload)
+    const proj = await deps.monitorStore.upsertProject(payload)
+    if (deps.workspaceMapping) {
+      const workspaceIds = new Set<string>()
+      if (proj.teamId) workspaceIds.add(proj.teamId)
+      for (const s of proj.sources ?? []) {
+        if (s.workspaceId) workspaceIds.add(s.workspaceId)
+      }
+      for (const wsId of workspaceIds) {
+        const existing = (await deps.workspaceMapping.getMapping(wsId)) ?? []
+        if (!existing.includes(proj.id)) {
+          await deps.workspaceMapping.saveMapping(wsId, [...existing, proj.id])
+        }
+      }
+    }
     return broadcastSnapshot()
   })
 
@@ -470,8 +483,34 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
   if (deps.workspaceMapping) {
     handleInvoke(
       IpcChannels.DashboardWorkspaceMappingList,
-      async (): Promise<{ workspaceId: string; projectIds: string[]; updatedAt: string }[]> =>
-        deps.workspaceMapping!.listMappings()
+      async (): Promise<{ workspaceId: string; projectIds: string[]; updatedAt: string }[]> => {
+        const [mappings, projects] = await Promise.all([
+          deps.workspaceMapping!.listMappings(),
+          deps.monitorStore.listProjects()
+        ])
+        const mapByWs = new Map<string, Set<string>>()
+        for (const m of mappings) {
+          mapByWs.set(m.workspaceId, new Set(m.projectIds))
+        }
+        // Also synthesize mappings from project.teamId and project.sources
+        for (const p of projects) {
+          if (p.teamId) {
+            if (!mapByWs.has(p.teamId)) mapByWs.set(p.teamId, new Set())
+            mapByWs.get(p.teamId)!.add(p.id)
+          }
+          for (const s of p.sources ?? []) {
+            if (s.workspaceId) {
+              if (!mapByWs.has(s.workspaceId)) mapByWs.set(s.workspaceId, new Set())
+              mapByWs.get(s.workspaceId)!.add(p.id)
+            }
+          }
+        }
+        return Array.from(mapByWs.entries()).map(([workspaceId, pIds]) => ({
+          workspaceId,
+          projectIds: Array.from(pIds),
+          updatedAt: new Date().toISOString()
+        }))
+      }
     )
     handleInvoke(
       IpcChannels.DashboardWorkspaceMappingGet,
@@ -484,6 +523,42 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
         const projects = await deps.monitorStore.listProjects()
         const validProjectIds = projects.map((p) => p.id)
         await deps.workspaceMapping!.saveMapping(payload.workspaceId, payload.projectIds, validProjectIds)
+
+        // Ensure newly mapped projects also have this workspace in their sources
+        for (const pId of payload.projectIds) {
+          const targetProj = projects.find((p) => p.id === pId)
+          if (targetProj) {
+            const hasSource = (targetProj.sources ?? []).some((s) => s.workspaceId === payload.workspaceId)
+            if (!hasSource && targetProj.teamId !== payload.workspaceId) {
+              const now = new Date().toISOString()
+              const updatedSources = [
+                ...(targetProj.sources ?? []),
+                {
+                  id: `src-browser-${Date.now().toString(36)}`,
+                  kind: 'browser' as const,
+                  platform: 'slack' as const,
+                  profileId: targetProj.profileId,
+                  workspaceId: payload.workspaceId,
+                  workspaceName: 'Slack Workspace',
+                  channels: targetProj.monitors.map((m) => ({ id: m.channelId, name: m.channelName })),
+                  role: 'client' as const,
+                  backfillDays: 7 as const,
+                  enabled: true,
+                  status: 'connected' as const,
+                  createdAt: now,
+                  updatedAt: now
+                }
+              ]
+              await deps.monitorStore.upsertProject({
+                project: {
+                  ...targetProj,
+                  sources: updatedSources
+                }
+              })
+            }
+          }
+        }
+
         await broadcastConfigChanged()
       }
     )
