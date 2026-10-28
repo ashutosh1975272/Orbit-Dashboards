@@ -65,6 +65,16 @@ const api: IpcApi = {
     activateSplit: (primary, secondary) =>
       ipcRenderer.invoke(IpcChannels.ProfileActivateSplit, { primary, secondary }),
     clearSplit: () => ipcRenderer.invoke(IpcChannels.ProfileClearSplit),
+    addCustomLink: (profileId, link) =>
+      ipcRenderer.invoke(IpcChannels.ProfileAddCustomLink, { profileId, link }),
+    updateCustomLink: (profileId, linkId, patch) =>
+      ipcRenderer.invoke(IpcChannels.ProfileUpdateCustomLink, { profileId, linkId, patch }),
+    removeCustomLink: (profileId, linkId) =>
+      ipcRenderer.invoke(IpcChannels.ProfileRemoveCustomLink, { profileId, linkId }),
+    reorderCustomLinks: (profileId, orderedIds) =>
+      ipcRenderer.invoke(IpcChannels.ProfileReorderCustomLinks, { profileId, orderedIds }),
+    listCustomLinks: (profileId) =>
+      ipcRenderer.invoke(IpcChannels.ProfileListCustomLinks, { profileId }),
     updateBounds: (bounds: ViewportBounds) =>
       ipcRenderer.invoke(IpcChannels.ProfileUpdateBounds, bounds),
     setEmbedVisible: (visible: boolean) =>

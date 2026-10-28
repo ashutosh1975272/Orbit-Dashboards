@@ -61,6 +61,15 @@ export interface ProfileApps {
   whatsapp: AppSession
 }
 
+export interface CustomLink {
+  id: string
+  name: string
+  url: string
+  order: number
+  createdAt: string
+  partition: string
+}
+
 export interface Profile {
   id: string
   displayName: string
@@ -80,6 +89,7 @@ export interface Profile {
    */
   googleAuthStatus: 'not-signed-in' | 'signing-in' | 'signed-in'
   apps: ProfileApps
+  customLinks?: CustomLink[]
 }
 
 export function profileDisplayLabel(profile: Profile): string {

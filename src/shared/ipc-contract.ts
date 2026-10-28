@@ -101,6 +101,11 @@ export const IpcChannels = {
   ProfileImportMetadata: 'profile:import-metadata',
   ProfileActivateSplit: 'profile:activate-split',
   ProfileClearSplit: 'profile:clear-split',
+  ProfileAddCustomLink: 'profile:add-custom-link',
+  ProfileUpdateCustomLink: 'profile:update-custom-link',
+  ProfileRemoveCustomLink: 'profile:remove-custom-link',
+  ProfileReorderCustomLinks: 'profile:reorder-custom-links',
+  ProfileListCustomLinks: 'profile:list-custom-links',
   ProfileSessionStatusChanged: 'profile:session-status-changed',
   ProfileUpdated: 'profile:updated',
   ProfileAuthProgress: 'profile:auth-progress',
@@ -252,6 +257,15 @@ export interface IpcApi {
       secondary: { profileId: string; appId: AppId; bounds: ViewportBounds }
     ) => Promise<void>
     clearSplit: () => Promise<void>
+    addCustomLink: (profileId: string, link: { name: string; url: string }) => Promise<Profile>
+    updateCustomLink: (
+      profileId: string,
+      linkId: string,
+      patch: { name?: string; url?: string }
+    ) => Promise<Profile>
+    removeCustomLink: (profileId: string, linkId: string) => Promise<Profile>
+    reorderCustomLinks: (profileId: string, orderedIds: string[]) => Promise<Profile>
+    listCustomLinks: (profileId: string) => Promise<import('./types').CustomLink[]>
     updateBounds: (bounds: ViewportBounds) => Promise<void>
     setEmbedVisible: (visible: boolean) => Promise<void>
     startGoogleAuth: (profileId: string, bounds?: ViewportBounds) => Promise<Profile>

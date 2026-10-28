@@ -1,5 +1,22 @@
 # Status Ledger
 
+## LNK-1 — Profile Custom Links Data Model, Store & Validation (2026-10-28, branch `beta`)
+- `pnpm run typecheck`: PASS — 0 errors (Node & Web).
+- `pnpm test`: PASS — **70 files, 580/580 tests passed** (exit 0, 0 failures, 0 regressions).
+- Data model:
+  - Added `CustomLink` interface `{ id, name, url, order, createdAt, partition }` in `src/shared/types.ts`.
+  - Added `customLinks?: CustomLink[]` to `Profile`.
+  - Partition format: `persist:profile-${profileId}-link-${linkId}`.
+- Store & Validation (`src/main/profiles/profile-store.ts`):
+  - Normalization: `customLinks` defaults to `[]` idempotently for existing profiles without links.
+  - Validation: HTTPS only, 1–40 chars trimmed name, reject `javascript:`, `file:`, `data:` schemes, non-empty host, max 30 links per profile, duplicate URL rejection within profile (case-insensitive & trailing-slash normalized).
+  - Store APIs: `listCustomLinks`, `addCustomLink`, `updateCustomLink`, `removeCustomLink`, `reorderCustomLinks`.
+- IPC & Partition Cleanup:
+  - Registered IPC handlers in `src/main/ipc/profiles.ipc.ts` (`ProfileAddCustomLink`, `ProfileUpdateCustomLink`, `ProfileRemoveCustomLink`, `ProfileReorderCustomLinks`, `ProfileListCustomLinks`).
+  - Implemented session partition storage cleanup on `removeCustomLink`, single profile deletion, and `clearAllProfiles`.
+  - Exposed methods on `window.api.profiles` in `src/preload/index.ts`.
+- Unit tests added: `tests/unit/profile-custom-links.test.ts` (13/13 passed).
+
 ## SET-2 to SET-5 — Card Settings Redesign & Master Verification Complete (2026-10-27, branch `feat/settings-redesign-v2`, commit `2807c9b`)
 - `npm run typecheck`: PASS — 0 errors (Node & Web).
 - `pnpm test`: PASS — **68 files, 565/565 tests passed** (exit 0, 0 failures, 0 regressions).
