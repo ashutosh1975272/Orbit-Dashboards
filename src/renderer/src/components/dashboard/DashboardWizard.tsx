@@ -1,7 +1,17 @@
 import type React from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { useDashboardStore } from '../../hooks/useDashboard'
+import { useProfileStore } from '../../hooks/useProfiles'
 import { buildManifest, USER_SCOPES } from './slack-manifest'
+import {
+  SourcePicker,
+  WorkspacePicker,
+  BackfillSelect,
+  AutomationNotice,
+  type SourceType,
+  type ProfileWorkspaceOption
+} from './sources'
+import type { ProjectSource } from '../../../../shared/dashboard-contract'
 
 /**
  * Add-project wizard (v2.1 — docs/tickets/dashboard-v2.1.md):
@@ -55,8 +65,8 @@ function vaultKeyForProject(projectName: string): string {
 }
 
 const STEPS = [
-  'Create Slack app',
-  'Install & get token',
+  'Choose source',
+  'Connect & configure',
   'Choose channels',
   'Confirm card',
   'Finish'
@@ -140,6 +150,39 @@ export default function DashboardWizard({
   )
   const [replaceMode, setReplaceMode] = useState(false)
 
+  // source selection state (SLK-5)
+  const [sourceType, setSourceType] = useState<SourceType>(
+    target?.project.sourcePreference === 'browser_only' ||
+      (target?.project.sources && target.project.sources.some((s) => s.kind === 'browser'))
+      ? 'browser'
+      : 'token'
+  )
+  const profiles = useProfileStore((s) => s.profiles)
+  const workspaceOptions = useMemo<ProfileWorkspaceOption[]>(() => {
+    const list: ProfileWorkspaceOption[] = []
+    for (const p of profiles) {
+      for (const w of p.apps.slack.availableWorkspaces) {
+        list.push({
+          profileId: p.id,
+          profileEmail: p.customName || p.displayName,
+          workspaceId: w.teamId,
+          workspaceName: w.teamName
+        })
+      }
+    }
+    return list
+  }, [profiles])
+
+  const [selectedWorkspaceKey, setSelectedWorkspaceKey] = useState<string>(() => {
+    if (target?.project.profileId && target?.project.teamId) {
+      return `${target.project.profileId}:${target.project.teamId}`
+    }
+    return workspaceOptions[0] ? `${workspaceOptions[0].profileId}:${workspaceOptions[0].workspaceId}` : ''
+  })
+
+  const [backfillDays, setBackfillDays] = useState<number>(7)
+  const [automationNoticeAck, setAutomationNoticeAck] = useState<boolean>(true)
+
   // channels
   const [channels, setChannels] = useState<Array<{ id: string; name: string }>>([])
   const [loadingChannels, setLoadingChannels] = useState(false)
@@ -196,24 +239,40 @@ export default function DashboardWizard({
   // Auto-load the channel list when the channels step opens (async only —
   // no synchronous state writes inside the effect body).
   useEffect(() => {
-    if (step !== 3 || !channelQuery || channels.length > 0) return
+    if (step !== 3 || channels.length > 0) return
     let alive = true
     void (async () => {
       try {
-        const found = await fetchChannels(channelQuery)
-        if (!alive) return
-        setChannels(found)
-        setChannelError(null)
+        if (sourceType === 'browser') {
+          if (!selectedWorkspaceKey) return
+          const [profId, teamId] = selectedWorkspaceKey.split(':')
+          if (!profId || !teamId) return
+          setLoadingChannels(true)
+          setChannelError(null)
+          const found = await window.api.slack.listChannels(profId, teamId)
+          if (!alive) return
+          setChannels(found.map((c) => ({ id: c.id, name: c.name })))
+          setLoadingChannels(false)
+        } else {
+          if (!channelQuery) return
+          setLoadingChannels(true)
+          setChannelError(null)
+          const found = await fetchChannels(channelQuery)
+          if (!alive) return
+          setChannels(found)
+          setLoadingChannels(false)
+        }
       } catch (err) {
         if (!alive) return
         setChannels([])
         setChannelError(err instanceof Error ? err.message : 'channel fetch failed')
+        setLoadingChannels(false)
       }
     })()
     return () => {
       alive = false
     }
-  }, [step, channelQuery, channels.length])
+  }, [step, sourceType, selectedWorkspaceKey, channelQuery, channels.length])
 
   async function connectToken(): Promise<void> {
     if (!vaultKey.trim() || !tokenValue.trim()) {
@@ -249,18 +308,39 @@ export default function DashboardWizard({
 
   function pickChannels(): void {
     if (selected.size === 0) return
-    if (!projectName.trim() && result?.teamName) setProjectName(result.teamName)
+    if (!projectName.trim()) {
+      if (sourceType === 'browser') {
+        const found = workspaceOptions.find(
+          (o) => `${o.profileId}:${o.workspaceId}` === selectedWorkspaceKey
+        )
+        if (found) setProjectName(found.workspaceName)
+      } else if (result?.teamName) {
+        setProjectName(result.teamName)
+      }
+    }
     setStep(4)
   }
 
   async function createCard(): Promise<void> {
     if (!projectName.trim() || selected.size === 0) return
     // v2.3 — hard rule: a card must be bound to exactly one workspace
-    const teamId = result?.teamId ?? target?.project.teamId
-    const teamName = result?.teamName ?? target?.project.teamName
+    let teamId = result?.teamId ?? target?.project.teamId
+    let teamName = result?.teamName ?? target?.project.teamName
+    let profileId = target?.project.profileId ?? (savedKey ? `manual:${savedKey}` : '')
+
+    if (sourceType === 'browser') {
+      const parts = selectedWorkspaceKey.split(':')
+      profileId = parts[0] || profileId
+      teamId = parts[1] || teamId
+      const found = workspaceOptions.find(
+        (o) => `${o.profileId}:${o.workspaceId}` === selectedWorkspaceKey
+      )
+      if (found) teamName = found.workspaceName
+    }
+
     if (!teamId) {
       setCreateError(
-        'Workspace unknown — reconnect the connector so the card can be bound to one workspace.'
+        'Workspace unknown — select a workspace or reconnect the connector so the card can be bound to one workspace.'
       )
       return
     }
@@ -273,19 +353,44 @@ export default function DashboardWizard({
       const monitors = channels
         .filter((c) => selected.has(c.id))
         .map((c) => ({ channelId: c.id, channelName: c.name }))
+
+      const now = new Date().toISOString()
+      const browserSources: ProjectSource[] | undefined =
+        sourceType === 'browser'
+          ? [
+              {
+                id: `src-browser-${Date.now().toString(36)}`,
+                kind: 'browser',
+                platform: 'slack',
+                profileId,
+                workspaceId: teamId,
+                workspaceName: teamName || 'Slack Workspace',
+                channels: monitors.map((m) => ({ id: m.channelId, name: m.channelName })),
+                role: 'client',
+                backfillDays: (backfillDays === 1 || backfillDays === 30 ? backfillDays : 7) as 1 | 7 | 30,
+                enabled: true,
+                status: 'connected',
+                createdAt: now,
+                updatedAt: now
+              }
+            ]
+          : target?.project.sources
+
       await upsertProject({
         ...(target ? target.project : undefined),
         id,
         name: projectName.trim(),
         clientName: clientName.trim() || projectName.trim(),
         // editing an OAuth card must not silently convert it to a manual token
-        profileId: target?.project.profileId ?? `manual:${savedKey}`,
+        profileId: profileId || `manual:${savedKey}`,
         teamId,
         teamName,
         selfUserId: result?.userId ?? target?.project.selfUserId,
         appId: 'slack',
-        tokenSource: target?.project.tokenSource ?? 'manual',
-        manualTokenKey: savedKey || target?.project.manualTokenKey,
+        tokenSource: sourceType === 'browser' ? 'oauth' : (target?.project.tokenSource ?? 'manual'),
+        manualTokenKey: sourceType === 'browser' ? undefined : (savedKey || target?.project.manualTokenKey),
+        sourcePreference: sourceType === 'browser' ? 'browser_only' : 'token_first',
+        sources: browserSources,
         monitors: monitors.length
           ? monitors
           : (target?.project.monitors ?? []).map((m) => ({
@@ -341,69 +446,82 @@ export default function DashboardWizard({
         )}
       </header>
 
-      {/* ===== STEP 1 — guided connect ===== */}
+      {/* ===== STEP 1 — Choose Source ===== */}
       {step === 1 ? (
         <div className="wizard-body">
-          <h3>Connect a workspace</h3>
-          <ol className="wizard-guide">
-            <li>
-              <p>
-                <b>1. Create the Slack app</b> (one-time, ~1 min) — you own it, and it reads your
-                channels plus posts replies from the Slack Chat tab. Open{' '}
-                <a href={APPS_HOME} target="_blank" rel="noreferrer">
-                  api.slack.com/apps
-                </a>{' '}
-                and click <b>Create New App → From an app manifest</b>.
-              </p>
-            </li>
-            <li>
-              <p>
-                <b>2. Paste this manifest JSON</b> in the manifest box (it already carries all{' '}
-                {USER_SCOPES.length} scopes, including chat:write for replies, and a correct
-                redirect URL):
-              </p>
-              <pre className="wizard-code">{manifest}</pre>
-              <button type="button" className="dash-subtle" onClick={() => void copyManifest()}>
-                {copied === 'manifest' ? '✓ Copied' : '⧉ Copy JSON'}
-              </button>
-            </li>
-            <li>
-              <p>
-                <b>3. Install it to the workspace</b> — while in your app page open{' '}
-                <b>Settings → Install App → Install to workspace</b> and press <b>Allow</b>.
-              </p>
-            </li>
-            <li>
-              <p>
-                <b>4. Find &amp; copy the token</b> — still on the app page, open{' '}
-                <b>Settings → OAuth &amp; Permissions</b>; under <b>User OAuth Tokens</b> you will
-                see <code>xoxp-…</code>. Click copy (if no token exists yet, press{' '}
-                <b>Install to workspace</b> first).
-              </p>
-            </li>
-          </ol>
-          <p className="settings-hint">
-            Tip: repeat step 3 once <b>per workspace</b> you want to read — each install gives a
-            token that only reads that workspace.
+          <h3>Choose Connection Method</h3>
+          <p className="wizard-sub">
+            Select how Orbit should read messages from your Slack workspace.
           </p>
-          <div className="settings-actions">
-            <button type="button" className="dash-primary" onClick={() => setStep(2)}>
-              I have the token →
+          <SourcePicker value={sourceType} onChange={(val) => setSourceType(val)} />
+          <div className="settings-actions" style={{ marginTop: 24 }}>
+            <button
+              type="button"
+              className="dash-primary"
+              onClick={() => setStep(2)}
+            >
+              Continue →
             </button>
           </div>
         </div>
       ) : null}
 
-      {step === 2 ? (
+      {/* ===== STEP 2 — Connect & Configure ===== */}
+      {step === 2 && sourceType === 'browser' ? (
         <div className="wizard-body">
-          <h3>Paste the token</h3>
+          <h3>Logged-in Slack Workspace</h3>
+          <p className="wizard-sub">
+            Map a Slack workspace docked under your Google Profile in Orbit.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <WorkspacePicker
+              options={workspaceOptions}
+              selectedKey={selectedWorkspaceKey}
+              onChange={(key) => setSelectedWorkspaceKey(key)}
+            />
+            <BackfillSelect
+              days={backfillDays}
+              onChange={(d) => setBackfillDays(d)}
+            />
+            <AutomationNotice
+              acknowledged={automationNoticeAck}
+              onChange={(a) => setAutomationNoticeAck(a)}
+            />
+          </div>
+          <div className="settings-actions" style={{ marginTop: 20 }}>
+            <button type="button" className="dash-subtle" onClick={() => setStep(1)}>
+              ← Back
+            </button>
+            <button
+              type="button"
+              className="dash-primary"
+              disabled={!selectedWorkspaceKey || !automationNoticeAck}
+              onClick={() => {
+                setChannels([])
+                setSelected(new Set())
+                setStep(3)
+              }}
+            >
+              Continue to Channels →
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* ===== STEP 2 (Token Option) — Guided Setup & Paste Token ===== */}
+      {step === 2 && sourceType === 'token' ? (
+        <div className="wizard-body">
+          <h3>Slack App Token Setup</h3>
           {savedTokenMask && !replaceMode ? (
             <>
               <p className="wizard-saved-token">
                 saved connector: <code>{savedKey}</code> · <code>{savedTokenMask}</code>
               </p>
               <div className="settings-actions">
-                <button type="button" className="dash-subtle" onClick={() => setStep(3)}>
+                <button type="button" className="dash-subtle" onClick={() => setStep(1)}>
+                  ← Back
+                </button>
+                <button type="button" className="dash-primary" onClick={() => setStep(3)}>
                   Continue with it →
                 </button>
               </div>
@@ -417,6 +535,27 @@ export default function DashboardWizard({
             </>
           ) : (
             <>
+              <ol className="wizard-guide">
+                <li>
+                  <p>
+                    <b>1. Create App from Manifest:</b> Open{' '}
+                    <a href={APPS_HOME} target="_blank" rel="noreferrer">
+                      api.slack.com/apps
+                    </a>{' '}
+                    and select <b>From an app manifest</b>.
+                  </p>
+                  <pre className="wizard-code">{manifest}</pre>
+                  <button type="button" className="dash-subtle" onClick={() => void copyManifest()}>
+                    {copied === 'manifest' ? '✓ Copied' : '⧉ Copy Manifest JSON'}
+                  </button>
+                </li>
+                <li>
+                  <p>
+                    <b>2. Install App & Copy Token:</b> Under <b>OAuth & Permissions</b>, copy the{' '}
+                    <code>xoxp-…</code> user token.
+                  </p>
+                </li>
+              </ol>
               <label className="settings-row">
                 <p className="settings-hint">
                   Project name — the key becomes <code>{vaultKey || 'DASH_TOKEN_<PROJECT>'}</code>{' '}
@@ -451,7 +590,7 @@ export default function DashboardWizard({
               ) : null}
               <div className="settings-actions">
                 <button type="button" className="dash-subtle" onClick={() => setStep(1)}>
-                  ← Setup guide
+                  ← Back
                 </button>
                 <button
                   type="button"
