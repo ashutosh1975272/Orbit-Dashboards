@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { AppId } from '../../../../shared/types'
+import { AppId, profileDisplayLabel } from '../../../../shared/types'
 import { useProfileStore } from '../../hooks/useProfiles'
 
 interface AddPlatformPageProps {
   open: boolean
   onClose: () => void
+  initialProfileId?: string | null
 }
 
 interface PlatformEntry {
@@ -15,6 +16,25 @@ interface PlatformEntry {
   supported: boolean
   description: string
 }
+
+export interface PresetLink {
+  name: string
+  url: string
+  icon: string
+  category: 'AI Agents' | 'Productivity & Dev'
+}
+
+export const POPULAR_PRESETS: PresetLink[] = [
+  { name: 'Claude', url: 'https://claude.ai', icon: '🤖', category: 'AI Agents' },
+  { name: 'ChatGPT', url: 'https://chatgpt.com', icon: '✨', category: 'AI Agents' },
+  { name: 'Perplexity', url: 'https://perplexity.ai', icon: '🔍', category: 'AI Agents' },
+  { name: 'Gemini', url: 'https://gemini.google.com', icon: '💎', category: 'AI Agents' },
+  { name: 'GitHub', url: 'https://github.com', icon: '🐙', category: 'Productivity & Dev' },
+  { name: 'Notion', url: 'https://notion.so', icon: '📝', category: 'Productivity & Dev' },
+  { name: 'Linear', url: 'https://linear.app', icon: '📐', category: 'Productivity & Dev' },
+  { name: 'Figma', url: 'https://figma.com', icon: '🎨', category: 'Productivity & Dev' },
+  { name: 'Google Drive', url: 'https://drive.google.com', icon: '📁', category: 'Productivity & Dev' }
+]
 
 const PLATFORMS: PlatformEntry[] = [
   {
@@ -67,172 +87,199 @@ const PLATFORMS: PlatformEntry[] = [
   }
 ]
 
-function workspaceIcon(teamName: string): string {
-  return teamName.trim().charAt(0).toUpperCase()
-}
-
-type ProfileAppSession = Record<AppId, { sessionStatus: string; availableWorkspaces: { teamId: string; teamName: string; openUrl: string; teamDomain?: string; lastChannelName?: string }[] }>
-
-export function AddPlatformPage({
-  open,
-  onClose
-}: AddPlatformPageProps): React.JSX.Element | null {
-  if (!open) return null
-
-  const profiles = useProfileStore.getState().profiles
-  const [workspaces, setWorkspaces] = useState<Array<{
-    teamId: string
-    teamName: string
-    teamDomain?: string
-    profileId: string
-    appId: AppId
-    projectCount: number
-  }>>([])
-  const [_mappings, setMappings] = useState<{ workspaceId: string; projectIds: string[] }[]>([])
-
-  const loadData = useCallback(async () => {
-    const allWorkspaces: Array<{
-      teamId: string
-      teamName: string
-      teamDomain?: string
-      profileId: string
-      appId: AppId
-      projectCount: number
-    }> = []
-
-    for (const profile of profiles) {
-      for (const appId of ['slack', 'teams'] as AppId[]) {
-        const session = (profile.apps as unknown as ProfileAppSession)[appId]
-        if (session?.sessionStatus === 'signed-in') {
-          for (const ws of session.availableWorkspaces) {
-            allWorkspaces.push({
-              teamId: ws.teamId,
-              teamName: ws.teamName,
-              teamDomain: ws.teamDomain,
-              profileId: profile.id,
-              appId,
-              projectCount: 0
-            })
-          }
-        }
-      }
-    }
-
-    try {
-      const mapList = await window.api.dashboard.listWorkspaceMappings()
-      setMappings(mapList)
-
-      const withCounts = allWorkspaces.map((w) => ({
-        ...w,
-        projectCount: mapList.find((m) => m.workspaceId === w.teamId)?.projectIds.length ?? 0
-      }))
-      setWorkspaces(withCounts)
-    } catch {
-      setWorkspaces(allWorkspaces)
-    }
-  }, [profiles])
+export function AddPlatformPage({ open, onClose, initialProfileId }: AddPlatformPageProps): React.JSX.Element | null {
+  const profiles = useProfileStore((s) => s.profiles)
+  const activeProfileId = useProfileStore((s) => s.activeProfileId)
+  const [selectedProfileId, setSelectedProfileId] = useState<string>('')
+  const [customName, setCustomName] = useState('')
+  const [customUrl, setCustomUrl] = useState('')
+  const [feedbackMsg, setFeedbackMsg] = useState<{ text: string; error?: boolean } | null>(null)
+  const [addingPreset, setAddingPreset] = useState<string | null>(null)
 
   useEffect(() => {
-    loadData()
-  }, [loadData])
+    if (initialProfileId) {
+      setSelectedProfileId(initialProfileId)
+    } else if (activeProfileId) {
+      setSelectedProfileId(activeProfileId)
+    } else if (profiles.length > 0 && !selectedProfileId) {
+      setSelectedProfileId(profiles[0]!.id)
+    }
+  }, [initialProfileId, activeProfileId, profiles])
 
-  const platformStatus = (appId: AppId): 'connected' | 'needs-login' | 'signing-in' => {
-    const profile = profiles[0]
-    if (!profile) return 'needs-login'
-    const session = (profile.apps as unknown as Record<AppId, { sessionStatus: string }>)[appId]
-    if (session?.sessionStatus === 'signed-in') return 'connected'
-    if (session?.sessionStatus === 'not-signed-in') return 'needs-login'
-    return 'signing-in'
-  }
+  const handleAddLink = useCallback(
+    async (name: string, url: string) => {
+      if (!selectedProfileId) {
+        setFeedbackMsg({ text: 'Please select a profile first.', error: true })
+        return
+      }
+      setFeedbackMsg(null)
+      try {
+        const updated = await window.api.profiles.addCustomLink(selectedProfileId, {
+          name,
+          url
+        })
+        useProfileStore.setState((prev) => ({
+          profiles: prev.profiles.map((p) => (p.id === updated.id ? updated : p))
+        }))
+        setFeedbackMsg({ text: `Successfully added ${name} to sidebar!`, error: false })
+        setCustomName('')
+        setCustomUrl('')
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        setFeedbackMsg({ text: msg, error: true })
+      }
+    },
+    [selectedProfileId]
+  )
+
+  if (!open) return null
 
   return (
-    <div
-      className="add-platform-backdrop"
-      role="presentation"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
-    >
-      <div className="add-platform-panel" role="dialog" aria-modal="true" aria-label="Add platform or custom link">
-        <header className="add-platform-header">
-          <h2>Add platform</h2>
-          <button type="button" className="btn ghost" onClick={onClose}>
-            Close
+    <div className="add-platform-backdrop" onClick={onClose}>
+      <div
+        className="add-platform-panel"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Add Platform or Custom Links"
+      >
+        <div className="add-platform-header">
+          <div>
+            <h2>Add Platform or Web Link</h2>
+            <p className="add-section-sub" style={{ margin: '4px 0 0 0' }}>
+              Connect native workspaces or add web links to your account.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn ghost btn-sm"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            ✕
           </button>
-        </header>
+        </div>
 
+        {/* Profile Selector */}
+        <div
+          style={{
+            background: 'var(--bg-page)',
+            padding: '12px 16px',
+            borderRadius: '8px',
+            border: '1px solid var(--border)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '20px'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text)' }}>
+              Target Google Email:
+            </span>
+            <select
+              value={selectedProfileId}
+              onChange={(e) => setSelectedProfileId(e.target.value)}
+              style={{
+                background: 'var(--surface)',
+                color: 'var(--text)',
+                border: '1px solid var(--border)',
+                borderRadius: '6px',
+                padding: '6px 10px',
+                fontSize: '0.85rem'
+              }}
+            >
+              {profiles.length === 0 ? (
+                <option value="">No profiles added yet</option>
+              ) : (
+                profiles.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {profileDisplayLabel(p)} ({p.displayName})
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+          {feedbackMsg && (
+            <span
+              style={{
+                fontSize: '0.82rem',
+                color: feedbackMsg.error ? 'var(--danger, #ff5c5c)' : 'var(--accent, #6366f1)',
+                fontWeight: 500
+              }}
+            >
+              {feedbackMsg.text}
+            </span>
+          )}
+        </div>
+
+        {/* 1-Click Popular Presets */}
         <section className="add-section">
-          <h3 className="add-section-title">Connected workspaces</h3>
+          <h3 className="add-section-title">Popular AI Agents & Tools (1-Click Add)</h3>
           <p className="add-section-sub">
-            Workspaces you're already signed into. Click "Map to cards" to link them
-            to project cards.
+            Click "+ Add" to instantly bind Claude, ChatGPT, Notion, GitHub and more to this email.
           </p>
-          <div className="add-workspace-grid">
-            {workspaces.length === 0 ? (
-              <p className="add-empty">No connected workspaces yet.</p>
-            ) : (
-              workspaces.map((ws) => (
-                <div
-                  key={`${ws.profileId}:${ws.appId}:${ws.teamId}`}
-                  className="add-workspace-card"
-                >
-                  <div className="add-workspace-header">
-                    <span className="add-workspace-icon">{workspaceIcon(ws.teamName)}</span>
-                    <div className="add-workspace-info">
-                      <span className="add-workspace-name">{ws.teamName}</span>
-                      {ws.teamDomain && <span className="add-workspace-domain">@{ws.teamDomain}</span>}
-                    </div>
-                    <span className={`add-workspace-badge ${ws.projectCount > 0 ? 'is-mapped' : 'is-unmapped'}`}>
-                      {ws.projectCount > 0 ? `Mapped to ${ws.projectCount} cards` : 'Not mapped'}
-                    </span>
+
+          <div className="preset-grid">
+            {POPULAR_PRESETS.map((preset) => (
+              <div key={preset.name} className="preset-card">
+                <div className="preset-meta">
+                  <span className="preset-icon">{preset.icon}</span>
+                  <div>
+                    <div className="preset-name">{preset.name}</div>
                   </div>
-                  <button
-                    type="button"
-                    className="btn primary btn-sm"
-                    onClick={() => {
-                      onClose()
-                    }}
-                  >
-                    Map to cards
-                  </button>
                 </div>
-              ))
-            )}
+                <button
+                  type="button"
+                  className="btn primary btn-sm"
+                  style={{ padding: '4px 8px', fontSize: '0.78rem' }}
+                  onClick={async () => {
+                    setAddingPreset(preset.name)
+                    await handleAddLink(preset.name, preset.url)
+                    setAddingPreset(null)
+                  }}
+                  disabled={addingPreset === preset.name}
+                >
+                  {addingPreset === preset.name ? 'Adding…' : '+ Add'}
+                </button>
+              </div>
+            ))}
           </div>
         </section>
+
+        {/* Native Workspaces */}
         <section className="add-section">
-          <h3 className="add-section-title">Available platforms</h3>
-          <p className="add-section-sub">
-            Connect a new platform or view connection status.
-          </p>
+          <h3 className="add-section-title">Supported Messaging Platforms</h3>
           <div className="add-platform-list">
-            {PLATFORMS.map((p) => {
-              const status = p.id === 'slack' || p.id === 'teams' || p.id === 'whatsapp'
-                ? platformStatus(p.id as AppId)
-                : p.status
-              const isConnected = status === 'connected'
-              const isSupported = p.supported
+            {PLATFORMS.map((platform) => {
+              const currentProfile = profiles.find((p) => p.id === selectedProfileId)
+              const session = currentProfile && platform.id in currentProfile.apps
+                ? currentProfile.apps[platform.id as AppId]
+                : null
+              const isConnected = session?.sessionStatus === 'signed-in'
+              const status = isConnected
+                ? 'connected'
+                : platform.supported
+                  ? 'needs-login'
+                  : 'soon'
+
               return (
                 <div
-                  key={p.id}
-                  className={`add-platform-row${isSupported ? '' : ' is-soon'}`}
+                  key={platform.id}
+                  className={`add-platform-row${!platform.supported ? ' is-soon' : ''}`}
                 >
                   <div className="add-platform-info">
-                    <span className="add-platform-icon">{p.icon}</span>
-                    <div>
-                      <span className="add-platform-name">{p.name}</span>
-                      <span className="add-platform-desc">{p.description}</span>
-                    </div>
+                    <span className="add-platform-icon">{platform.icon}</span>
+                    <span className="add-platform-name">{platform.name}</span>
+                    <span className="add-platform-desc">{platform.description}</span>
                   </div>
                   <div className="add-platform-status">
-                    <span
-                      className={`add-platform-status-dot ${status === 'connected' ? 'connected' : status === 'soon' ? 'soon' : 'needs-login'}`}
-                    />
+                    <span className={`add-platform-status-dot ${status}`} />
                     <span className="add-platform-status-label">
                       {status === 'connected' ? 'Connected' : status === 'soon' ? 'Soon' : 'Needs login'}
                     </span>
                   </div>
-                  {isSupported && !isConnected ? (
+                  {platform.supported && !isConnected ? (
                     <button
                       type="button"
                       className="btn primary btn-sm"
@@ -242,7 +289,7 @@ export function AddPlatformPage({
                     >
                       Connect
                     </button>
-                  ) : isSupported && isConnected ? (
+                  ) : platform.supported && isConnected ? (
                     <button type="button" className="btn ghost btn-sm" disabled>
                       Connected
                     </button>
@@ -255,17 +302,20 @@ export function AddPlatformPage({
           </div>
         </section>
 
+        {/* Custom Link Form */}
         <section className="add-section add-section-custom">
-          <h3 className="add-section-title">Custom link</h3>
+          <h3 className="add-section-title">Add Any Custom URL</h3>
           <p className="add-section-sub">
-            Add any secure web link for embedded viewing. View only — no automation.
+            Add any secure HTTPS web link for embedded viewing. View only — no automation.
           </p>
           <div className="add-custom-form">
             <div className="add-custom-field">
               <label className="add-custom-label">Name</label>
               <input
                 type="text"
-                placeholder="e.g. Client Portal"
+                value={customName}
+                onChange={(e) => setCustomName(e.target.value)}
+                placeholder="e.g. Claude Workspace, Linear Team, Jira"
                 className="add-custom-input"
               />
             </div>
@@ -273,19 +323,27 @@ export function AddPlatformPage({
               <label className="add-custom-label">URL (https only)</label>
               <input
                 type="url"
+                value={customUrl}
+                onChange={(e) => setCustomUrl(e.target.value)}
                 placeholder="https://example.com"
                 className="add-custom-input"
               />
             </div>
-            <button type="button" className="btn primary btn-sm">
+            <button
+              type="button"
+              className="btn primary btn-sm"
+              onClick={() => handleAddLink(customName, customUrl)}
+              disabled={!customName.trim() || !customUrl.trim()}
+            >
               Add link
             </button>
           </div>
           <p className="add-custom-note">
-            View only. Automation aur scraping is link par available nahi.
+            View only. Automation aur scraping is link par available nahi. Partition isolated.
           </p>
         </section>
       </div>
     </div>
   )
 }
+export default AddPlatformPage

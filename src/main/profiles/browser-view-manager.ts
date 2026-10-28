@@ -56,6 +56,10 @@ export function viewKey(profileId: string, appId: AppId): string {
   return `${profileId}:${appId}`
 }
 
+export function customLinkKey(profileId: string, linkId: string): string {
+  return `link:${profileId}:${linkId}`
+}
+
 export type WorkspaceSeenHandler = (
   profileId: string,
   appId: AppId,
@@ -834,6 +838,57 @@ export class BrowserViewManager {
     log.info('browser view activated', { profileId, appId })
   }
 
+  activateCustomLink(
+    profileId: string,
+    linkId: string,
+    url: string,
+    mainWindow: BrowserWindow,
+    bounds: Rectangle
+  ): void {
+    const key = customLinkKey(profileId, linkId)
+    let view = this.views.get(key)
+    if (!view || view.webContents.isDestroyed()) {
+      view = new WebContentsView({
+        webPreferences: {
+          partition: `persist:profile-${profileId}-link-${linkId}`,
+          contextIsolation: true,
+          nodeIntegration: false,
+          sandbox: true
+        }
+      })
+      view.webContents.setWindowOpenHandler(({ url: openUrl }) => {
+        void view?.webContents.loadURL(openUrl)
+        return { action: 'deny' }
+      })
+      void view.webContents.loadURL(url)
+      this.views.set(key, view)
+    }
+
+    this.lastBounds = bounds
+
+    if (this.activeKey && this.activeKey !== key) {
+      const prev = this.views.get(this.activeKey)
+      if (prev) {
+        mainWindow.contentView.removeChildView(prev)
+      }
+      this.lastEmittedThemeKey = null
+    }
+
+    this.activeKey = key
+
+    if (this.embedHidden) {
+      log.info('custom link view activated (hidden for overlay)', { profileId, linkId })
+      return
+    }
+
+    if (!mainWindow.contentView.children.includes(view)) {
+      mainWindow.contentView.addChildView(view)
+    }
+    view.setBounds(bounds)
+    this.noteActivity()
+    log.info('custom link view activated', { profileId, linkId, url })
+  }
+
   activateSecondary(
     profileId: string,
     appId: AppId,
@@ -1026,6 +1081,21 @@ export class BrowserViewManager {
     }
     if (this.secondaryKey?.startsWith(`${profileId}:`)) {
       this.secondaryKey = null
+    }
+    // Destroy custom links associated with this profile
+    const prefix = `link:${profileId}:`
+    for (const key of [...this.views.keys()]) {
+      if (key.startsWith(prefix)) {
+        const view = this.views.get(key)
+        if (mainWindow && this.activeKey === key && view) {
+          mainWindow.contentView.removeChildView(view)
+          this.activeKey = null
+        }
+        if (view && !view.webContents.isDestroyed()) {
+          view.webContents.close()
+        }
+        this.views.delete(key)
+      }
     }
     log.info('browser views destroyed for profile', { profileId })
   }

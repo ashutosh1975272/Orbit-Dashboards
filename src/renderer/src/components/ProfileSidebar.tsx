@@ -1,6 +1,6 @@
 import { memo, useMemo, useState } from 'react'
 import { APP_DISPLAY_NAME } from '../../../shared/brand'
-import type { AppId, AppSession, AppSessionStatus, Profile } from '../../../shared/types'
+import type { AppId, AppSession, AppSessionStatus, CustomLink, Profile } from '../../../shared/types'
 import {
   APP_IDS,
   appSupportsWorkspaces,
@@ -51,6 +51,12 @@ interface ProfileSidebarProps {
   onPlatformSettings: (profileId: string, appId: AppId) => void
   /** Open the "+ Add" page for adding platforms / custom links. */
   onAddPlatform: () => void
+  /** Open the Accounts & Workspaces management hub. */
+  onOpenAccountsSettings?: () => void
+  /** Active custom link ID if one is currently opened in embed */
+  activeCustomLinkId?: string | null
+  /** Select and view a custom link */
+  onSelectCustomLink?: (profileId: string, link: CustomLink) => void
   /** Optional slot rendered after the Recents strip (dashboard entry point). */
   dashboardSlot?: React.ReactNode
 }
@@ -304,6 +310,9 @@ export const ProfileSidebar = memo(function ProfileSidebar({
   onDismissError,
   onPlatformSettings,
   onAddPlatform,
+  onOpenAccountsSettings,
+  activeCustomLinkId,
+  onSelectCustomLink,
   dashboardSlot
 }: ProfileSidebarProps): React.JSX.Element {
   const [profileExpanded, setProfileExpanded] = useState<Record<string, boolean>>({})
@@ -457,7 +466,9 @@ export const ProfileSidebar = memo(function ProfileSidebar({
         {profiles.length === 0 ? (
           <li className="empty-hint">No profiles yet.</li>
         ) : (
-          profiles.map((profile) => {
+          profiles
+            .filter((p) => !p.hiddenInSidebar)
+            .map((profile) => {
             const profileOpen = isProfileOpen(profile.id)
             const profileActive = profile.id === activeProfileId
             const label = profileDisplayLabel(profile)
@@ -635,6 +646,47 @@ export const ProfileSidebar = memo(function ProfileSidebar({
                         </li>
                       )
                     })}
+
+                    {/* Custom Links Rows */}
+                    {(profile.customLinks ?? [])
+                      .filter((link) => !link.hiddenInSidebar)
+                      .map((link) => {
+                        const isLinkActive =
+                          profileActive && activeCustomLinkId === link.id
+
+                        return (
+                          <li
+                            key={link.id}
+                            className={`nav-app${isLinkActive ? ' is-active' : ''}`}
+                          >
+                            <div className="nav-app-row">
+                              <button
+                                type="button"
+                                className="nav-app-select"
+                                onClick={() => {
+                                  onSelect(profile.id)
+                                  onSelectCustomLink?.(profile.id, link)
+                                }}
+                                title={`Open ${link.name} (${link.url})`}
+                              >
+                                <span
+                                  style={{
+                                    fontSize: '0.82rem',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    width: '16px',
+                                    marginRight: '2px'
+                                  }}
+                                >
+                                  🌐
+                                </span>
+                                <span className="nav-app-label">{link.name}</span>
+                              </button>
+                            </div>
+                          </li>
+                        )
+                      })}
                   </ul>
                 ) : null}
               </li>
@@ -652,6 +704,15 @@ export const ProfileSidebar = memo(function ProfileSidebar({
           aria-label="Add platform or custom link"
         >
           + Add
+        </button>
+        <button
+          type="button"
+          className="nav-accounts-btn"
+          onClick={onOpenAccountsSettings}
+          title="Accounts and Workspaces Hub"
+          aria-label="Accounts and Workspaces Hub"
+        >
+          ⚙ Accounts
         </button>
       </div>
 

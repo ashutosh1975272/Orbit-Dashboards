@@ -75,6 +75,12 @@ const api: IpcApi = {
       ipcRenderer.invoke(IpcChannels.ProfileReorderCustomLinks, { profileId, orderedIds }),
     listCustomLinks: (profileId) =>
       ipcRenderer.invoke(IpcChannels.ProfileListCustomLinks, { profileId }),
+    setHiddenInSidebar: (profileId, hidden) =>
+      ipcRenderer.invoke(IpcChannels.ProfileSetHiddenInSidebar, { profileId, hidden }),
+    setLinkHiddenInSidebar: (profileId, linkId, hidden) =>
+      ipcRenderer.invoke(IpcChannels.ProfileSetLinkHiddenInSidebar, { profileId, linkId, hidden }),
+    activateCustomLink: (profileId, linkId, url, bounds) =>
+      ipcRenderer.invoke(IpcChannels.ProfileActivateCustomLink, { profileId, linkId, url, bounds }),
     updateBounds: (bounds: ViewportBounds) =>
       ipcRenderer.invoke(IpcChannels.ProfileUpdateBounds, bounds),
     setEmbedVisible: (visible: boolean) =>

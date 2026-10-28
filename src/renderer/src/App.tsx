@@ -19,6 +19,7 @@ import { SidebarPanelIcon } from './components/SidebarPanelIcon'
 import { SlackViewport } from './components/SlackViewport'
 import { PlatformSettingsPanel } from './components/dashboard/PlatformSettingsPanel'
 import { AddPlatformPage } from './components/dashboard/AddPlatformPage'
+import { AccountsManagementModal } from './components/dashboard/AccountsManagementModal'
 import { sidebarToastFor } from './lib/sidebar-toast'
 import { modKey, modShift } from './lib/shortcut-label'
 import { useProfileStore } from './hooks/useProfiles'
@@ -82,6 +83,8 @@ function App(): React.JSX.Element {
     appId: AppId
   } | null>(null)
   const [addPlatformOpen, setAddPlatformOpen] = useState(false)
+  const [accountsModalOpen, setAccountsModalOpen] = useState(false)
+  const [activeCustomLinkId, setActiveCustomLinkId] = useState<string | null>(null)
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS)
   const [locked, setLocked] = useState(false)
   const [unlocking, setUnlocking] = useState(false)
@@ -328,13 +331,15 @@ function App(): React.JSX.Element {
   const showEmbed = Boolean(
     adminAuthenticated &&
     activeProfile &&
-    activeAppId &&
+    (activeAppId || activeCustomLinkId) &&
     !dashboardOpen &&
     !wizardOpen &&
     !browserAuthBusy &&
     !locked &&
     !settingsOpen &&
     !cmdkOpen &&
+    !addPlatformOpen &&
+    !accountsModalOpen &&
     !showOnboarding
   )
 
@@ -449,6 +454,7 @@ function App(): React.JSX.Element {
 
   const handleSelectProfile = useCallback(
     async (profileId: string) => {
+      setActiveCustomLinkId(null)
       if (profileId === activeProfileId) {
         return
       }
@@ -464,8 +470,21 @@ function App(): React.JSX.Element {
     [activeProfileId, activateProfile, selectApp]
   )
 
+  const handleSelectCustomLink = useCallback(
+    async (profileId: string, link: import('../../shared/types').CustomLink) => {
+      closeDashboard()
+      setActiveCustomLinkId(link.id)
+      useProfileStore.setState({ activeProfileId: profileId, activeAppId: null })
+      const bounds = viewportBounds()
+      await window.api.profiles.activateCustomLink(profileId, link.id, link.url, bounds)
+      setStatusLine(`Viewing ${link.name} · ${link.url}`)
+    },
+    [closeDashboard]
+  )
+
   const handleSidebarSelectApp = useCallback(
     (profileId: string, appId: AppId) => {
+      setActiveCustomLinkId(null)
       void (async () => {
         closeDashboard()
         const refreshed = useProfileStore.getState().profiles.find((p) => p.id === profileId)
@@ -784,6 +803,9 @@ function App(): React.JSX.Element {
                 setPlatformSettings({ profileId, appId })
               }}
               onAddPlatform={() => setAddPlatformOpen(true)}
+              onOpenAccountsSettings={() => setAccountsModalOpen(true)}
+              activeCustomLinkId={activeCustomLinkId}
+              onSelectCustomLink={handleSelectCustomLink}
             />
             <div
               className="sidebar-resizer"
@@ -971,6 +993,19 @@ function App(): React.JSX.Element {
 
       {addPlatformOpen ? (
         <AddPlatformPage open={true} onClose={() => setAddPlatformOpen(false)} />
+      ) : null}
+
+      {accountsModalOpen ? (
+        <AccountsManagementModal
+          open={true}
+          onClose={() => setAccountsModalOpen(false)}
+          onAddGoogleAccount={() => {
+            const emailInput = document.querySelector('.nav-input') as HTMLInputElement | null
+            emailInput?.focus()
+          }}
+          onSelectProfile={(id) => void handleSelectProfile(id)}
+          onOpenCustomLink={(pId, link) => void handleSelectCustomLink(pId, link)}
+        />
       ) : null}
 
       {showOnboarding && !locked ? (

@@ -106,6 +106,9 @@ export const IpcChannels = {
   ProfileRemoveCustomLink: 'profile:remove-custom-link',
   ProfileReorderCustomLinks: 'profile:reorder-custom-links',
   ProfileListCustomLinks: 'profile:list-custom-links',
+  ProfileSetHiddenInSidebar: 'profile:set-hidden-in-sidebar',
+  ProfileSetLinkHiddenInSidebar: 'profile:set-link-hidden-in-sidebar',
+  ProfileActivateCustomLink: 'profile:activate-custom-link',
   ProfileSessionStatusChanged: 'profile:session-status-changed',
   ProfileUpdated: 'profile:updated',
   ProfileAuthProgress: 'profile:auth-progress',
@@ -266,6 +269,14 @@ export interface IpcApi {
     removeCustomLink: (profileId: string, linkId: string) => Promise<Profile>
     reorderCustomLinks: (profileId: string, orderedIds: string[]) => Promise<Profile>
     listCustomLinks: (profileId: string) => Promise<import('./types').CustomLink[]>
+    setHiddenInSidebar: (profileId: string, hidden: boolean) => Promise<Profile>
+    setLinkHiddenInSidebar: (profileId: string, linkId: string, hidden: boolean) => Promise<Profile>
+    activateCustomLink: (
+      profileId: string,
+      linkId: string,
+      url: string,
+      bounds: ViewportBounds
+    ) => Promise<void>
     updateBounds: (bounds: ViewportBounds) => Promise<void>
     setEmbedVisible: (visible: boolean) => Promise<void>
     startGoogleAuth: (profileId: string, bounds?: ViewportBounds) => Promise<Profile>

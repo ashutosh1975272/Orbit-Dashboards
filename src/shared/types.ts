@@ -68,6 +68,7 @@ export interface CustomLink {
   order: number
   createdAt: string
   partition: string
+  hiddenInSidebar?: boolean
 }
 
 export interface Profile {
@@ -83,6 +84,8 @@ export interface Profile {
   sortOrder?: number
   /** When true, skip tray/desktop notifications for this profile. */
   muted?: boolean
+  /** When true, hide profile row from left sidebar */
+  hiddenInSidebar?: boolean
   /**
    * Google account cookies ready (Chrome password + 2SV).
    * App logins (Slack/Teams) happen separately after the user picks an app.

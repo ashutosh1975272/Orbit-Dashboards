@@ -215,5 +215,24 @@ describe('Profile Custom Links (Phase 1 LNK-1)', () => {
       expect(profile).toBeDefined()
       expect(profile?.customLinks).toEqual([])
     })
+
+    it('toggles sidebar visibility for profile and links', async () => {
+      const p = await store.create('user@gmail.com')
+      expect(p.hiddenInSidebar).toBe(false)
+
+      const hiddenProf = await store.setSidebarVisibility(p.id, true)
+      expect(hiddenProf.hiddenInSidebar).toBe(true)
+
+      const shownProf = await store.setSidebarVisibility(p.id, false)
+      expect(shownProf.hiddenInSidebar).toBe(false)
+
+      const withLink = await store.addCustomLink(p.id, { name: 'Claude', url: 'https://claude.ai' })
+      const linkId = withLink.customLinks![0]!.id
+      expect(withLink.customLinks![0]!.hiddenInSidebar).toBe(false)
+
+      const hiddenLink = await store.setLinkSidebarVisibility(p.id, linkId, true)
+      expect(hiddenLink.customLinks![0]!.hiddenInSidebar).toBe(true)
+    })
   })
 })
+

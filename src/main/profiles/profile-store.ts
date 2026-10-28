@@ -388,6 +388,7 @@ type RawProfile = {
   avatarUrl?: unknown
   sortOrder?: unknown
   muted?: unknown
+  hiddenInSidebar?: unknown
   googleAuthStatus?: unknown
   apps?: unknown
   customLinks?: unknown
@@ -455,6 +456,7 @@ function normalizeProfile(raw: RawProfile): Profile {
         ? raw.googleAuthStatus
         : 'not-signed-in',
     muted: raw.muted === true,
+    hiddenInSidebar: raw.hiddenInSidebar === true,
     ...(typeof sortOrder === 'number' ? { sortOrder } : {}),
     ...(customName ? { customName } : {}),
     ...(avatarUrl ? { avatarUrl } : {}),
@@ -481,7 +483,8 @@ function normalizeCustomLinks(raw: unknown): CustomLink[] {
       partition:
         typeof rec.partition === 'string' && rec.partition.trim()
           ? rec.partition.trim()
-          : `persist:profile-link-${rec.id.trim()}`
+          : `persist:profile-link-${rec.id.trim()}`,
+      hiddenInSidebar: rec.hiddenInSidebar === true
     })
   }
   return out.sort((a, b) => a.order - b.order)
@@ -621,6 +624,7 @@ export class ProfileStore {
       googleAuthStatus: 'not-signed-in',
       sortOrder: data.profiles.length,
       muted: false,
+      hiddenInSidebar: false,
       apps: emptyProfileApps(),
       customLinks: []
     }
@@ -1181,7 +1185,8 @@ export class ProfileStore {
       url: validated.url,
       order: existing.length,
       createdAt: new Date().toISOString(),
-      partition: `persist:profile-${profileId}-link-${linkId}`
+      partition: `persist:profile-${profileId}-link-${linkId}`,
+      hiddenInSidebar: false
     }
 
     const updatedProfile: Profile = {
@@ -1285,6 +1290,44 @@ export class ProfileStore {
     const updatedProfile: Profile = {
       ...profile,
       customLinks: reordered
+    }
+    data.profiles[index] = updatedProfile
+    await this.write(data)
+    return updatedProfile
+  }
+
+  async setSidebarVisibility(profileId: string, hidden: boolean): Promise<Profile> {
+    const data = await this.read()
+    const index = data.profiles.findIndex((p) => p.id === profileId)
+    if (index === -1) {
+      throw new Error(`Profile not found: ${profileId}`)
+    }
+    const updatedProfile: Profile = {
+      ...data.profiles[index]!,
+      hiddenInSidebar: hidden
+    }
+    data.profiles[index] = updatedProfile
+    await this.write(data)
+    return updatedProfile
+  }
+
+  async setLinkSidebarVisibility(
+    profileId: string,
+    linkId: string,
+    hidden: boolean
+  ): Promise<Profile> {
+    const data = await this.read()
+    const index = data.profiles.findIndex((p) => p.id === profileId)
+    if (index === -1) {
+      throw new Error(`Profile not found: ${profileId}`)
+    }
+    const profile = data.profiles[index]!
+    const links = (profile.customLinks ?? []).map((l) =>
+      l.id === linkId ? { ...l, hiddenInSidebar: hidden } : l
+    )
+    const updatedProfile: Profile = {
+      ...profile,
+      customLinks: links
     }
     data.profiles[index] = updatedProfile
     await this.write(data)

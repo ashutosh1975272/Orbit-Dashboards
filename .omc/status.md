@@ -1,5 +1,27 @@
 # Status Ledger
 
+## LNK-2 to LNK-5 — Accounts & Workspaces Hub, 1-Click Presets & Custom Links (2026-10-28, branch `beta`)
+- `pnpm run typecheck`: PASS — 0 errors (Node & Web).
+- `pnpm test`: PASS — **70 files, 581/581 tests passed** (exit 0, 0 failures, 0 regressions).
+- `electron-vite build`: PASS — clean build of main, preload, and renderer.
+- **Sidebar Footer `⚙ Accounts` Button**:
+  - Positioned beside `+ Add` in `ProfileSidebar.tsx`.
+  - Opens `AccountsManagementModal.tsx`.
+- **Accounts & Workspaces Hub**:
+  - Displays each profile as an expanded card (identity, active indicator, Google sign-in status, connected Slack/Teams/WhatsApp status).
+  - Sequence reordering (`▲` / `▼`) persisted via `window.api.profiles.reorder`.
+  - Sidebar visibility toggle (`hiddenInSidebar`) for both profiles and individual custom links: hides from the sidebar navigation while preserving sessions, sync, and card mappings.
+  - Direct 1-click popular presets on each profile card: **Claude**, **ChatGPT**, **Perplexity**, **Gemini**, **GitHub**, **Notion**, **Linear**, **Figma**, **Google Drive**.
+  - Inline custom link form on each card.
+- **`AddPlatformPage` Revamp**:
+  - Target Google Email dropdown (defaults to active account).
+  - 1-Click Popular Presets grid.
+  - Fully wired controlled custom form with client validation, feedback badges, and store integration.
+- **Custom Links View & Session Isolation**:
+  - `BrowserViewManager.activateCustomLink`: loads in WebContentsView with partition `persist:profile-<profileId>-link-<linkId>`.
+  - Full Google OAuth / login capabilities with cookies saved and isolated per link.
+  - Clean detachment and child view cleanup upon navigation/overlay opens.
+
 ## LNK-1 — Profile Custom Links Data Model, Store & Validation (2026-10-28, branch `beta`)
 - `pnpm run typecheck`: PASS — 0 errors (Node & Web).
 - `pnpm test`: PASS — **70 files, 580/580 tests passed** (exit 0, 0 failures, 0 regressions).

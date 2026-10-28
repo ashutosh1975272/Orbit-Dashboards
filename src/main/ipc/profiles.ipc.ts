@@ -867,4 +867,48 @@ export function registerProfileIpc(deps: ProfileIpcDeps): void {
       return deps.profileStore.listCustomLinks(payload.profileId)
     }
   )
+
+  handleInvoke(
+    IpcChannels.ProfileSetHiddenInSidebar,
+    async (payload: { profileId: string; hidden: boolean }) => {
+      const updated = await deps.profileStore.setSidebarVisibility(payload.profileId, payload.hidden)
+      notifyProfileUpdated(deps.getMainWindow, updated)
+      return updated
+    }
+  )
+
+  handleInvoke(
+    IpcChannels.ProfileSetLinkHiddenInSidebar,
+    async (payload: { profileId: string; linkId: string; hidden: boolean }) => {
+      const updated = await deps.profileStore.setLinkSidebarVisibility(
+        payload.profileId,
+        payload.linkId,
+        payload.hidden
+      )
+      notifyProfileUpdated(deps.getMainWindow, updated)
+      return updated
+    }
+  )
+
+  handleInvoke(
+    IpcChannels.ProfileActivateCustomLink,
+    async (payload: {
+      profileId: string
+      linkId: string
+      url: string
+      bounds: ViewportBounds
+    }) => {
+      const mainWindow = deps.getMainWindow()
+      if (!mainWindow) throw new Error('Main window is not available')
+      closeChromeStayEmbed()
+      deps.browserViewManager.setEmbedVisible(mainWindow, true)
+      deps.browserViewManager.activateCustomLink(
+        payload.profileId,
+        payload.linkId,
+        payload.url,
+        mainWindow,
+        payload.bounds
+      )
+    }
+  )
 }

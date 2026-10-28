@@ -512,8 +512,8 @@
 }
 
 .add-platform-panel {
-  width: min(950px, 95vw);
-  max-height: min(90vh, 750px);
+  width: min(1140px, 96vw);
+  max-height: min(90vh, 820px);
   overflow: auto;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -767,16 +767,18 @@
   color: var(--muted);
 }
 
-/* Nav add button in ProfileSidebar */
+/* Nav add & accounts buttons in ProfileSidebar */
 .nav-add-section {
   margin: 12px 0 0 0;
   padding-top: 8px;
   border-top: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
 }
 
 .nav-add-btn {
-  width: 100%;
-  padding: 10px 14px;
+  flex: 1;
+  padding: 8px 12px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -785,12 +787,114 @@
   border-radius: 8px;
   background: var(--bg-page);
   color: var(--text);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
 }
 
-.nav-add-btn:hover {
+.nav-accounts-btn {
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-page);
+  color: var(--text-faint);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.nav-add-btn:hover,
+.nav-accounts-btn:hover {
   border-color: var(--accent);
+  color: var(--text);
   background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+/* Preset Grids & Profile Cards Hub */
+.preset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.preset-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--bg-page);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+
+.preset-card:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+
+.preset-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.preset-icon {
+  font-size: 1.25rem;
+}
+
+.preset-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-card-hub {
+  background: var(--bg-page);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px 20px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.profile-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.profile-card-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.profile-avatar-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: #fff;
+  font-size: 0.85rem;
+}
+
+.profile-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
