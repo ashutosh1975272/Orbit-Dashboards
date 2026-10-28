@@ -1,6 +1,8 @@
 import { SlackPoller, isSlackAuthFailure } from './slack-poller'
 import { slackTokenKey } from './slack-throttle'
 import type { InsightEngine } from './insight-engine'
+import { SlackReaderView } from '../slack-reader/slack-reader-view'
+import { RunLogStore } from './run-log-store'
 import type {
   DashboardChannelDelta,
   DashboardMetrics,
@@ -405,6 +407,63 @@ export class DashboardSyncEngine {
               ? 'No manual token saved for this project yet'
               : 'Workspace not connected via OAuth yet'
           )
+        }
+      }
+
+      // If project has active browser sources, scrape channels via SlackReaderView
+      if (browserSources.length > 0) {
+        for (const bSrc of browserSources) {
+          if (!bSrc.profileId || !bSrc.workspaceId) continue
+          const startTime = Date.now()
+          let channelsRead = 0
+          let newMessagesCount = 0
+          try {
+            const reader = new SlackReaderView({
+              profileId: bSrc.profileId,
+              workspaceId: bSrc.workspaceId
+            })
+            for (const ch of bSrc.channels) {
+              const messages = await reader.readChannelMessages(ch.id)
+              channelsRead++
+              if (messages.length > 0) {
+                const appendRes = await this.deltaStore.appendMessages({
+                  profileId: bSrc.profileId,
+                  teamId: bSrc.workspaceId,
+                  channelId: ch.id,
+                  channelName: ch.name,
+                  messages,
+                  source: 'client'
+                })
+                newMessagesCount += appendRes.added
+                clientDeltas.push({
+                  channelId: ch.id,
+                  channelName: ch.name,
+                  messageCount: messages.length,
+                  latestMessageAt: messages[messages.length - 1]?.ts ?? null,
+                  cursor: appendRes.cursor,
+                  lastSyncAt: appendRes.lastSyncAt
+                })
+              }
+            }
+            reader.destroy()
+            const runLogStore = new RunLogStore({ rootDir: this.deltaStore.rootDir })
+            await runLogStore.append({
+              runId: `run-${Date.now().toString(36)}`,
+              ts: new Date().toISOString(),
+              trigger: 'manual',
+              projectId: project.id,
+              sourceId: bSrc.id,
+              sourceKind: 'browser',
+              workspaceId: bSrc.workspaceId,
+              channelsRead,
+              newMessages: newMessagesCount,
+              durationMs: Date.now() - startTime,
+              llmCalls: 0,
+              status: 'connected'
+            })
+          } catch (err) {
+            this.log(`[dashboard] browser source ${bSrc.id} scrape error: ${String(err)}`)
+          }
         }
       }
 
