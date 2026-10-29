@@ -439,6 +439,8 @@ export const ProfileSidebar = memo(function ProfileSidebar({
         </div>
       </div>
 
+      {dashboardSlot}
+
       {visibleRecents.length > 0 ? (
         <div className="recent-strip" aria-label="Recent workspaces">
           <div className="recent-strip-head">
@@ -499,8 +501,6 @@ export const ProfileSidebar = memo(function ProfileSidebar({
           </ul>
         </div>
       ) : null}
-
-      {dashboardSlot}
 
       <label className="field-label" htmlFor="google-email">
         Google email
