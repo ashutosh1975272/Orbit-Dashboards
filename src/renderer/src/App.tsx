@@ -648,6 +648,57 @@ function App(): React.JSX.Element {
     }
   }, [email, createProfile, activateProfile, startGoogleAuth, loadProfiles])
 
+  const handleCreateAndAuthProfile = useCallback(
+    async (displayName: string, targetEmail: string) => {
+      const hint = targetEmail.trim()
+      if (!hint) return
+      setLocalAuthPhase('google')
+      setStatusLine('Opening Chrome for Google authentication…')
+      try {
+        const profile = await createProfile(hint)
+        if (displayName.trim() && displayName.trim() !== hint) {
+          await window.api.profiles.setCustomName(profile.id, displayName.trim())
+        }
+        await loadProfiles()
+
+        const latest = useProfileStore.getState().profiles.find((p) => p.id === profile.id) ?? profile
+        const googleOk = latest.googleAuthStatus === 'signed-in'
+
+        if (googleOk) {
+          await activateProfile(profile.id, viewportBounds())
+          setToast(`Profile ${displayName || hint} already signed in.`)
+          return
+        }
+
+        useProfileStore.setState((s) => ({
+          profiles: s.profiles.map((p) =>
+            p.id === profile.id ? { ...p, googleAuthStatus: 'signing-in' } : p
+          )
+        }))
+        await activateProfile(profile.id, viewportBounds())
+        await nextPaint()
+        await new Promise((r) => setTimeout(r, 50))
+        setStatusLine('Waiting for Google / 2SV…')
+        await startGoogleAuth(profile.id, viewportBounds())
+        await loadProfiles()
+        const updated = useProfileStore.getState().profiles.find((p) => p.id === profile.id)
+        if (updated?.googleAuthStatus === 'signed-in') {
+          setToast(`Google verified! Profile ${displayName || hint} created.`)
+          setStatusLine('Google done. Open Slack under this profile to continue.')
+        } else if (!updated) {
+          setStatusLine('Cancelled — unsigned profile removed.')
+        } else {
+          setStatusLine('Google sign-in did not finish. Try again.')
+        }
+      } catch (err) {
+        setStatusLine(String(err))
+      } finally {
+        setLocalAuthPhase(null)
+      }
+    },
+    [createProfile, activateProfile, startGoogleAuth, loadProfiles]
+  )
+
   const handleCancelChrome = useCallback(() => {
     void window.api.profiles.cancelAuthBusy(activeProfileId ?? undefined)
     void window.api.profiles.cancelChromeEmbed()
@@ -1145,14 +1196,7 @@ function App(): React.JSX.Element {
       <NewProfileModal
         open={newProfileModalOpen}
         onClose={() => setNewProfileModalOpen(false)}
-        onCreate={async (name, email) => {
-          const profile = await useProfileStore.getState().createProfile(email)
-          if (name.trim() && name.trim() !== email) {
-            await window.api.profiles.setCustomName(profile.id, name.trim())
-          }
-          await useProfileStore.getState().loadProfiles()
-          setToast(`Created profile ${name.trim() || email}`)
-        }}
+        onCreate={handleCreateAndAuthProfile}
       />
 
       {platformSettings ? (

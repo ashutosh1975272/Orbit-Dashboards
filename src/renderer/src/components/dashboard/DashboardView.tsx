@@ -769,6 +769,18 @@ export default function DashboardView(): React.ReactElement | null {
               await window.api.profiles.setCustomName(profile.id, name.trim())
             }
             await useProfileStore.getState().loadProfiles()
+            // Initiate Google Authentication in Chrome
+            try {
+              useProfileStore.setState((s) => ({
+                profiles: s.profiles.map((p) =>
+                  p.id === profile.id ? { ...p, googleAuthStatus: 'signing-in' } : p
+                )
+              }))
+              await useProfileStore.getState().startGoogleAuth(profile.id)
+              await useProfileStore.getState().loadProfiles()
+            } catch {
+              // startGoogleAuth handles its own status & error state
+            }
           }}
         />
         <GlobalSettingsPanel
