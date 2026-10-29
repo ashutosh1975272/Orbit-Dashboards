@@ -330,6 +330,7 @@ export const ProfileSidebar = memo(function ProfileSidebar({
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [dragId, setDragId] = useState<string | null>(null)
+  const [activeLook, setActiveLook] = useState<'ancient' | 'new-cosmic'>('ancient')
   const profileIdSet = useMemo(() => new Set(profiles.map((p) => p.id)), [profiles])
   const visibleRecents = useMemo(
     () => recentWorkspaces.filter((r) => profileIdSet.has(r.profileId)).slice(0, 5),
@@ -376,6 +377,65 @@ export const ProfileSidebar = memo(function ProfileSidebar({
               <SidebarPanelIcon />
             </button>
           </div>
+        </div>
+
+        {/* View Looks Switcher: Ancient Look (default) vs New Cosmic */}
+        <div
+          className="sidebar-looks-switcher"
+          role="group"
+          aria-label="Sidebar Appearance Look"
+          style={{
+            display: 'flex',
+            gap: '4px',
+            marginTop: '10px',
+            background: 'rgba(0, 0, 0, 0.28)',
+            padding: '3px',
+            borderRadius: '8px',
+            border: '1px solid rgba(255, 255, 255, 0.07)'
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setActiveLook('ancient')}
+            aria-pressed={activeLook === 'ancient'}
+            style={{
+              flex: 1,
+              padding: '5px 8px',
+              fontSize: '11px',
+              fontWeight: 600,
+              borderRadius: '6px',
+              border: activeLook === 'ancient' ? '1px solid var(--accent)' : '1px solid transparent',
+              background: activeLook === 'ancient' ? 'color-mix(in srgb, var(--accent) 22%, transparent)' : 'transparent',
+              color: activeLook === 'ancient' ? '#fff' : 'var(--text-faint)',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+              textAlign: 'center'
+            }}
+            title="Ancient Look (Default established theme)"
+          >
+            Ancient Look
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveLook('new-cosmic')}
+            aria-pressed={activeLook === 'new-cosmic'}
+            style={{
+              flex: 1,
+              padding: '5px 8px',
+              fontSize: '11px',
+              fontWeight: 600,
+              borderRadius: '6px',
+              border: activeLook === 'new-cosmic' ? '1px solid var(--accent)' : '1px solid transparent',
+              background: activeLook === 'new-cosmic' ? 'color-mix(in srgb, var(--accent) 22%, transparent)' : 'transparent',
+              color: activeLook === 'new-cosmic' ? '#fff' : 'var(--text-faint)',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+              textAlign: 'center'
+            }}
+            title="New Cosmic Look (Futuristic exploration)"
+          >
+            New Cosmic
+          </button>
         </div>
       </div>
 
