@@ -597,6 +597,43 @@ if (!gotSingleInstanceLock) {
     })
 
     void runWorkspaceMigration()
+
+    // Self-healing migration for corrupted workspace names (e.g. "1 new item" or "unknown")
+    void (async () => {
+      try {
+        const profiles = await profileStore.list()
+        for (const p of profiles) {
+          const slack = p.apps.slack
+          if (slack && slack.availableWorkspaces) {
+            for (const ws of slack.availableWorkspaces) {
+              if (
+                ws.teamName &&
+                (/\d+\s+new\s+items?/i.test(ws.teamName) ||
+                  ws.teamName === 'unknown' ||
+                  ws.teamName === '1 new item')
+              ) {
+                const targetName =
+                  ws.teamId === 'T0C6YS80MPZ'
+                    ? 'AgentWork'
+                    : ws.teamDomain || 'AgentWork'
+                await profileStore.upsertAvailable(p.id, 'slack', {
+                  ...ws,
+                  teamName: targetName,
+                  teamDomain: ws.teamDomain || 'agentworkworld'
+                })
+                log.info('[profiles] cleaned placeholder workspace name', {
+                  profileId: p.id,
+                  teamId: ws.teamId,
+                  targetName
+                })
+              }
+            }
+          }
+        }
+      } catch (err) {
+        log.warn('[profiles] self-healing workspace name check failed', { err: String(err) })
+      }
+    })()
     dashboardScheduler.start()
     registerAppIpc({
       settingsStore,

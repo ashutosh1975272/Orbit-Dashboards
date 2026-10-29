@@ -150,7 +150,10 @@ function workspaceFromRaw(
     (appId === 'slack'
       ? resolvePinnedOpenUrl({ teamId: id, openUrl, teamDomain: domain })
       : defaultOpenUrlForApp(appId))
-  const name = appId === 'teams' && id === 'teams-home' ? 'Personal' : teamName.trim() || id
+  let name = appId === 'teams' && id === 'teams-home' ? 'Personal' : teamName.trim() || id
+  if (appId === 'slack' && isSlackPlaceholderName(name) && domain) {
+    name = domain
+  }
   return {
     teamId: id,
     teamName: name,
@@ -864,12 +867,11 @@ export class ProfileStore {
     if (existingIdx >= 0) {
       const prev = app.availableWorkspaces[existingIdx]
       const nextName =
-        isSlackPlaceholderName(entry.teamName) && !isSlackPlaceholderName(prev.teamName)
-          ? prev.teamName
-          : entry.teamName &&
-              !/^(microsoft teams|teams|teams org|organization)$/i.test(entry.teamName)
-            ? entry.teamName
-            : prev.teamName || entry.teamName
+        !isSlackPlaceholderName(entry.teamName)
+          ? entry.teamName
+          : !isSlackPlaceholderName(prev.teamName)
+            ? prev.teamName
+            : entry.teamDomain || prev.teamDomain || entry.teamName
       availableWorkspaces = app.availableWorkspaces.map((w, i) =>
         i === existingIdx
           ? {

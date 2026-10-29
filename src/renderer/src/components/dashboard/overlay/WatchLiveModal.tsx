@@ -78,7 +78,6 @@ export const WatchLiveModal: React.FC<WatchLiveModalProps> = ({
       }
     }
 
-    // Brief timeout to let modal render into DOM before querying getBoundingClientRect
     const timer = setTimeout(attachLiveView, 150)
 
     const handleResize = () => {
@@ -109,34 +108,104 @@ export const WatchLiveModal: React.FC<WatchLiveModalProps> = ({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="relative w-full max-w-5xl h-[85vh] bg-[#1a1d21] border border-slate-700 rounded-xl shadow-2xl flex flex-col overflow-hidden">
+    <div
+      className="platform-settings-backdrop"
+      role="presentation"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+      style={{ zIndex: 1200 }}
+    >
+      <div
+        className="platform-settings-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Watch Live Scraping Automation"
+        style={{
+          width: '92vw',
+          maxWidth: '1100px',
+          height: '84vh',
+          display: 'flex',
+          flexDirection: 'column',
+          padding: 0,
+          overflow: 'hidden',
+          background: '#15171a',
+          border: '1px solid var(--border)',
+          borderRadius: '12px',
+          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.7)'
+        }}
+      >
         {/* Header bar */}
-        <div className="flex items-center justify-between px-4 py-3 bg-[#111315] border-b border-slate-800 select-none">
-          <div className="flex items-center gap-2">
-            <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
-            <h3 className="text-sm font-semibold text-slate-100 flex items-center gap-1.5">
-              <span>Watch Live Automation</span>
-              <span className="text-xs font-normal text-slate-400">({projectName})</span>
-            </h3>
-            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-              Read-Only
+        <header
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '12px 18px',
+            borderBottom: '1px solid var(--border)',
+            background: 'var(--surface-subtle)'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span
+              style={{
+                width: '10px',
+                height: '10px',
+                borderRadius: '50%',
+                background: '#22c55e',
+                boxShadow: '0 0 8px rgba(34, 197, 94, 0.8)'
+              }}
+            />
+            <div>
+              <span style={{ fontWeight: 600, fontSize: '15px', color: 'var(--text)' }}>
+                Watch Live Automation
+              </span>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginLeft: '8px' }}>
+                ({projectName})
+              </span>
+            </div>
+            <span
+              style={{
+                fontSize: '10px',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                padding: '2px 8px',
+                borderRadius: '4px',
+                background: 'rgba(99, 102, 241, 0.15)',
+                color: '#818cf8',
+                border: '1px solid rgba(99, 102, 241, 0.3)'
+              }}
+            >
+              Read-Only Overlay
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-slate-400">App-Level Non-Invasive Overlay</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+              Non-Invasive App-Level Layer
+            </span>
             <button
+              type="button"
+              className="btn ghost btn-sm"
               onClick={onClose}
-              className="px-2.5 py-1 text-xs rounded bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors border border-slate-700"
+              style={{ padding: '4px 10px', fontSize: '13px' }}
             >
-              Close
+              ✕ Close
             </button>
           </div>
-        </div>
+        </header>
 
         {/* Viewport container where WebContentsView sits */}
-        <div ref={containerRef} className="relative flex-1 bg-black overflow-hidden">
+        <div
+          ref={containerRef}
+          style={{
+            position: 'relative',
+            flex: 1,
+            background: '#0d0e11',
+            overflow: 'hidden'
+          }}
+        >
           {/* Overlay UI (Agent Cursor, Highlighting, Status Pill) */}
           <StatusPill
             channelName={lastEvent?.channelName}
@@ -149,16 +218,37 @@ export const WatchLiveModal: React.FC<WatchLiveModalProps> = ({
           <AgentCursor x={cursorPos.x} y={cursorPos.y} visible={isLiveActive} />
           <MessageHighlight bounds={highlightBounds} visible={isLiveActive} />
 
-          {/* Placeholder / Error message if scraper not currently running */}
+          {/* Placeholder if scraper not currently active in this instant */}
           {!isLiveActive && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-10 bg-slate-900/60 pointer-events-none">
-              <div className="text-3xl mb-2">🕷️</div>
-              <h4 className="text-sm font-medium text-slate-200 mb-1">
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '24px',
+                textAlign: 'center',
+                background: 'rgba(15, 17, 21, 0.85)',
+                zIndex: 10
+              }}
+            >
+              <div style={{ fontSize: '36px', marginBottom: '10px' }}>🕷️</div>
+              <h4 style={{ margin: '0 0 6px 0', fontSize: '15px', color: 'var(--text)' }}>
                 {errorMsg || 'Waiting for Scraper to Run…'}
               </h4>
-              <p className="text-xs text-slate-400 max-w-sm">
-                Click <strong>"Scrape"</strong> on the project card or in Settings &gt; Sources to
-                start reading Slack messages live in this view.
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: '12px',
+                  color: 'var(--text-muted)',
+                  maxWidth: '380px',
+                  lineHeight: 1.5
+                }}
+              >
+                Click <strong>&quot;🕷 Scrape&quot;</strong> on the workspace row in Settings &gt;
+                Sources (or on the project card) to observe real-time message scraping here.
               </p>
             </div>
           )}
@@ -167,4 +257,3 @@ export const WatchLiveModal: React.FC<WatchLiveModalProps> = ({
     </div>
   )
 }
-

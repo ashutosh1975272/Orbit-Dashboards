@@ -125,18 +125,20 @@ function displayWorkspaceName(ws: {
   const name = sanitized || ws.teamName?.trim()
   const generic =
     !name ||
-    /^(microsoft teams|teams|teams org|organization|teams-home)$/i.test(name) ||
+    /^(microsoft teams|teams|teams org|organization|teams-home|unknown)$/i.test(name) ||
+    /^\d+\s+new\s+items?/i.test(name) ||
+    /^new\s+item/i.test(name) ||
     /^tenant-/i.test(name) ||
     /^T[A-Z0-9]+$/i.test(name)
 
   if (!generic) {
     return name
   }
-  if (ws.lastChannelName?.trim()) {
-    return sanitizeWorkspaceName(ws.lastChannelName.trim()) || ws.lastChannelName.trim()
-  }
   if (ws.teamDomain?.trim()) {
     return ws.teamDomain.trim()
+  }
+  if (ws.lastChannelName?.trim()) {
+    return sanitizeWorkspaceName(ws.lastChannelName.trim()) || ws.lastChannelName.trim()
   }
   if (ws.teamId === 'teams-home') {
     return 'Personal'

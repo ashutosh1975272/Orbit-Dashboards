@@ -9,7 +9,14 @@ import {
  * Prefer human workspace names — never leave bare T… ids as the display name when DOM has better.
  */
 export const READ_SLACK_WORKSPACE_NAME_SCRIPT = `(() => {
-  const bad = (t) => !t || /^T[A-Z0-9]+$/i.test(t) || /^slack$/i.test(t);
+  const bad = (t) =>
+    !t ||
+    /^T[A-Z0-9]+$/i.test(t) ||
+    /^slack$/i.test(t) ||
+    /^unknown$/i.test(t) ||
+    /\\d+\\s+new\\s+items?/i.test(t) ||
+    /^new\\s+item/i.test(t) ||
+    /^\\(\\d+\\)/.test(t);
   const clean = (t) => (t || '').replace(/\\s+/g, ' ').trim();
 
   const selectors = [
@@ -42,7 +49,14 @@ export const READ_SLACK_WORKSPACE_NAME_SCRIPT = `(() => {
 
 /** Workspace name + current channel/DM title from the Slack client DOM / tab title. */
 export const READ_SLACK_CONTEXT_SCRIPT = `(() => {
-  const badWs = (t) => !t || /^T[A-Z0-9]+$/i.test(t) || /^slack$/i.test(t);
+  const badWs = (t) =>
+    !t ||
+    /^T[A-Z0-9]+$/i.test(t) ||
+    /^slack$/i.test(t) ||
+    /^unknown$/i.test(t) ||
+    /\\d+\\s+new\\s+items?/i.test(t) ||
+    /^new\\s+item/i.test(t) ||
+    /^\\(\\d+\\)/.test(t);
   const badCh = (t) =>
     !t ||
     /^[CDGT][A-Z0-9]{8,}$/i.test(t) ||
@@ -160,7 +174,14 @@ export const READ_TEAMS_ORG_NAME_SCRIPT = `(() => {
 export const DISCOVER_WORKSPACES_SCRIPT = `(() => {
   const out = [];
   const seen = new Set();
-  const badName = (t) => !t || /^T[A-Z0-9]+$/i.test(t) || /^slack$/i.test(t);
+  const badName = (t) =>
+    !t ||
+    /^T[A-Z0-9]+$/i.test(t) ||
+    /^slack$/i.test(t) ||
+    /^unknown$/i.test(t) ||
+    /\\d+\\s+new\\s+items?/i.test(t) ||
+    /^new\\s+item/i.test(t) ||
+    /^\\(\\d+\\)/.test(t);
   const clean = (t) => (t || '').replace(/\\s+/g, ' ').trim();
 
   const readCurrentName = () => {

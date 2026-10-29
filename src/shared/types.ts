@@ -275,6 +275,10 @@ export function appLabel(appId: AppId): string {
 export function sanitizeWorkspaceName(raw?: string): string {
   if (!raw) return ''
   let cleaned = raw.replace(/\s+/g, ' ').trim()
+  // Reject notification/badge patterns
+  if (/\d+\s+new\s+items?/i.test(cleaned) || /^new\s+item/i.test(cleaned) || /^\(\d+\)/.test(cleaned)) {
+    return ''
+  }
   // Strip trailing " | Slack" or " - Slack"
   cleaned = cleaned.replace(/\s*[|—–-]\s*Slack\s*$/i, '').trim()
   // Strip Slack channel prefix pattern: "channel (Channel) - WorkspaceName" or "#channel - WorkspaceName"
