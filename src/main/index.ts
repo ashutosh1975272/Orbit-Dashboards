@@ -35,6 +35,7 @@ import { DashboardChatRetriever } from './dashboard/chat-retrieval'
 import { HistoryStore } from './dashboard/history-store'
 import { DashboardViewedStore } from './dashboard/viewed-store'
 import { DashboardScheduleStore } from './dashboard/schedule-store'
+import { RunLogStore } from './dashboard/run-log-store'
 import { AiSettingsStore } from './dashboard/ai-settings-store'
 import { AiSettingsService, DEFAULT_EMBEDDING_MODEL } from './dashboard/ai-settings'
 import { ConfigService } from './dashboard/config-service'
@@ -577,6 +578,7 @@ if (!gotSingleInstanceLock) {
       monitorStore: dashboardMonitorStore,
       engine: dashboardEngine,
       deltaStore: dashboardDeltaStore,
+      runLogStore: new RunLogStore({ rootDir: dashboardDeltaStore.rootDir }),
       scheduler: dashboardScheduler,
       getMainWindow: () => mainWindow,
       oauthTokenProvider: { tryGet: (profileId, teamId) => tokenStore.tryGet(profileId, teamId) },
