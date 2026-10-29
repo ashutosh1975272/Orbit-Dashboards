@@ -20,6 +20,7 @@ import { SlackViewport } from './components/SlackViewport'
 import { PlatformSettingsPanel } from './components/dashboard/PlatformSettingsPanel'
 import { AddPlatformPage } from './components/dashboard/AddPlatformPage'
 import { AccountsManagementModal } from './components/dashboard/AccountsManagementModal'
+import { UnifiedSettingsModal, type SettingsTabKey } from './components/dashboard/UnifiedSettingsModal'
 import { ScrapeNavbar, type NavbarState, type ScrapeSnippet } from './components/dashboard/overlay/ScrapeNavbar'
 import { sidebarToastFor } from './lib/sidebar-toast'
 import { modKey, modShift } from './lib/shortcut-label'
@@ -79,6 +80,8 @@ function App(): React.JSX.Element {
   )
   const [cmdkOpen, setCmdkOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [unifiedSettingsOpen, setUnifiedSettingsOpen] = useState(false)
+  const [unifiedSettingsTab, setUnifiedSettingsTab] = useState<SettingsTabKey>('general')
   const [platformSettings, setPlatformSettings] = useState<{
     profileId: string
     appId: AppId
@@ -397,6 +400,7 @@ function App(): React.JSX.Element {
     !browserAuthBusy &&
     !locked &&
     !settingsOpen &&
+    !unifiedSettingsOpen &&
     !cmdkOpen &&
     !platformSettings &&
     !addPlatformOpen &&
@@ -864,7 +868,10 @@ function App(): React.JSX.Element {
                 setPlatformSettings({ profileId, appId })
               }}
               onAddPlatform={() => setAddPlatformOpen(true)}
-              onOpenAccountsSettings={() => setAccountsModalOpen(true)}
+              onOpenAccountsSettings={() => {
+                setUnifiedSettingsTab('general')
+                setUnifiedSettingsOpen(true)
+              }}
               activeCustomLinkId={activeCustomLinkId}
               onSelectCustomLink={handleSelectCustomLink}
             />
@@ -1058,6 +1065,80 @@ function App(): React.JSX.Element {
             setAdminAuthenticated(false)
             void window.api.profiles.setEmbedVisible(false)
           })
+        }}
+      />
+
+      {/* Unified Global Settings Hub: single source of truth for all global configs */}
+      <UnifiedSettingsModal
+        open={unifiedSettingsOpen && !locked}
+        initialTab={unifiedSettingsTab}
+        settings={settings}
+        onClose={() => setUnifiedSettingsOpen(false)}
+        onChangeSettings={(patch) => {
+          void window.api.app.setSettings(patch).then((s) => {
+            setSettings(s)
+            applyDocumentTheme(s.theme)
+            applySidebarDensity(s.sidebarDensity)
+            applySidebarWidth(s.sidebarWidth)
+            if (!s.splitViewEnabled) setSplitSecondary(null)
+          })
+        }}
+        onClearAllProfiles={() => {
+          void window.api.profiles.clearAll().then(async () => {
+            useProfileStore.setState({
+              profiles: [],
+              activeProfileId: null,
+              activeAppId: null
+            })
+            const s = await window.api.app.getSettings()
+            setSettings(s)
+          })
+        }}
+        onExportProfiles={() => {
+          void window.api.profiles.exportMetadata().then((list) => {
+            const blob = new Blob([JSON.stringify(list, null, 2)], {
+              type: 'application/json'
+            })
+            const a = document.createElement('a')
+            a.href = URL.createObjectURL(blob)
+            a.download = 'cosmic-profiles.json'
+            a.click()
+          })
+        }}
+        onImportProfiles={() => {
+          const input = document.createElement('input')
+          input.type = 'file'
+          input.accept = 'application/json,.json'
+          input.onchange = () => {
+            const file = input.files?.[0]
+            if (!file) return
+            void file.text().then(async (text) => {
+              const parsed = JSON.parse(text) as Profile[]
+              const list = await window.api.profiles.importMetadata(parsed)
+              useProfileStore.setState({ profiles: list })
+              setToast(`Imported — ${list.length} profiles total (sessions still need sign-in).`)
+            })
+          }
+          input.click()
+        }}
+        onAdminLogout={() => {
+          void window.api.app.adminLogout().then(() => {
+            setAdminAuthenticated(false)
+            void window.api.profiles.setEmbedVisible(false)
+          })
+        }}
+        onAddGoogleAccount={() => {
+          setUnifiedSettingsOpen(false)
+          const emailInput = document.querySelector('.nav-input') as HTMLInputElement | null
+          emailInput?.focus()
+        }}
+        onSelectProfile={(id) => {
+          setUnifiedSettingsOpen(false)
+          void handleSelectProfile(id)
+        }}
+        onOpenCustomLink={(pId, link) => {
+          setUnifiedSettingsOpen(false)
+          void handleSelectCustomLink(pId, link)
         }}
       />
 

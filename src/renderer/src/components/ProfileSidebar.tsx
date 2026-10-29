@@ -713,10 +713,10 @@ export const ProfileSidebar = memo(function ProfileSidebar({
           type="button"
           className="nav-accounts-btn"
           onClick={onOpenAccountsSettings}
-          title="Accounts and Workspaces Hub"
-          aria-label="Accounts and Workspaces Hub"
+          title="Global Settings & Accounts Hub"
+          aria-label="Global Settings & Accounts Hub"
         >
-          ⚙ Accounts
+          ⚙ Settings
         </button>
       </div>
 
