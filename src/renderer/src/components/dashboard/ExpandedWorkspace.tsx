@@ -13,6 +13,7 @@ import { useDashboardStore } from '../../hooks/useDashboard'
 import WorkspaceSidebar from './WorkspaceSidebar'
 import WorkspaceContent from './WorkspaceContent'
 import SlackChatTab from './SlackChatTab'
+import { CardAddModal } from './CardAddModal'
 import { buildConnectorChannelLists, type NavEntry, type WorkspaceEntryTab } from './workspace-nav'
 import type { DetailKey } from './guide-model'
 
@@ -89,6 +90,7 @@ export default function ExpandedWorkspace({
   const [teamWorkspace, setTeamWorkspace] = useState<DashboardTeamWorkspace | null>(null)
   const [teamLoading, setTeamLoading] = useState(true)
   const [cardViewMode, setCardViewMode] = useState<CardViewMode>('insights')
+  const [cardAddOpen, setCardAddOpen] = useState(false)
 
   // "New since your last visit" is measured from the moment the reader stops
   // looking at the Dashboard (leaving the dash panel or closing the card), not
@@ -267,6 +269,7 @@ export default function ExpandedWorkspace({
               onToggleConnector={toggleConnector}
               onToggleCollapse={toggleCollapse}
               onResize={resize}
+              onOpenAdd={() => setCardAddOpen(true)}
             />
             <WorkspaceContent
               view={view}
@@ -279,6 +282,11 @@ export default function ExpandedWorkspace({
               onSync={onSync}
               onOpenSettings={onSettings}
               onSelect={select}
+            />
+            <CardAddModal
+              open={cardAddOpen}
+              project={project}
+              onClose={() => setCardAddOpen(false)}
             />
           </>
         )}

@@ -45,6 +45,7 @@ interface WorkspaceSidebarProps {
   onToggleConnector: (key: ConnectorKey) => void
   onToggleCollapse: () => void
   onResize: (width: number) => void
+  onOpenAdd?: () => void
 }
 
 /** Real counts only — a row with nothing in it is dimmed, never given a badge. */
@@ -165,7 +166,8 @@ export default function WorkspaceSidebar({
   onToggleInfoGroup,
   onToggleConnector,
   onToggleCollapse,
-  onResize
+  onResize,
+  onOpenAdd
 }: WorkspaceSidebarProps): React.ReactElement {
   const collapsed = nav.collapsed
   const asideRef = useRef<HTMLElement>(null)
@@ -351,6 +353,7 @@ export default function WorkspaceSidebar({
                 ) : section.key === 'slack' ? (
                   <>
                     {/* SECTION 1: GLOBAL ACCOUNTS */}
+                    {!layout.custom.hiddenItems?.['slack']?.includes('global_accounts') && (
                     <div className="ws-nav-group" style={{ marginBottom: 4 }}>
                       <button
                         type="button"
@@ -402,9 +405,16 @@ export default function WorkspaceSidebar({
                         </>
                       )}
                     </div>
+                    )}
 
                     {/* SECTION 2 & 3: OUR SLACK & CLIENT CONNECTORS */}
-                    {NAV_CONNECTORS.map((connector) => {
+                    {NAV_CONNECTORS.filter((c) => {
+                      const hiddenSub = layout.custom.hiddenItems?.['slack'] ?? []
+                      if (c.key === 'team' && hiddenSub.includes('our_slack')) return false
+                      if (c.key === 'client' && hiddenSub.includes('client_slack')) return false
+                      if (['upwork', 'teams', 'whatsapp', 'googlechat', 'discord'].includes(c.key) && hiddenSub.includes('other_platforms')) return false
+                      return true
+                    }).map((connector) => {
                     const list = channels[connector.key]
                     const allId = connector.allId
                     const entries = list?.entries ?? []
@@ -493,7 +503,33 @@ export default function WorkspaceSidebar({
         })}
       </nav>
 
-      <div className="ws-nav-footer">
+      <div className="ws-nav-footer" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {onOpenAdd && (
+          <button
+            type="button"
+            className="ws-nav-item"
+            onClick={onOpenAdd}
+            title="Add global workspaces, client channels, or platform links to this project card"
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: 8,
+              padding: '6px 12px',
+              fontSize: '12px',
+              fontWeight: 600,
+              color: '#f8fafc',
+              cursor: 'pointer'
+            }}
+          >
+            <span>➕</span>
+            <span>+ Add</span>
+          </button>
+        )}
         <Row
           fixed
           icon="settings"

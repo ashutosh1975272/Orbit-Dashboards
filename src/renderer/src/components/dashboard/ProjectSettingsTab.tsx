@@ -106,6 +106,25 @@ export default function ProjectSettingsTab({
     updateLayout(DEFAULT_LAYOUT)
   }
 
+  const handleToggleSubItem = (parentKey: string, subItemKey: string): void => {
+    const currentHidden = new Set(layout.custom.hiddenItems?.[parentKey] ?? [])
+    if (currentHidden.has(subItemKey)) {
+      currentHidden.delete(subItemKey)
+    } else {
+      currentHidden.add(subItemKey)
+    }
+    updateLayout({
+      ...layout,
+      custom: {
+        ...layout.custom,
+        hiddenItems: {
+          ...layout.custom.hiddenItems,
+          [parentKey]: Array.from(currentHidden)
+        }
+      }
+    })
+  }
+
   const saveSchedule = async (): Promise<void> => {
     setScheduleSaving(true)
     setScheduleNotice(null)
@@ -756,6 +775,50 @@ export default function ProjectSettingsTab({
                   onToggleSection={handleToggleSection}
                   onReset={handleResetLayout}
                 />
+
+                {/* Granular Section Visibility Toggles for Slack & Accounts */}
+                <div style={{ marginTop: '24px', padding: '16px', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border)', borderRadius: '10px' }}>
+                  <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 600, color: 'var(--text)' }}>
+                    Detailed Card Sidebar Sections
+                  </h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
+                      <input
+                        type="checkbox"
+                        checked={!layout.custom.hiddenItems?.['slack']?.includes('global_accounts')}
+                        onChange={() => handleToggleSubItem('slack', 'global_accounts')}
+                      />
+                      <span><b>Global Accounts</b> (workspaces signed-in across all profiles)</span>
+                    </label>
+
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
+                      <input
+                        type="checkbox"
+                        checked={!layout.custom.hiddenItems?.['slack']?.includes('our_slack')}
+                        onChange={() => handleToggleSubItem('slack', 'our_slack')}
+                      />
+                      <span><b>Our Slack</b> (internal team channels)</span>
+                    </label>
+
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
+                      <input
+                        type="checkbox"
+                        checked={!layout.custom.hiddenItems?.['slack']?.includes('client_slack')}
+                        onChange={() => handleToggleSubItem('slack', 'client_slack')}
+                      />
+                      <span><b>Client Slack</b> (client communication channels)</span>
+                    </label>
+
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
+                      <input
+                        type="checkbox"
+                        checked={!layout.custom.hiddenItems?.['slack']?.includes('other_platforms')}
+                        onChange={() => handleToggleSubItem('slack', 'other_platforms')}
+                      />
+                      <span><b>Other Connectors</b> (Discord, Teams, WhatsApp, Upwork, Google Chat)</span>
+                    </label>
+                  </div>
+                </div>
               </section>
             </div>
           )}
