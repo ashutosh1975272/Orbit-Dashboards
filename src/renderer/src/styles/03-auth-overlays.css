@@ -588,17 +588,28 @@
 /* Dashboard sidebar entry (native row after Recents) — v2.0.1 */
 .dash-entry {
   /* Air between the app title and the entry — the two never touch. */
-  margin-top: 12px;
-  padding: 2px 12px 8px;
+  margin-top: 10px;
+  margin-bottom: 8px;
+  padding: 0;
 }
 .dash-entry-row {
-  font-size: 0.98rem;
+  width: 100%;
+  font-size: 0.92rem;
   font-weight: 600;
   padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  transition: all 0.15s ease;
+  box-sizing: border-box;
 }
-.dash-entry-row.is-active,
-.dash-entry-app.is-active {
-  background: var(--accent-soft);
+.dash-entry-row:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+}
+.dash-entry-row.is-active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
 }
 .dash-entry-glyph {
   color: var(--accent);
@@ -613,11 +624,28 @@
   transform: rotate(90deg);
 }
 .dash-entry-apps {
-  padding: 2px 0 4px 24px;
+  padding: 4px 0 2px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 .dash-entry-app {
-  font-size: 0.92rem;
-  padding: 6px 12px;
+  width: 100%;
+  font-size: 0.88rem;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+.dash-entry-app:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+}
+.dash-entry-app.is-active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
 }
 
 .dash-view {
