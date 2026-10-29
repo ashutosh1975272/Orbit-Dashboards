@@ -11,6 +11,8 @@ import DashboardWizard from './DashboardWizard'
 import GlobalSettingsPanel from './GlobalSettingsPanel'
 import ErrorBoundary from './ErrorBoundary'
 import RecentStrip from './RecentStrip'
+import { NewProfileModal } from './NewProfileModal'
+import { useProfileStore } from '../../hooks/useProfiles'
 import {
   filterCounts,
   matchesFilter,
@@ -114,6 +116,9 @@ export default function DashboardView(): React.ReactElement | null {
     }
   })
   const [schedulePaused, setSchedulePaused] = useState(false)
+  const [newProfileModalOpen, setNewProfileModalOpen] = useState(false)
+  const [selectedProfileFilter, setSelectedProfileFilter] = useState<string>('all')
+  const profiles = useProfileStore((s) => s.profiles)
   const [dragId, setDragId] = useState<string | null>(null)
   const [dropId, setDropId] = useState<string | null>(null)
   const [syncRun, setSyncRun] = useState<{ total: number; done: number } | null>(null)
@@ -338,8 +343,19 @@ export default function DashboardView(): React.ReactElement | null {
   const unpinnedEntries = sortUnpinned(
     cardEntries.filter((entry) => !pinnedIds.has(entry.snapshot.project.id))
   )
-  const counts = filterCounts(unpinnedEntries)
-  const filteredEntries = unpinnedEntries.filter((entry) => matchesFilter(filter, entry))
+  const matchesProfile = (entry: ProjectEntry): boolean => {
+    if (selectedProfileFilter === 'all') return true
+    const p = entry.snapshot.project
+    if (p.profileId === selectedProfileFilter) return true
+    const browserSrc = (p.sources ?? []).find((s) => s.kind === 'browser')
+    if (browserSrc?.profileId === selectedProfileFilter) return true
+    return false
+  }
+
+  const profileScopedPinned = pinnedEntries.filter(matchesProfile)
+  const profileScopedUnpinned = unpinnedEntries.filter(matchesProfile)
+  const counts = filterCounts(profileScopedUnpinned)
+  const filteredEntries = profileScopedUnpinned.filter((entry) => matchesFilter(filter, entry))
   const syncingAll = Boolean(syncRun) || Boolean(progress?.syncing) || syncingProjectIds.length > 0
   const syncLabel = syncRun
     ? `Syncing ${Math.min(syncRun.total, syncRun.done + 1)}/${syncRun.total}`
@@ -550,7 +566,51 @@ export default function DashboardView(): React.ReactElement | null {
             </p>
           </div>
 
-          <div className="dash-head-actions">
+          <div className="dash-head-actions" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {/* Profile Dropdown Filter */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Profile:</span>
+              <select
+                value={selectedProfileFilter}
+                onChange={(e) => setSelectedProfileFilter(e.target.value)}
+                style={{
+                  background: 'var(--surface)',
+                  color: 'var(--text)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '6px',
+                  padding: '5px 10px',
+                  fontSize: '13px'
+                }}
+              >
+                <option value="all">All Profiles ({profiles.length})</option>
+                {profiles.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.displayName || p.id}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* + New Profile Button */}
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setNewProfileModalOpen(true)}
+              style={{ fontSize: '13px', padding: '6px 12px' }}
+            >
+              + New Profile
+            </button>
+
+            {/* + New Workspace Button */}
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => openWizard()}
+              style={{ fontSize: '13px', padding: '6px 12px' }}
+            >
+              + New Workspace
+            </button>
+
             <div className="segmented" role="group" aria-label="View mode">
               {(['compact', 'expanded', 'mixed'] as const).map((mode) => (
                 <button
@@ -587,10 +647,6 @@ export default function DashboardView(): React.ReactElement | null {
             >
               <GearGlyph />
               Settings
-            </button>
-
-            <button type="button" className="btn btn-primary" onClick={() => openWizard()}>
-              New project
             </button>
           </div>
         </header>
@@ -630,15 +686,15 @@ export default function DashboardView(): React.ReactElement | null {
 
         <RecentStrip items={recent} pinnedIds={pinnedIds} onOpen={openFromRecent} />
 
-        {pinnedEntries.length > 0 ? (
+        {profileScopedPinned.length > 0 ? (
           <section className="dash-section dash-pinned" aria-labelledby="dash-pinned-title">
             <div className="dash-section-head">
               <h2 id="dash-pinned-title">
-                Pinned <span className="dash-count">{pinnedEntries.length}</span>
+                Pinned <span className="dash-count">{profileScopedPinned.length}</span>
               </h2>
             </div>
             <div className="dash-list" data-testid="dash-pinned">
-              {pinnedEntries.map((entry, index) => {
+              {profileScopedPinned.map((entry, index) => {
                 const id = entry.snapshot.project.id
                 return (
                   <div
@@ -731,6 +787,17 @@ export default function DashboardView(): React.ReactElement | null {
         </section>
 
         {wizardOpenFor ? <DashboardWizard /> : null}
+        <NewProfileModal
+          open={newProfileModalOpen}
+          onClose={() => setNewProfileModalOpen(false)}
+          onCreate={async (name, email) => {
+            const profile = await useProfileStore.getState().createProfile(email)
+            if (name.trim() && name.trim() !== email) {
+              await window.api.profiles.setCustomName(profile.id, name.trim())
+            }
+            await useProfileStore.getState().loadProfiles()
+          }}
+        />
         <GlobalSettingsPanel
           open={globalSettingsOpen}
           onClose={() => setGlobalSettingsOpen(false)}
