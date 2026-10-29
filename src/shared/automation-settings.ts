@@ -57,3 +57,4 @@ export const DEFAULT_AUTOMATION_SETTINGS: AutomationSettings = {
   notifyOnPause: true,
   notifyOnNewUrgent: false
 }
+

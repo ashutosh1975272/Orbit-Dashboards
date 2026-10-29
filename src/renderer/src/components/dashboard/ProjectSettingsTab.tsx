@@ -8,7 +8,6 @@ import { useDashboardStore } from '../../hooks/useDashboard'
 import AiSettingsForm from './AiSettingsForm'
 import DashboardWizard from './DashboardWizard'
 import { RunLogsModal } from './RunLogsModal'
-import { WatchLiveModal } from './overlay/WatchLiveModal'
 import { SidebarLayoutView } from './SidebarLayoutView'
 import {
   LayoutMode,
@@ -54,7 +53,6 @@ export default function ProjectSettingsTab({
   const [sourceNotice, setSourceNotice] = useState<string | null>(null)
   const [scrapingSourceId, setScrapingSourceId] = useState<string | null>(null)
   const [logsOpen, setLogsOpen] = useState(false)
-  const [watchLiveOpen, setWatchLiveOpen] = useState(false)
 
   // Schedule state
   const [startDate, setStartDate] = useState(project.startDate ?? '')
@@ -472,9 +470,20 @@ export default function ProjectSettingsTab({
                             <button
                               type="button"
                               className="dash-subtle"
-                              onClick={() => setWatchLiveOpen(true)}
+                              onClick={() => {
+                                const targetProfileId = src.profileId || (project.profileId.startsWith('manual:') ? undefined : project.profileId)
+                                if (targetProfileId && src.workspaceId) {
+                                  useDashboardStore.getState().closeDashboard()
+                                  void useProfileStore.getState().openWorkspace(targetProfileId, 'slack', src.workspaceId, {
+                                    x: 320,
+                                    y: 40,
+                                    width: window.innerWidth - 320,
+                                    height: window.innerHeight - 40
+                                  })
+                                }
+                              }}
                               style={{ fontSize: 12, padding: '4px 8px' }}
-                              title="Watch scraper in real-time with cursor overlay"
+                              title="Go to Slack session with live control strip"
                             >
                               👀 Watch Live
                             </button>
@@ -782,12 +791,6 @@ export default function ProjectSettingsTab({
         projectId={project.id}
         projectName={project.name}
         onClose={() => setLogsOpen(false)}
-      />
-      <WatchLiveModal
-        isOpen={watchLiveOpen}
-        projectId={project.id}
-        projectName={project.name}
-        onClose={() => setWatchLiveOpen(false)}
       />
     </div>
   )

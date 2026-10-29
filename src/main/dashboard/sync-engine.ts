@@ -104,6 +104,7 @@ export interface DashboardSyncEngineDeps {
   viewedStore?: { get(projectId: string): Promise<string | null> }
   /** v2.3 — called after a background sync (e.g. to refresh the digest) */
   onSynced?: (snapshots: DashboardProjectSnapshot[]) => void
+  getExistingBrowserView?: (profileId: string, appId: 'slack') => any
 }
 
 export class DashboardSyncEngine {
@@ -121,6 +122,7 @@ export class DashboardSyncEngine {
   private readonly viewedStore: { get(projectId: string): Promise<string | null> } | undefined
   private readonly metricsCache: Map<string, { key: string; value: DashboardMetrics }> = new Map()
   private readonly onSynced: ((snapshots: DashboardProjectSnapshot[]) => void) | undefined
+  private readonly getExistingBrowserView?: (profileId: string, appId: 'slack') => any
   private scrapeEventListener: ((event: ScrapeStepEvent) => void) | null = null
   private activeWatchReader: SlackReaderView | null = null
 
@@ -148,6 +150,7 @@ export class DashboardSyncEngine {
     this.historyReader = deps.historyReader
     this.viewedStore = deps.viewedStore
     this.onSynced = deps.onSynced
+    this.getExistingBrowserView = deps.getExistingBrowserView
     if (deps.onProgress) this.progressCallbacks.push(deps.onProgress)
   }
 
@@ -617,16 +620,29 @@ export class DashboardSyncEngine {
       let channelsRead = 0
       let newMessagesCount = 0
       const snippets: { channelId: string; channelName?: string; sender: string; ts: string; snippet: string }[] = []
+      let runStatus: 'connected' | 'challenge' | 'needs-login' | 'adapter-broken' | 'error' = 'connected'
+      let runError: string | undefined = undefined
+
       try {
+        const existingView = this.getExistingBrowserView?.(bSrc.profileId, 'slack')
         const reader = new SlackReaderView({
           profileId: bSrc.profileId,
           workspaceId: bSrc.workspaceId,
+          existingView: existingView ?? null,
           onEvent: (ev) => this.scrapeEventListener?.(ev)
         })
         this.activeWatchReader = reader
+
         for (const ch of bSrc.channels) {
+          this.scrapeEventListener?.({
+            type: 'navigate',
+            channelName: ch.name || ch.id,
+            text: `Reading #${ch.name || ch.id}…`
+          })
+
           const messages = await reader.readChannelMessages(ch.id)
           channelsRead++
+
           if (messages.length > 0) {
             const appendRes = await this.deltaStore.appendMessages({
               profileId: bSrc.profileId,
@@ -672,31 +688,47 @@ export class DashboardSyncEngine {
             sources: updatedSources
           }
         })
-
-        const runLogStore = new RunLogStore({ rootDir: this.deltaStore.rootDir })
-        await runLogStore.append({
-          runId: `run-${Date.now().toString(36)}`,
-          ts: nowIso,
-          trigger: 'manual',
-          projectId: project.id,
-          sourceId: bSrc.id,
-          sourceKind: 'browser',
-          workspaceId: bSrc.workspaceId,
-          channelsRead,
-          newMessages: newMessagesCount,
-          snippets: snippets.slice(0, 20),
-          durationMs: Date.now() - startTime,
-          llmCalls: 0,
-          status: 'connected'
-        })
-      } catch (err) {
-        this.log(`[dashboard] manual scrape source ${bSrc.id} error: ${String(err)}`)
-        return {
-          channelsRead: totalChannelsRead,
-          newMessages: totalNewMessages,
-          status: 'error',
-          error: err instanceof Error ? err.message : String(err)
+      } catch (err: any) {
+        runStatus = 'error'
+        runError = err instanceof Error ? err.message : String(err)
+        this.log(`[dashboard] manual scrape source ${bSrc.id} error: ${runError}`)
+      } finally {
+        if (this.activeWatchReader) {
+          this.activeWatchReader.destroy()
+          this.activeWatchReader = null
         }
+        // Guaranteed audit log write - runs on EVERY scrape attempt (success, 0 messages, or error)
+        try {
+          const runLogStore = new RunLogStore({ rootDir: this.deltaStore.rootDir })
+          await runLogStore.append({
+            runId: `run-${Date.now().toString(36)}`,
+            ts: new Date().toISOString(),
+            trigger: 'manual',
+            projectId: project.id,
+            sourceId: bSrc.id,
+            sourceKind: 'browser',
+            workspaceId: bSrc.workspaceId,
+            channelsRead,
+            newMessages: newMessagesCount,
+            snippets: snippets.slice(0, 20),
+            durationMs: Date.now() - startTime,
+            llmCalls: 0,
+            status: runStatus === 'error' ? 'adapter-broken' : runStatus,
+            errorCode: runError
+          })
+        } catch {
+          // ignore log write failure
+        }
+
+        // Emit final run completion event so buttons never stay stuck in "Scraping..."
+        this.scrapeEventListener?.({
+          type: 'run_finished',
+          channelName: bSrc.workspaceId,
+          messageCount: newMessagesCount,
+          text: runError
+            ? `Scrape stopped: ${runError}`
+            : `Scraped ${channelsRead} channels. ${newMessagesCount} new messages captured.`
+        })
       }
     }
 

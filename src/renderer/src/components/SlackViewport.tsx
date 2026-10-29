@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { boundsEqual, createRafThrottle } from '../lib/perf'
 import { LiveSessionBorder, type BorderState } from './dashboard/overlay/LiveSessionBorder'
+import { useDashboardStore } from '../hooks/useDashboard'
 
 interface SlackViewportProps {
   hasActiveProfile: boolean
@@ -16,9 +17,13 @@ export function SlackViewport({
   const [scrapeState, setScrapeState] = useState<BorderState>('idle')
   const [statusText, setStatusText] = useState<string>('')
   const [snippets, setSnippets] = useState<Array<{ sender: string; snippet: string; channelName?: string; ts: string }>>([])
+  const openDashboard = useDashboardStore((s) => s.openDashboard)
 
   useEffect(() => {
     // Listen to real-time scrape events for dynamic border and live control strip
+    if (!window.api?.dashboard?.onScrapeEvent) {
+      return
+    }
     const unsubscribe = window.api.dashboard.onScrapeEvent((event: any) => {
       if (event.type === 'navigate' || event.type === 'status' || event.type === 'read') {
         setScrapeState('reading')
@@ -106,6 +111,7 @@ export function SlackViewport({
           setScrapeState('idle')
           setStatusText('')
         }}
+        onBackToDashboard={openDashboard}
       />
       {!hasActiveProfile ? (
         <div className="viewport-placeholder">

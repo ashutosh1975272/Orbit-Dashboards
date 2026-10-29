@@ -370,7 +370,11 @@ export default function WorkspaceSidebar({
                             )}
                             {list?.loading && <p className="ws-nav-note">Loading channels…</p>}
                             {list?.error && (
-                              <p className="ws-nav-note is-error">{list.error}</p>
+                              <p className="ws-nav-note is-error" style={{ fontSize: '11px', lineHeight: 1.4 }}>
+                                {list.error.includes('token_revoked')
+                                  ? 'Client token revoked. Please reconnect token or use Browser Session.'
+                                  : list.error}
+                              </p>
                             )}
                             {!list?.loading && !list?.error && entries.length === 0 && (
                               <p className="ws-nav-note">{connector.note}</p>

@@ -6,23 +6,28 @@ import { deduplicateMessages, normalizeScrapedMessage } from './normalizer'
 import type { DashboardStoredMessage } from '../dashboard/delta-store'
 
 export interface ScrapeStepEvent {
-  type: 'navigate' | 'scroll' | 'highlight' | 'status'
+  type: 'navigate' | 'scroll' | 'highlight' | 'status' | 'run_finished' | 'run_failed' | 'paused' | 'waiting_for_user' | 'challenge' | 'read'
   channelName?: string
   scrollIndex?: number
   maxScroll?: number
   messageCount?: number
   bounds?: { x: number; y: number; width: number; height: number }
   text?: string
+  snippet?: string
+  sender?: string
+  timestamp?: string
 }
 
 export interface SlackReaderOptions {
   profileId: string
   workspaceId: string
+  existingView?: WebContentsView | null
   onEvent?: (event: ScrapeStepEvent) => void
 }
 
 export class SlackReaderView {
   private view: WebContentsView | null = null
+  private isBorrowedView = false
   private readonly adapter = new SlackAdapter()
   private readonly profileId: string
   private readonly workspaceId: string
@@ -32,11 +37,15 @@ export class SlackReaderView {
     this.profileId = options.profileId
     this.workspaceId = options.workspaceId
     this.onEvent = options.onEvent
+    if (options.existingView && !options.existingView.webContents.isDestroyed()) {
+      this.view = options.existingView
+      this.isBorrowedView = true
+    }
   }
 
   /**
-   * Initializes the hidden background view using the profile's dedicated session partition.
-   * Completely isolated and hidden from view.
+   * Initializes the view. If an active session view is provided, reuses it.
+   * Otherwise initializes the background view using the profile's dedicated session partition.
    */
   async initialize(): Promise<void> {
     if (this.view && !this.view.webContents.isDestroyed()) return
@@ -184,7 +193,7 @@ export class SlackReaderView {
   }
 
   destroy(): void {
-    if (this.view && !this.view.webContents.isDestroyed()) {
+    if (!this.isBorrowedView && this.view && !this.view.webContents.isDestroyed()) {
       this.view.webContents.close()
     }
     this.view = null

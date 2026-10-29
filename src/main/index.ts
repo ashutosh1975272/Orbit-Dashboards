@@ -411,6 +411,8 @@ if (!gotSingleInstanceLock) {
       },
       historyReader: (projectId: string) => dashboardHistoryStore.read(projectId),
       viewedStore: dashboardViewedStore,
+      getExistingBrowserView: (profileId, appId) =>
+        browserViewManager.getExistingView(profileId, appId),
       onSynced: () => {
         void refreshDigestNow().catch((err) =>
           log.warn('[dashboard] digest refresh failed', { err: String(err) })

@@ -9,6 +9,7 @@ interface LiveSessionBorderProps {
   onPause?: () => void
   onResume?: () => void
   onStop?: () => void
+  onBackToDashboard?: () => void
   statusText?: string
   snippets?: Array<{ sender: string; snippet: string; channelName?: string; ts: string }>
 }
@@ -48,6 +49,7 @@ export const LiveSessionBorder: React.FC<LiveSessionBorderProps> = ({
   onPause,
   onResume,
   onStop,
+  onBackToDashboard,
   statusText,
   snippets = []
 }) => {
@@ -178,6 +180,25 @@ export const LiveSessionBorder: React.FC<LiveSessionBorderProps> = ({
                 </button>
               )}
 
+              {onBackToDashboard && (
+                <button
+                  type="button"
+                  onClick={onBackToDashboard}
+                  style={{
+                    background: 'rgba(99, 102, 241, 0.25)',
+                    border: '1px solid #6366f1',
+                    color: '#c7d2fe',
+                    padding: '3px 8px',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '11px',
+                    fontWeight: 500
+                  }}
+                  title="Return to Dashboard view"
+                >
+                  ← Dashboard
+                </button>
+              )}
               {onStop && (
                 <button
                   type="button"
@@ -258,3 +279,4 @@ export const LiveSessionBorder: React.FC<LiveSessionBorderProps> = ({
     </div>
   )
 }
+

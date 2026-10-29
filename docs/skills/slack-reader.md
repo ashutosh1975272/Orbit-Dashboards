@@ -47,3 +47,4 @@ The **Slack Reader** is a passive, read-only automation engine designed to extra
 - **Zero Synthetic Actions during Scraping**: No automated typing, clicking, sending, reacting, or editing.
 - **Zero Credential Extraction**: Never extracts internal Slack tokens (`xoxc-*`), authentication cookies, or local storage.
 - **Non-Invasive Visuals**: Border and control strips are Orbit app-level layers (`pointer-events: none`). No scripts or CSS are injected into Slack DOM.
+

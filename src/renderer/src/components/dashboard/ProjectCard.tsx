@@ -2,12 +2,12 @@ import type React from 'react'
 import { memo, useMemo, useState } from 'react'
 import type { DashboardProjectSnapshot } from '../../../../shared/dashboard-contract'
 import { useDashboardStore } from '../../hooks/useDashboard'
+import { useProfileStore } from '../../hooks/useProfiles'
 import { buildCardView, buildCardSummary } from './card-view'
 import { sameProjectForCard } from './project-card-compare'
 import CompactCard from './CompactCard'
 import ExpandedWorkspace from './ExpandedWorkspace'
 import { RunLogsModal } from './RunLogsModal'
-import { WatchLiveModal } from './overlay/WatchLiveModal'
 import type { WorkspaceEntryTab } from './workspace-nav'
 import type { DetailKey } from './guide-model'
 
@@ -62,7 +62,22 @@ function ProjectCardInner({
   const syncing = syncingIds.includes(project.id)
   const [scraping, setScraping] = useState(false)
   const [logsOpen, setLogsOpen] = useState(false)
-  const [watchLiveOpen, setWatchLiveOpen] = useState(false)
+
+  const handleWatchLive = async (): Promise<void> => {
+    // Switch to authentic embedded Slack view in right pane (no popup modal)
+    useDashboardStore.getState().closeDashboard()
+    const browserSource = (project.sources ?? []).find((s) => s.kind === 'browser')
+    const targetProfileId = browserSource?.profileId || (project.profileId.startsWith('manual:') ? undefined : project.profileId)
+    const targetTeamId = browserSource?.workspaceId || project.teamId
+    if (targetProfileId && targetTeamId) {
+      await useProfileStore.getState().openWorkspace(targetProfileId, 'slack', targetTeamId, {
+        x: 320,
+        y: 40,
+        width: window.innerWidth - 320,
+        height: window.innerHeight - 40
+      })
+    }
+  }
 
   const handleScrape = async (): Promise<void> => {
     setScraping(true)
@@ -119,7 +134,7 @@ function ProjectCardInner({
         onScrape={() => void handleScrape()}
         scraping={scraping}
         onLogs={() => setLogsOpen(true)}
-        onWatchLive={() => setWatchLiveOpen(true)}
+        onWatchLive={() => void handleWatchLive()}
         onSettings={() => onOpenSettings(project.id)}
         onEdit={() => openWizard(project.id)}
         onRemove={() => onDelete(project.id)}
@@ -135,12 +150,6 @@ function ProjectCardInner({
         projectId={project.id}
         projectName={project.name}
         onClose={() => setLogsOpen(false)}
-      />
-      <WatchLiveModal
-        isOpen={watchLiveOpen}
-        projectId={project.id}
-        projectName={project.name}
-        onClose={() => setWatchLiveOpen(false)}
       />
     </>
   )

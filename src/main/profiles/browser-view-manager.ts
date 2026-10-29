@@ -99,6 +99,10 @@ export class BrowserViewManager {
     this.activityHandler = handler
   }
 
+  getExistingView(profileId: string, appId: AppId): WebContentsView | null {
+    return this.views.get(viewKey(profileId, appId)) ?? null
+  }
+
   noteActivity(): void {
     this.activityHandler?.()
   }
