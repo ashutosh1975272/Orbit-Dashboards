@@ -6,12 +6,13 @@ import type {
   DashboardTeamWorkspace
 } from '../../../../shared/dashboard-contract'
 import type { CardSummary, CardView } from './card-view'
-import CardHead, { type CardHeadFlag } from './CardHead'
+import CardHead, { type CardHeadFlag, type CardViewMode } from './CardHead'
 import { useWorkspaceNav } from '../../hooks/useWorkspaceNav'
 import { useSlackChannels } from '../../hooks/useSlackChannels'
 import { useDashboardStore } from '../../hooks/useDashboard'
 import WorkspaceSidebar from './WorkspaceSidebar'
 import WorkspaceContent from './WorkspaceContent'
+import SlackChatTab from './SlackChatTab'
 import { buildConnectorChannelLists, type NavEntry, type WorkspaceEntryTab } from './workspace-nav'
 import type { DetailKey } from './guide-model'
 
@@ -87,6 +88,7 @@ export default function ExpandedWorkspace({
   const listing = useSlackChannels(project, 'client')
   const [teamWorkspace, setTeamWorkspace] = useState<DashboardTeamWorkspace | null>(null)
   const [teamLoading, setTeamLoading] = useState(true)
+  const [cardViewMode, setCardViewMode] = useState<CardViewMode>('insights')
 
   // "New since your last visit" is measured from the moment the reader stops
   // looking at the Dashboard (leaving the dash panel or closing the card), not
@@ -182,6 +184,8 @@ export default function ExpandedWorkspace({
         clientName={identity.clientName}
         aiBadge={view.aiBadge}
         flags={headFlags}
+        viewMode={cardViewMode}
+        onViewModeChange={setCardViewMode}
         syncing={syncing}
         onSync={onSync}
         onScrape={onScrape}
@@ -200,32 +204,84 @@ export default function ExpandedWorkspace({
         className={`ws-body${nav.collapsed ? ' is-collapsed' : ''}`}
         style={{ '--ws-nav-w': `${nav.width}px` } as React.CSSProperties}
       >
-        <WorkspaceSidebar
-          projectId={project.id}
-          projectProfileId={project.profileId}
-          view={view}
-          nav={nav}
-          channels={channelLists}
-          onOpenGroup={openGroup}
-          onSelect={select}
-          onToggleSection={toggleSection}
-          onToggleInfoGroup={toggleInfoGroup}
-          onToggleConnector={toggleConnector}
-          onToggleCollapse={toggleCollapse}
-          onResize={resize}
-        />
-        <WorkspaceContent
-          view={view}
-          summary={summary}
-          project={project}
-          snapshot={snapshot}
-          nav={nav}
-          channels={channelLists}
-          syncing={syncing}
-          onSync={onSync}
-          onOpenSettings={onSettings}
-          onSelect={select}
-        />
+        {cardViewMode === 'live' ? (
+          <div
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              background: 'var(--bg-main, #111)',
+              borderRadius: 8,
+              overflow: 'hidden',
+              minHeight: 520
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '8px 16px',
+                background: 'rgba(255, 255, 255, 0.04)',
+                borderBottom: '1px solid var(--border)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+                  💻 Live Slack Session: {identity.teamName || identity.name}
+                </span>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                  (Authentic embedded web view)
+                </span>
+              </div>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                style={{ fontSize: 12, padding: '4px 8px' }}
+                onClick={() => void onWatchLive?.()}
+              >
+                Pop out to full window ↗
+              </button>
+            </div>
+            <div style={{ flex: 1, position: 'relative' }}>
+              <SlackChatTab
+                key={`live-tab-${project.id}`}
+                projectId={summary.projectId}
+                source="client"
+                lockedChannel={null}
+              />
+            </div>
+          </div>
+        ) : (
+          <>
+            <WorkspaceSidebar
+              projectId={project.id}
+              projectProfileId={project.profileId}
+              view={view}
+              nav={nav}
+              channels={channelLists}
+              onOpenGroup={openGroup}
+              onSelect={select}
+              onToggleSection={toggleSection}
+              onToggleInfoGroup={toggleInfoGroup}
+              onToggleConnector={toggleConnector}
+              onToggleCollapse={toggleCollapse}
+              onResize={resize}
+            />
+            <WorkspaceContent
+              view={view}
+              summary={summary}
+              project={project}
+              snapshot={snapshot}
+              nav={nav}
+              channels={channelLists}
+              syncing={syncing}
+              onSync={onSync}
+              onOpenSettings={onSettings}
+              onSelect={select}
+            />
+          </>
+        )}
       </div>
     </article>
   )
