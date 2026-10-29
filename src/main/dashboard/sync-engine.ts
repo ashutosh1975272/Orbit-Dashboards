@@ -1,7 +1,7 @@
 import { SlackPoller, isSlackAuthFailure } from './slack-poller'
 import { slackTokenKey } from './slack-throttle'
 import type { InsightEngine } from './insight-engine'
-import { SlackReaderView } from '../slack-reader/slack-reader-view'
+import { SlackReaderView, type ScrapeStepEvent } from '../slack-reader/slack-reader-view'
 import { RunLogStore } from './run-log-store'
 import type {
   DashboardChannelDelta,
@@ -121,6 +121,16 @@ export class DashboardSyncEngine {
   private readonly viewedStore: { get(projectId: string): Promise<string | null> } | undefined
   private readonly metricsCache: Map<string, { key: string; value: DashboardMetrics }> = new Map()
   private readonly onSynced: ((snapshots: DashboardProjectSnapshot[]) => void) | undefined
+  private scrapeEventListener: ((event: ScrapeStepEvent) => void) | null = null
+  private activeWatchReader: SlackReaderView | null = null
+
+  setScrapeEventListener(listener: ((event: ScrapeStepEvent) => void) | null): void {
+    this.scrapeEventListener = listener
+  }
+
+  getActiveWatchReader(): SlackReaderView | null {
+    return this.activeWatchReader
+  }
   private readonly progressCallbacks: Array<(payload: DashboardSyncProgressPayload) => void> = []
   /** per-project cached snapshot — rebuilt after any sync */
   private readonly lastResults: Map<string, DashboardProjectSnapshot> = new Map()
@@ -446,6 +456,9 @@ export class DashboardSyncEngine {
               }
             }
             reader.destroy()
+        if (this.activeWatchReader === reader) {
+          this.activeWatchReader = null
+        }
 
             // Update source stats
             const nowIso = new Date().toISOString()
@@ -607,8 +620,10 @@ export class DashboardSyncEngine {
       try {
         const reader = new SlackReaderView({
           profileId: bSrc.profileId,
-          workspaceId: bSrc.workspaceId
+          workspaceId: bSrc.workspaceId,
+          onEvent: (ev) => this.scrapeEventListener?.(ev)
         })
+        this.activeWatchReader = reader
         for (const ch of bSrc.channels) {
           const messages = await reader.readChannelMessages(ch.id)
           channelsRead++
@@ -634,6 +649,9 @@ export class DashboardSyncEngine {
           }
         }
         reader.destroy()
+        if (this.activeWatchReader === reader) {
+          this.activeWatchReader = null
+        }
         totalChannelsRead += channelsRead
         totalNewMessages += newMessagesCount
 

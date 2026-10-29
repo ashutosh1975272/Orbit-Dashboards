@@ -254,6 +254,45 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
     }
   )
 
+  // Wire scrape event listener to broadcast events to renderer for Watch Live overlay
+  deps.engine.setScrapeEventListener((event) => {
+    broadcast(IpcChannels.DashboardScrapeEvent, event)
+  })
+
+  handleInvoke(
+    IpcChannels.DashboardStartWatchLive,
+    async (payload: {
+      projectId: string
+      bounds: { x: number; y: number; width: number; height: number }
+    }) => {
+      const win = deps.getMainWindow()
+      const reader = deps.engine.getActiveWatchReader()
+      if (reader && win && !win.isDestroyed()) {
+        const view = reader.getView()
+        if (view) {
+          if (!win.contentView.children.includes(view)) {
+            win.contentView.addChildView(view)
+          }
+          view.setBounds(payload.bounds)
+          return { ok: true }
+        }
+      }
+      return { ok: false, error: 'No active reader view running right now.' }
+    }
+  )
+
+  handleInvoke(IpcChannels.DashboardStopWatchLive, async () => {
+    const win = deps.getMainWindow()
+    const reader = deps.engine.getActiveWatchReader()
+    if (reader && win && !win.isDestroyed()) {
+      const view = reader.getView()
+      if (view && win.contentView.children.includes(view)) {
+        win.contentView.removeChildView(view)
+        view.setBounds({ x: -10000, y: -10000, width: 1280, height: 800 })
+      }
+    }
+  })
+
   handleInvoke(IpcChannels.DashboardGetAppConfig, async () => ({
     clientId: process.env.SLACK_CLIENT_ID ?? '',
     redirectUri: process.env.SLACK_REDIRECT_URI ?? ''

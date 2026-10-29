@@ -21,6 +21,7 @@ interface CardHeadProps {
   onScrape?: () => void
   scraping?: boolean
   onLogs?: () => void
+  onWatchLive?: () => void
   onSettings: () => void
   onEdit: () => void
   onRemove?: () => void
@@ -50,6 +51,7 @@ export default function CardHead({
   onScrape,
   scraping = false,
   onLogs,
+  onWatchLive,
   onSettings,
   onEdit,
   onRemove,
@@ -118,6 +120,17 @@ export default function CardHead({
             title="View scraping run history and messages"
           >
             📋 Logs
+          </button>
+        ) : null}
+        {onWatchLive ? (
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={onWatchLive}
+            aria-label="Watch live scraping"
+            title="Watch real-time browser scraping with cursor overlay"
+          >
+            👀 Watch Live
           </button>
         ) : null}
         {onScrape ? (

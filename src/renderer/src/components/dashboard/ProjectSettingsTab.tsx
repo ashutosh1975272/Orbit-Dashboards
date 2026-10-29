@@ -8,6 +8,7 @@ import { useDashboardStore } from '../../hooks/useDashboard'
 import AiSettingsForm from './AiSettingsForm'
 import DashboardWizard from './DashboardWizard'
 import { RunLogsModal } from './RunLogsModal'
+import { WatchLiveModal } from './overlay/WatchLiveModal'
 import { SidebarLayoutView } from './SidebarLayoutView'
 import {
   LayoutMode,
@@ -53,6 +54,7 @@ export default function ProjectSettingsTab({
   const [sourceNotice, setSourceNotice] = useState<string | null>(null)
   const [scrapingSourceId, setScrapingSourceId] = useState<string | null>(null)
   const [logsOpen, setLogsOpen] = useState(false)
+  const [watchLiveOpen, setWatchLiveOpen] = useState(false)
 
   // Schedule state
   const [startDate, setStartDate] = useState(project.startDate ?? '')
@@ -466,16 +468,27 @@ export default function ProjectSettingsTab({
 
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                         {src.kind === 'browser' ? (
-                          <button
-                            type="button"
-                            className="dash-subtle"
-                            disabled={scrapingSourceId === src.id || src.enabled === false}
-                            style={{ fontSize: 12, padding: '4px 8px' }}
-                            onClick={() => void handleScrapeSource(src.id)}
-                            title="Scrape Slack messages for this workspace"
-                          >
-                            {scrapingSourceId === src.id ? 'Scraping…' : '🕷 Scrape'}
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              className="dash-subtle"
+                              onClick={() => setWatchLiveOpen(true)}
+                              style={{ fontSize: 12, padding: '4px 8px' }}
+                              title="Watch scraper in real-time with cursor overlay"
+                            >
+                              👀 Watch Live
+                            </button>
+                            <button
+                              type="button"
+                              className="dash-subtle"
+                              disabled={scrapingSourceId === src.id || src.enabled === false}
+                              style={{ fontSize: 12, padding: '4px 8px' }}
+                              onClick={() => void handleScrapeSource(src.id)}
+                              title="Scrape Slack messages for this workspace"
+                            >
+                              {scrapingSourceId === src.id ? 'Scraping…' : '🕷 Scrape'}
+                            </button>
+                          </>
                         ) : null}
                         <button
                           type="button"
@@ -769,6 +782,12 @@ export default function ProjectSettingsTab({
         projectId={project.id}
         projectName={project.name}
         onClose={() => setLogsOpen(false)}
+      />
+      <WatchLiveModal
+        isOpen={watchLiveOpen}
+        projectId={project.id}
+        projectName={project.name}
+        onClose={() => setWatchLiveOpen(false)}
       />
     </div>
   )

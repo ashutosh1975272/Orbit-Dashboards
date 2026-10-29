@@ -5,9 +5,20 @@ import { SlackAdapter, type SlackSessionState, type ScrapedChannelItem } from '.
 import { deduplicateMessages, normalizeScrapedMessage } from './normalizer'
 import type { DashboardStoredMessage } from '../dashboard/delta-store'
 
+export interface ScrapeStepEvent {
+  type: 'navigate' | 'scroll' | 'highlight' | 'status'
+  channelName?: string
+  scrollIndex?: number
+  maxScroll?: number
+  messageCount?: number
+  bounds?: { x: number; y: number; width: number; height: number }
+  text?: string
+}
+
 export interface SlackReaderOptions {
   profileId: string
   workspaceId: string
+  onEvent?: (event: ScrapeStepEvent) => void
 }
 
 export class SlackReaderView {
@@ -15,10 +26,12 @@ export class SlackReaderView {
   private readonly adapter = new SlackAdapter()
   private readonly profileId: string
   private readonly workspaceId: string
+  private readonly onEvent?: (event: ScrapeStepEvent) => void
 
   constructor(options: SlackReaderOptions) {
     this.profileId = options.profileId
     this.workspaceId = options.workspaceId
+    this.onEvent = options.onEvent
   }
 
   /**
@@ -84,10 +97,43 @@ export class SlackReaderView {
     const channelUrl = `https://app.slack.com/client/${this.workspaceId}/${channelId}`
     const currentUrl = this.view!.webContents.getURL()
 
+    this.onEvent?.({
+      type: 'navigate',
+      channelName: channelId,
+      text: `Navigating to channel ${channelId}…`
+    })
+
     if (!currentUrl.includes(`/${this.workspaceId}/${channelId}`)) {
       await this.view!.webContents.loadURL(channelUrl)
       // Allow DOM to settle passively
       await new Promise((resolve) => setTimeout(resolve, 2500))
+    }
+
+    this.onEvent?.({
+      type: 'status',
+      channelName: channelId,
+      text: `Reading visible messages in ${channelId}…`
+    })
+
+    // Inspect active message container bounds for highlight overlay
+    try {
+      const bounds = await this.view!.webContents.executeJavaScript(`
+        (() => {
+          const el = document.querySelector('.c-virtual_list__item') || document.querySelector('[data-qa="message_container"]');
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          return { x: r.x, y: r.y, width: r.width, height: r.height };
+        })()
+      `, true)
+      if (bounds) {
+        this.onEvent?.({
+          type: 'highlight',
+          bounds,
+          channelName: channelId
+        })
+      }
+    } catch {
+      // ignore
     }
 
     const rawMessages = await this.adapter.readVisibleMessages(this.view!)
@@ -97,6 +143,13 @@ export class SlackReaderView {
       const msg = normalizeScrapedMessage(raw, channelId)
       if (msg) normalized.push(msg)
     }
+
+    this.onEvent?.({
+      type: 'status',
+      channelName: channelId,
+      messageCount: normalized.length,
+      text: `Read ${normalized.length} messages in ${channelId}`
+    })
 
     return deduplicateMessages(this.workspaceId, channelId, normalized)
   }
@@ -118,6 +171,16 @@ export class SlackReaderView {
     }
 
     return this.adapter.postMessageViaDom(this.view!, text)
+  }
+
+  setBounds(bounds: { x: number; y: number; width: number; height: number }): void {
+    if (this.view && !this.view.webContents.isDestroyed()) {
+      this.view.setBounds(bounds)
+    }
+  }
+
+  getView(): WebContentsView | null {
+    return this.view
   }
 
   destroy(): void {

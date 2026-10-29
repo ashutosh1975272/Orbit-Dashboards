@@ -409,6 +409,16 @@ const api: IpcApi = {
       }>,
     getRunLogs: (payload: { projectId: string; limit?: number }) =>
       ipcRenderer.invoke(IpcChannels.DashboardGetRunLogs, payload) as Promise<any>,
+    startWatchLive: (payload: {
+      projectId: string
+      bounds: { x: number; y: number; width: number; height: number }
+    }) => ipcRenderer.invoke(IpcChannels.DashboardStartWatchLive, payload),
+    stopWatchLive: () => ipcRenderer.invoke(IpcChannels.DashboardStopWatchLive),
+    onScrapeEvent: (callback: (event: any) => void) => {
+      const listener = (_: any, event: any) => callback(event)
+      ipcRenderer.on(IpcChannels.DashboardScrapeEvent, listener)
+      return () => ipcRenderer.removeListener(IpcChannels.DashboardScrapeEvent, listener)
+    },
   }
 }
 

@@ -191,7 +191,10 @@ export const IpcChannels = {
   DashboardWorkspaceMappingDelete: 'dashboard:workspace-mapping-delete',
   DashboardGetProjects: 'dashboard:get-projects',
   DashboardSyncSource: 'dashboard:sync-source',
-  DashboardGetRunLogs: 'dashboard:get-run-logs'
+  DashboardGetRunLogs: 'dashboard:get-run-logs',
+  DashboardStartWatchLive: 'dashboard:start-watch-live',
+  DashboardStopWatchLive: 'dashboard:stop-watch-live',
+  DashboardScrapeEvent: 'dashboard:scrape-event'
 } as const
 
 export type IpcChannel = (typeof IpcChannels)[keyof typeof IpcChannels]
@@ -431,6 +434,22 @@ export interface IpcApi {
       status: string
       error?: string
     }>>
+    startWatchLive: (payload: {
+      projectId: string
+      bounds: { x: number; y: number; width: number; height: number }
+    }) => Promise<{ ok: boolean; error?: string }>
+    stopWatchLive: () => Promise<void>
+    onScrapeEvent: (
+      callback: (event: {
+        type: 'navigate' | 'scroll' | 'highlight' | 'status'
+        channelName?: string
+        scrollIndex?: number
+        maxScroll?: number
+        messageCount?: number
+        bounds?: { x: number; y: number; width: number; height: number }
+        text?: string
+      }) => void
+    ) => () => void
   }
 }
 
