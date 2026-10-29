@@ -470,6 +470,23 @@ export default function ProjectSettingsTab({
                             <button
                               type="button"
                               className="dash-subtle"
+                              onClick={async () => {
+                                setSourceNotice(`Auto-detecting channels in ${src.workspaceName}...`)
+                                try {
+                                  await handleScrapeSource(src.id)
+                                  setSourceNotice(`Auto-detected & synced channels successfully.`)
+                                } catch (e: any) {
+                                  setSourceNotice(`Auto-detect failed: ${e.message}`)
+                                }
+                              }}
+                              style={{ fontSize: 12, padding: '4px 8px', color: '#38bdf8' }}
+                              title="Auto-detect and sync all channels in this workspace"
+                            >
+                              ⟳ Auto-Sync Channels
+                            </button>
+                            <button
+                              type="button"
+                              className="dash-subtle"
                               onClick={() => {
                                 const targetProfileId = src.profileId || (project.profileId.startsWith('manual:') ? undefined : project.profileId)
                                 if (targetProfileId && src.workspaceId) {

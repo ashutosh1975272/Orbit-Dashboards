@@ -81,13 +81,16 @@ export function RunLogsModal({ open, projectId, projectName, onClose }: RunLogsM
         aria-modal="true"
         aria-label="Automation Scraping Logs"
         style={{
-          maxWidth: '960px',
-          width: '92%',
-          height: '85vh',
-          maxHeight: '85vh',
+          maxWidth: '1280px',
+          width: '96%',
+          height: '92vh',
+          maxHeight: '92vh',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.7)'
+          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.85)',
+          background: 'var(--bg, #0b0f19)',
+          borderRadius: '12px',
+          border: '1px solid rgba(255, 255, 255, 0.12)'
         }}
       >
         <header className="platform-settings-header" style={{ borderBottom: '1px solid var(--border)', paddingBottom: '12px' }}>
