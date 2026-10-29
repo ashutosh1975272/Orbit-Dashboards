@@ -2,6 +2,14 @@ import { appendFile, mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { log } from '../logging'
 
+export interface RunLogMessageSnippet {
+  channelId: string
+  channelName?: string
+  sender: string
+  ts: string
+  snippet: string
+}
+
 export interface RunLogEntry {
   runId: string
   ts: string
@@ -12,6 +20,7 @@ export interface RunLogEntry {
   workspaceId: string
   channelsRead: number
   newMessages: number
+  snippets?: RunLogMessageSnippet[]
   skippedReason?: string
   durationMs: number
   llmCalls: number

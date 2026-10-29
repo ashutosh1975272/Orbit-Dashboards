@@ -50,10 +50,14 @@ import type { ConfigService } from '../dashboard/config-service'
 import type { ProjectChatService, ProjectChatSink } from '../dashboard/project-chat-service'
 import { describeMissingScopes, missingSlackScopes } from '../dashboard/slack-scopes'
 import type { DashboardViewedStore } from '../dashboard/viewed-store'
+import { RunLogStore } from '../dashboard/run-log-store'
+import type { DashboardDeltaStore } from '../dashboard/delta-store'
 
 export interface DashboardIpcDeps {
   monitorStore: MonitorStore
   engine: DashboardSyncEngine
+  deltaStore?: DashboardDeltaStore
+  runLogStore?: RunLogStore
   scheduler: DashboardScheduler
   getMainWindow: () => BrowserWindow | null
   oauthTokenProvider: { tryGet(profileId: string, teamId: string): Promise<string | null> }
@@ -197,17 +201,15 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
     const proj = await deps.monitorStore.upsertProject(payload)
     if (deps.workspaceMapping) {
       const workspaceIds = new Set<string>()
-      if (proj.teamId) workspaceIds.add(proj.teamId)
       for (const s of proj.sources ?? []) {
         if (s.workspaceId) workspaceIds.add(s.workspaceId)
       }
-      for (const wsId of workspaceIds) {
-        const existing = (await deps.workspaceMapping.getMapping(wsId)) ?? []
-        if (!existing.includes(proj.id)) {
-          await deps.workspaceMapping.saveMapping(wsId, [...existing, proj.id])
-        }
+      if (workspaceIds.size === 0 && proj.teamId && proj.tokenSource !== 'manual') {
+        workspaceIds.add(proj.teamId)
       }
+      await deps.workspaceMapping.syncProjectWorkspaces(proj.id, workspaceIds)
     }
+    await broadcastConfigChanged()
     return broadcastSnapshot()
   })
 
@@ -226,6 +228,29 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
         await deps.engine.syncAll()
       }
       return broadcastSnapshot()
+    }
+  )
+
+  handleInvoke(
+    IpcChannels.DashboardSyncSource,
+    async (payload: { projectId: string; sourceId?: string }) => {
+      const res = await deps.engine.syncProjectSource(payload.projectId, payload.sourceId)
+      await broadcastSnapshot()
+      return res
+    }
+  )
+
+  handleInvoke(
+    IpcChannels.DashboardGetRunLogs,
+    async (payload: { projectId: string; limit?: number }) => {
+      if (deps.runLogStore) {
+        return deps.runLogStore.read(payload.projectId, payload.limit ?? 50)
+      }
+      if (deps.deltaStore?.rootDir) {
+        const store = new RunLogStore({ rootDir: deps.deltaStore.rootDir })
+        return store.read(payload.projectId, payload.limit ?? 50)
+      }
+      return []
     }
   )
 
@@ -488,16 +513,31 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
           deps.workspaceMapping!.listMappings(),
           deps.monitorStore.listProjects()
         ])
+        const projectMap = new Map(projects.map((p) => [p.id, p]))
         const mapByWs = new Map<string, Set<string>>()
+
+        // Populate from saved mappings, validating project source/connection
         for (const m of mappings) {
-          mapByWs.set(m.workspaceId, new Set(m.projectIds))
-        }
-        // Also synthesize mappings from project.teamId and project.sources
-        for (const p of projects) {
-          if (p.teamId) {
-            if (!mapByWs.has(p.teamId)) mapByWs.set(p.teamId, new Set())
-            mapByWs.get(p.teamId)!.add(p.id)
+          const validIds = new Set<string>()
+          for (const pId of m.projectIds) {
+            const proj = projectMap.get(pId)
+            if (!proj) continue
+            // If project defines sources, it must have a source matching this workspace
+            if (proj.sources && proj.sources.length > 0) {
+              if (proj.sources.some((s) => s.workspaceId === m.workspaceId)) {
+                validIds.add(pId)
+              }
+            } else if (proj.teamId === m.workspaceId && proj.tokenSource !== 'manual') {
+              validIds.add(pId)
+            }
           }
+          if (validIds.size > 0) {
+            mapByWs.set(m.workspaceId, validIds)
+          }
+        }
+
+        // Also add any projects that have explicit active sources for this workspace
+        for (const p of projects) {
           for (const s of p.sources ?? []) {
             if (s.workspaceId) {
               if (!mapByWs.has(s.workspaceId)) mapByWs.set(s.workspaceId, new Set())
@@ -505,6 +545,7 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
             }
           }
         }
+
         return Array.from(mapByWs.entries()).map(([workspaceId, pIds]) => ({
           workspaceId,
           projectIds: Array.from(pIds),
@@ -524,12 +565,13 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
         const validProjectIds = projects.map((p) => p.id)
         await deps.workspaceMapping!.saveMapping(payload.workspaceId, payload.projectIds, validProjectIds)
 
-        // Ensure newly mapped projects also have this workspace in their sources
+        // Synchronize projects:
+        // 1. Newly mapped projects get a browser source for this workspace
         for (const pId of payload.projectIds) {
           const targetProj = projects.find((p) => p.id === pId)
           if (targetProj) {
             const hasSource = (targetProj.sources ?? []).some((s) => s.workspaceId === payload.workspaceId)
-            if (!hasSource && targetProj.teamId !== payload.workspaceId) {
+            if (!hasSource) {
               const now = new Date().toISOString()
               const updatedSources = [
                 ...(targetProj.sources ?? []),
@@ -549,6 +591,23 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
                   updatedAt: now
                 }
               ]
+              await deps.monitorStore.upsertProject({
+                project: {
+                  ...targetProj,
+                  sources: updatedSources
+                }
+              })
+            }
+          }
+        }
+
+        // 2. Unmapped projects have sources for this workspace removed
+        const newProjectIdsSet = new Set(payload.projectIds)
+        for (const targetProj of projects) {
+          if (!newProjectIdsSet.has(targetProj.id)) {
+            const hasSource = (targetProj.sources ?? []).some((s) => s.workspaceId === payload.workspaceId)
+            if (hasSource) {
+              const updatedSources = (targetProj.sources ?? []).filter((s) => s.workspaceId !== payload.workspaceId)
               await deps.monitorStore.upsertProject({
                 project: {
                   ...targetProj,

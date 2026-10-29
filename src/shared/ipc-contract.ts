@@ -189,7 +189,9 @@ export const IpcChannels = {
   DashboardWorkspaceMappingGet: 'dashboard:workspace-mapping-get',
   DashboardWorkspaceMappingSave: 'dashboard:workspace-mapping-save',
   DashboardWorkspaceMappingDelete: 'dashboard:workspace-mapping-delete',
-  DashboardGetProjects: 'dashboard:get-projects'
+  DashboardGetProjects: 'dashboard:get-projects',
+  DashboardSyncSource: 'dashboard:sync-source',
+  DashboardGetRunLogs: 'dashboard:get-run-logs'
 } as const
 
 export type IpcChannel = (typeof IpcChannels)[keyof typeof IpcChannels]
@@ -402,6 +404,33 @@ export interface IpcApi {
     }) => Promise<void>
     deleteWorkspaceMapping: (workspaceId: string) => Promise<boolean>
     getProjects: () => Promise<{ id: string; name: string; clientName: string; teamId: string; profileId: string }[]>
+    syncSource: (payload: { projectId: string; sourceId?: string }) => Promise<{
+      channelsRead: number
+      newMessages: number
+      status: string
+      error?: string
+    }>
+    getRunLogs: (payload: { projectId: string; limit?: number }) => Promise<Array<{
+      runId: string
+      ts: string
+      trigger: 'scheduled' | 'manual'
+      projectId: string
+      sourceId: string
+      sourceKind: 'token' | 'browser'
+      workspaceId: string
+      channelsRead: number
+      newMessages: number
+      snippets?: Array<{
+        channelId: string
+        channelName?: string
+        sender: string
+        ts: string
+        snippet: string
+      }>
+      durationMs: number
+      status: string
+      error?: string
+    }>>
   }
 }
 

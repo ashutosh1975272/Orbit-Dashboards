@@ -18,6 +18,9 @@ interface CardHeadProps {
   flags?: CardHeadFlag[]
   syncing: boolean
   onSync: () => void
+  onScrape?: () => void
+  scraping?: boolean
+  onLogs?: () => void
   onSettings: () => void
   onEdit: () => void
   onRemove?: () => void
@@ -44,6 +47,9 @@ export default function CardHead({
   flags,
   syncing,
   onSync,
+  onScrape,
+  scraping = false,
+  onLogs,
   onSettings,
   onEdit,
   onRemove,
@@ -103,10 +109,33 @@ export default function CardHead({
             className="ws-head-pin"
           />
         ) : null}
+        {onLogs ? (
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={onLogs}
+            aria-label="Scraping logs"
+            title="View scraping run history and messages"
+          >
+            📋 Logs
+          </button>
+        ) : null}
+        {onScrape ? (
+          <button
+            type="button"
+            className="btn btn-ghost"
+            disabled={scraping || syncing}
+            onClick={onScrape}
+            aria-label="Scrape channels"
+            title="Scrape Slack messages via browser session"
+          >
+            {scraping ? 'Scraping…' : '🕷 Scrape'}
+          </button>
+        ) : null}
         <button
           type="button"
           className="btn btn-ghost"
-          disabled={syncing}
+          disabled={syncing || scraping}
           onClick={onSync}
           aria-label="Sync project"
         >

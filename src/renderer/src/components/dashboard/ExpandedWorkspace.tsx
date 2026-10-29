@@ -22,6 +22,9 @@ interface ExpandedWorkspaceProps {
   snapshot: DashboardProjectSnapshot
   syncing: boolean
   onSync: () => void
+  onScrape?: () => void
+  scraping?: boolean
+  onLogs?: () => void
   onSettings: () => void
   onEdit: () => void
   onRemove: () => void
@@ -50,6 +53,9 @@ export default function ExpandedWorkspace({
   snapshot,
   syncing,
   onSync,
+  onScrape,
+  scraping = false,
+  onLogs,
   onSettings,
   onEdit,
   onRemove,
@@ -176,6 +182,9 @@ export default function ExpandedWorkspace({
         flags={headFlags}
         syncing={syncing}
         onSync={onSync}
+        onScrape={onScrape}
+        scraping={scraping}
+        onLogs={onLogs}
         onSettings={onSettings}
         onEdit={onEdit}
         onRemove={onRemove}

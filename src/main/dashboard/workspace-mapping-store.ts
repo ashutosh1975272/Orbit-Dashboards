@@ -75,6 +75,35 @@ export class WorkspaceMappingStore {
     return removed
   }
 
+  /** Remove a project from all workspaces except the specified set. */
+  async syncProjectWorkspaces(projectId: string, activeWorkspaceIds: Set<string>): Promise<void> {
+    await this.mutate((current) => {
+      const next: Record<string, string[]> = {}
+      for (const [wsId, pIds] of Object.entries(current.mappings)) {
+        if (activeWorkspaceIds.has(wsId)) {
+          if (!pIds.includes(projectId)) {
+            next[wsId] = [...pIds, projectId]
+          } else {
+            next[wsId] = pIds
+          }
+        } else {
+          const filtered = pIds.filter((id) => id !== projectId)
+          if (filtered.length > 0) {
+            next[wsId] = filtered
+          }
+        }
+      }
+      for (const wsId of activeWorkspaceIds) {
+        if (!next[wsId]) {
+          next[wsId] = [projectId]
+        } else if (!next[wsId].includes(projectId)) {
+          next[wsId] = [...next[wsId], projectId]
+        }
+      }
+      return { ...current, mappings: next }
+    })
+  }
+
   /** Drop project IDs that no longer exist from all mappings. */
   async cleanupDeletedProjects(validProjectIds: string[]): Promise<void> {
     const validSet = new Set(validProjectIds)

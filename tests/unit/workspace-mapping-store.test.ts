@@ -90,6 +90,23 @@ describe('WorkspaceMappingStore', () => {
     expect(mapping).toEqual(['p1', 'p2'])
   })
 
+  it('syncProjectWorkspaces adds and removes project mappings across workspaces', async () => {
+    const store = await harness()
+    await store.saveMapping('ws1', ['p1', 'p2'])
+    await store.saveMapping('ws2', ['p1'])
+    // p1 now only belongs to ws2 and ws3
+    await store.syncProjectWorkspaces('p1', new Set(['ws2', 'ws3']))
+    expect(await store.getMapping('ws1')).toEqual(['p2'])
+    expect(await store.getMapping('ws2')).toEqual(['p1'])
+    expect(await store.getMapping('ws3')).toEqual(['p1'])
+
+    // p1 removed from all
+    await store.syncProjectWorkspaces('p1', new Set())
+    expect(await store.getMapping('ws1')).toEqual(['p2'])
+    expect(await store.getMapping('ws2')).toBeNull()
+    expect(await store.getMapping('ws3')).toBeNull()
+  })
+
   it('returns empty list when no mappings', async () => {
     const store = await harness()
     expect(await store.listMappings()).toEqual([])

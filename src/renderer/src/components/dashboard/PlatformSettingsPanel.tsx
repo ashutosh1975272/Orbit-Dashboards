@@ -67,6 +67,12 @@ export function PlatformSettingsPanel({
 
   useEffect(() => {
     loadData()
+    const unsubscribe = window.api.dashboard.onConfigChanged(() => {
+      void loadData()
+    })
+    return () => {
+      unsubscribe()
+    }
   }, [loadData])
 
   const workspaceMapping = mappings.find((m) => m.workspaceId === selectedWorkspace)

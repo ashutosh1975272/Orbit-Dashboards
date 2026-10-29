@@ -576,6 +576,7 @@ if (!gotSingleInstanceLock) {
     registerDashboardIpc({
       monitorStore: dashboardMonitorStore,
       engine: dashboardEngine,
+      deltaStore: dashboardDeltaStore,
       scheduler: dashboardScheduler,
       getMainWindow: () => mainWindow,
       oauthTokenProvider: { tryGet: (profileId, teamId) => tokenStore.tryGet(profileId, teamId) },

@@ -8,9 +8,11 @@ interface CompactCardProps {
   onToggle: () => void
   onExpandSection?: (section: number) => void
   onSync: (id: string) => void
+  onScrape?: (id: string) => void
   onSettings: () => void
   onRemove: () => void
   syncing: boolean
+  scraping?: boolean
   pinned?: boolean
   onTogglePin?: () => void
   canMoveUp?: boolean
@@ -89,9 +91,11 @@ export default function CompactCard({
   onToggle,
   onExpandSection,
   onSync,
+  onScrape,
   onSettings,
   onRemove,
   syncing,
+  scraping = false,
   pinned = false,
   onTogglePin,
   canMoveUp = false,
@@ -221,10 +225,23 @@ export default function CompactCard({
           </div>
 
           <span className="proj-row-head-actions">
+            {onScrape ? (
+              <button
+                type="button"
+                className="proj-icon-btn"
+                disabled={scraping || syncing}
+                aria-label={`Scrape ${name}`}
+                title={scraping ? 'Scraping browser session…' : 'Scrape Slack channels'}
+                onClick={() => onScrape(projectId)}
+                style={{ fontSize: '12px' }}
+              >
+                {scraping ? <span className="proj-spin" aria-hidden /> : '🕷'}
+              </button>
+            ) : null}
             <button
               type="button"
               className="proj-icon-btn"
-              disabled={syncing}
+              disabled={syncing || scraping}
               aria-label={`Sync ${name}`}
               title={syncing ? 'Syncing…' : 'Sync now'}
               onClick={() => onSync(projectId)}

@@ -446,10 +446,30 @@ export class DashboardSyncEngine {
               }
             }
             reader.destroy()
+
+            // Update source stats
+            const nowIso = new Date().toISOString()
+            const updatedSources = (project.sources ?? []).map((s) =>
+              s.id === bSrc.id
+                ? {
+                    ...s,
+                    status: 'connected' as const,
+                    lastReadAt: nowIso,
+                    lastReadNewCount: newMessagesCount
+                  }
+                : s
+            )
+            await this.monitorStore.upsertProject({
+              project: {
+                ...project,
+                sources: updatedSources
+              }
+            })
+
             const runLogStore = new RunLogStore({ rootDir: this.deltaStore.rootDir })
             await runLogStore.append({
               runId: `run-${Date.now().toString(36)}`,
-              ts: new Date().toISOString(),
+              ts: nowIso,
               trigger: 'manual',
               projectId: project.id,
               sourceId: bSrc.id,
@@ -556,6 +576,116 @@ export class DashboardSyncEngine {
         message: hint
       })
       return base
+    }
+  }
+
+  async syncProjectSource(
+    projectId: string,
+    sourceId?: string
+  ): Promise<{ channelsRead: number; newMessages: number; status: string; error?: string }> {
+    const projects = await this.monitorStore.listProjects()
+    const project = projects.find((p) => p.id === projectId)
+    if (!project) return { channelsRead: 0, newMessages: 0, status: 'error', error: 'Project not found' }
+
+    const browserSources = (project.sources ?? []).filter(
+      (s) => s.kind === 'browser' && s.enabled !== false && (!sourceId || s.id === sourceId)
+    )
+
+    if (browserSources.length === 0) {
+      return { channelsRead: 0, newMessages: 0, status: 'error', error: 'No active browser sources found' }
+    }
+
+    let totalChannelsRead = 0
+    let totalNewMessages = 0
+
+    for (const bSrc of browserSources) {
+      if (!bSrc.profileId || !bSrc.workspaceId) continue
+      const startTime = Date.now()
+      let channelsRead = 0
+      let newMessagesCount = 0
+      const snippets: { channelId: string; channelName?: string; sender: string; ts: string; snippet: string }[] = []
+      try {
+        const reader = new SlackReaderView({
+          profileId: bSrc.profileId,
+          workspaceId: bSrc.workspaceId
+        })
+        for (const ch of bSrc.channels) {
+          const messages = await reader.readChannelMessages(ch.id)
+          channelsRead++
+          if (messages.length > 0) {
+            const appendRes = await this.deltaStore.appendMessages({
+              profileId: bSrc.profileId,
+              teamId: bSrc.workspaceId,
+              channelId: ch.id,
+              channelName: ch.name,
+              messages,
+              source: 'client'
+            })
+            newMessagesCount += appendRes.added
+            for (const m of messages.slice(-5)) {
+              snippets.push({
+                channelId: ch.id,
+                channelName: ch.name,
+                sender: m.user || 'Anonymous',
+                ts: m.ts,
+                snippet: (m.text || '').slice(0, 100)
+              })
+            }
+          }
+        }
+        reader.destroy()
+        totalChannelsRead += channelsRead
+        totalNewMessages += newMessagesCount
+
+        const nowIso = new Date().toISOString()
+        const updatedSources = (project.sources ?? []).map((s) =>
+          s.id === bSrc.id
+            ? {
+                ...s,
+                status: 'connected' as const,
+                lastReadAt: nowIso,
+                lastReadNewCount: newMessagesCount
+              }
+            : s
+        )
+        await this.monitorStore.upsertProject({
+          project: {
+            ...project,
+            sources: updatedSources
+          }
+        })
+
+        const runLogStore = new RunLogStore({ rootDir: this.deltaStore.rootDir })
+        await runLogStore.append({
+          runId: `run-${Date.now().toString(36)}`,
+          ts: nowIso,
+          trigger: 'manual',
+          projectId: project.id,
+          sourceId: bSrc.id,
+          sourceKind: 'browser',
+          workspaceId: bSrc.workspaceId,
+          channelsRead,
+          newMessages: newMessagesCount,
+          snippets: snippets.slice(0, 20),
+          durationMs: Date.now() - startTime,
+          llmCalls: 0,
+          status: 'connected'
+        })
+      } catch (err) {
+        this.log(`[dashboard] manual scrape source ${bSrc.id} error: ${String(err)}`)
+        return {
+          channelsRead: totalChannelsRead,
+          newMessages: totalNewMessages,
+          status: 'error',
+          error: err instanceof Error ? err.message : String(err)
+        }
+      }
+    }
+
+    return {
+      channelsRead: totalChannelsRead,
+      newMessages: totalNewMessages,
+      status: 'success'
     }
   }
 

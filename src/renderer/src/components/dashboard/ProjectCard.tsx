@@ -1,11 +1,12 @@
 import type React from 'react'
-import { memo, useMemo } from 'react'
+import { memo, useMemo, useState } from 'react'
 import type { DashboardProjectSnapshot } from '../../../../shared/dashboard-contract'
 import { useDashboardStore } from '../../hooks/useDashboard'
 import { buildCardView, buildCardSummary } from './card-view'
 import { sameProjectForCard } from './project-card-compare'
 import CompactCard from './CompactCard'
 import ExpandedWorkspace from './ExpandedWorkspace'
+import { RunLogsModal } from './RunLogsModal'
 import type { WorkspaceEntryTab } from './workspace-nav'
 import type { DetailKey } from './guide-model'
 
@@ -54,52 +55,85 @@ function ProjectCardInner({
 }: ProjectCardProps): React.ReactElement {
   const project = snapshot.project
   const syncNow = useDashboardStore((s) => s.syncNow)
+  const syncSource = useDashboardStore((s) => s.syncSource)
   const openWizard = useDashboardStore((s) => s.openWizard)
   const syncingIds = useDashboardStore((s) => s.syncingProjectIds)
   const syncing = syncingIds.includes(project.id)
+  const [scraping, setScraping] = useState(false)
+  const [logsOpen, setLogsOpen] = useState(false)
+
+  const handleScrape = async (): Promise<void> => {
+    setScraping(true)
+    try {
+      await syncSource({ projectId: project.id })
+    } finally {
+      setScraping(false)
+    }
+  }
 
   const view = useMemo(() => buildCardView(snapshot, index), [snapshot, index])
   const summary = useMemo(() => buildCardSummary(snapshot, index), [snapshot, index])
 
   if (!expanded) {
     return (
-      <CompactCard
-        summary={summary}
-        onToggle={onToggle}
-        onExpandSection={onExpandSection}
-        onSync={(id) => void syncNow(id)}
-        onSettings={() => onOpenSettings(project.id)}
-        onRemove={() => onDelete(project.id)}
-        syncing={syncing}
-        pinned={pinned}
-        onTogglePin={onTogglePin}
-        canMoveUp={canMoveUp}
-        canMoveDown={canMoveDown}
-        onMoveUp={onMoveUp}
-        onMoveDown={onMoveDown}
-      />
+      <>
+        <CompactCard
+          summary={summary}
+          onToggle={onToggle}
+          onExpandSection={onExpandSection}
+          onSync={(id) => void syncNow(id)}
+          onScrape={() => void handleScrape()}
+          scraping={scraping}
+          onSettings={() => onOpenSettings(project.id)}
+          onRemove={() => onDelete(project.id)}
+          syncing={syncing}
+          pinned={pinned}
+          onTogglePin={onTogglePin}
+          canMoveUp={canMoveUp}
+          canMoveDown={canMoveDown}
+          onMoveUp={onMoveUp}
+          onMoveDown={onMoveDown}
+        />
+        <RunLogsModal
+          open={logsOpen}
+          projectId={project.id}
+          projectName={project.name}
+          onClose={() => setLogsOpen(false)}
+        />
+      </>
     )
   }
 
   return (
-    <ExpandedWorkspace
-      key={`${project.id}:${initialTab ?? ''}:${tabNonce ?? 0}:${initialGuideSection ?? ''}:${initialDetailKey ?? ''}`}
-      view={view}
-      summary={summary}
-      project={project}
-      snapshot={snapshot}
-      syncing={syncing}
-      onSync={() => void syncNow(project.id)}
-      onSettings={() => onOpenSettings(project.id)}
-      onEdit={() => openWizard(project.id)}
-      onRemove={() => onDelete(project.id)}
-      onToggle={onToggle}
-      pinned={pinned}
-      onTogglePin={onTogglePin}
-      initialTab={initialTab}
-      initialGuideSection={initialGuideSection}
-      initialDetailKey={initialDetailKey}
-    />
+    <>
+      <ExpandedWorkspace
+        key={`${project.id}:${initialTab ?? ''}:${tabNonce ?? 0}:${initialGuideSection ?? ''}:${initialDetailKey ?? ''}`}
+        view={view}
+        summary={summary}
+        project={project}
+        snapshot={snapshot}
+        syncing={syncing}
+        onSync={() => void syncNow(project.id)}
+        onScrape={() => void handleScrape()}
+        scraping={scraping}
+        onLogs={() => setLogsOpen(true)}
+        onSettings={() => onOpenSettings(project.id)}
+        onEdit={() => openWizard(project.id)}
+        onRemove={() => onDelete(project.id)}
+        onToggle={onToggle}
+        pinned={pinned}
+        onTogglePin={onTogglePin}
+        initialTab={initialTab}
+        initialGuideSection={initialGuideSection}
+        initialDetailKey={initialDetailKey}
+      />
+      <RunLogsModal
+        open={logsOpen}
+        projectId={project.id}
+        projectName={project.name}
+        onClose={() => setLogsOpen(false)}
+      />
+    </>
   )
 }
 

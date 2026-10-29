@@ -7,6 +7,7 @@ import type {
 import { useDashboardStore } from '../../hooks/useDashboard'
 import AiSettingsForm from './AiSettingsForm'
 import DashboardWizard from './DashboardWizard'
+import { RunLogsModal } from './RunLogsModal'
 import { SidebarLayoutView } from './SidebarLayoutView'
 import {
   LayoutMode,
@@ -50,6 +51,8 @@ export default function ProjectSettingsTab({
   const [newSourceKey, setNewSourceKey] = useState('')
   const [addingSource, setAddingSource] = useState(false)
   const [sourceNotice, setSourceNotice] = useState<string | null>(null)
+  const [scrapingSourceId, setScrapingSourceId] = useState<string | null>(null)
+  const [logsOpen, setLogsOpen] = useState(false)
 
   // Schedule state
   const [startDate, setStartDate] = useState(project.startDate ?? '')
@@ -190,6 +193,27 @@ export default function ProjectSettingsTab({
     setNewSourceKey('')
     setSourceNotice('Browser source added')
     setTimeout(() => setSourceNotice(null), 3000)
+  }
+
+  const handleScrapeSource = async (sourceId: string): Promise<void> => {
+    setScrapingSourceId(sourceId)
+    setSourceNotice('Scraping workspace messages via browser...')
+    try {
+      const res = await useDashboardStore.getState().syncSource({
+        projectId: project.id,
+        sourceId
+      })
+      if (res.status === 'success') {
+        setSourceNotice(`Scraped successfully: ${res.newMessages} new messages found across ${res.channelsRead} channels.`)
+      } else {
+        setSourceNotice(res.error ? `Scrape failed: ${res.error}` : 'Scrape completed with issues.')
+      }
+    } catch (err) {
+      setSourceNotice(err instanceof Error ? `Scrape error: ${err.message}` : 'Scrape failed')
+    } finally {
+      setScrapingSourceId(null)
+      setTimeout(() => setSourceNotice(null), 5000)
+    }
   }
 
   const handleRemoveSource = async (sourceId: string): Promise<void> => {
@@ -355,16 +379,26 @@ export default function ProjectSettingsTab({
                       <h4>Connected Sources</h4>
                       <p>Active token and passive browser automation sources feeding this project.</p>
                     </div>
-                    {!addingSource && (
+                    <div style={{ display: 'flex', gap: 8 }}>
                       <button
                         type="button"
-                        className="dash-primary"
-                        onClick={() => setAddingSource(true)}
+                        className="dash-subtle"
+                        onClick={() => setLogsOpen(true)}
                         style={{ fontSize: 13, padding: '6px 12px' }}
                       >
-                        + Add Browser Source
+                        📋 View Run Logs
                       </button>
-                    )}
+                      {!addingSource && (
+                        <button
+                          type="button"
+                          className="dash-primary"
+                          onClick={() => setAddingSource(true)}
+                          style={{ fontSize: 13, padding: '6px 12px' }}
+                        >
+                          + Add Browser Source
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </header>
 
@@ -430,7 +464,19 @@ export default function ProjectSettingsTab({
                         </div>
                       </div>
 
-                      <div style={{ display: 'flex', gap: 8 }}>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        {src.kind === 'browser' ? (
+                          <button
+                            type="button"
+                            className="dash-subtle"
+                            disabled={scrapingSourceId === src.id || src.enabled === false}
+                            style={{ fontSize: 12, padding: '4px 8px' }}
+                            onClick={() => void handleScrapeSource(src.id)}
+                            title="Scrape Slack messages for this workspace"
+                          >
+                            {scrapingSourceId === src.id ? 'Scraping…' : '🕷 Scrape'}
+                          </button>
+                        ) : null}
                         <button
                           type="button"
                           className="dash-subtle"
@@ -717,6 +763,13 @@ export default function ProjectSettingsTab({
           </div>
         </footer>
       </div>
+
+      <RunLogsModal
+        open={logsOpen}
+        projectId={project.id}
+        projectName={project.name}
+        onClose={() => setLogsOpen(false)}
+      />
     </div>
   )
 }

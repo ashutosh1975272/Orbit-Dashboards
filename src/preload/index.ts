@@ -400,6 +400,15 @@ const api: IpcApi = {
         teamId: string
         profileId: string
       }>>,
+    syncSource: (payload: { projectId: string; sourceId?: string }) =>
+      ipcRenderer.invoke(IpcChannels.DashboardSyncSource, payload) as Promise<{
+        channelsRead: number
+        newMessages: number
+        status: string
+        error?: string
+      }>,
+    getRunLogs: (payload: { projectId: string; limit?: number }) =>
+      ipcRenderer.invoke(IpcChannels.DashboardGetRunLogs, payload) as Promise<any>,
   }
 }
 
