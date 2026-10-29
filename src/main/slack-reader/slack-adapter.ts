@@ -42,6 +42,15 @@ export const LIST_CHANNELS_SCRIPT = `
   const channels = [];
   const items = document.querySelectorAll('${SLACK_SELECTORS.channelItem}');
   items.forEach((item) => {
+    // Exclude direct message containers and user rows
+    if (
+      item.classList.contains('p-channel_sidebar__item--user') ||
+      item.querySelector('[data-qa-channel-sidebar-item="user"]') ||
+      item.closest('[data-qa="channel_sidebar_section_users"]')
+    ) {
+      return;
+    }
+
     const nameEl = item.querySelector('${SLACK_SELECTORS.channelName}');
     const badgeEl = item.querySelector('${SLACK_SELECTORS.channelUnreadBadge}');
     const linkEl = item.querySelector('a[href]');
@@ -50,15 +59,24 @@ export const LIST_CHANNELS_SCRIPT = `
 
     let id = '';
     const href = linkEl ? linkEl.getAttribute('href') || '' : '';
-    const match = href.match(/\\/messages\\/([^/?]+)/);
+    const match = href.match(/\\/messages\\/([^/?]+)/) || href.match(/\\/client\\/[^/]+\\/([^/?]+)/);
     if (match && match[1]) {
       id = match[1];
     } else {
       id = name.toLowerCase().replace(/[^a-z0-9-_]/g, '');
     }
 
+    // Exclude Direct Message IDs (starting with D)
+    if (id.startsWith('D')) {
+      return;
+    }
+
     const ariaLabel = item.getAttribute('aria-label') || '';
-    const isPrivate = ariaLabel.toLowerCase().includes('private') || name.startsWith('🔒');
+    const isPrivate =
+      ariaLabel.toLowerCase().includes('private') ||
+      name.startsWith('🔒') ||
+      Boolean(item.querySelector('[data-qa="channel_icon_private"]')) ||
+      Boolean(item.querySelector('.c-icon--lock'));
 
     channels.push({
       id,
