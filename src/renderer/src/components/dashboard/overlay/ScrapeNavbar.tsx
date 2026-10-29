@@ -279,3 +279,4 @@ const buttonStyle: React.CSSProperties = {
   outline: 'none',
   transition: 'background 0.15s ease, color 0.15s ease'
 }
+

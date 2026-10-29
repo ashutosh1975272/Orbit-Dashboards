@@ -79,15 +79,24 @@ export const READ_VISIBLE_MESSAGES_SCRIPT = `
 (function() {
   const rows = document.querySelectorAll('${SLACK_SELECTORS.messageRow}');
   const results = [];
+  let lastAuthor = null;
 
   rows.forEach((row) => {
     const senderEl = row.querySelector('${SLACK_SELECTORS.messageSender}');
     const tsEl = row.querySelector('${SLACK_SELECTORS.messageTimestamp}');
     const bodyEl = row.querySelector('${SLACK_SELECTORS.messageBody}');
 
-    // Extract timestamp from data-ts attribute or inner text
+    // If an author header exists on this row, update lastAuthor
+    if (senderEl) {
+      const authorText = senderEl.textContent.trim();
+      if (authorText) {
+        lastAuthor = authorText;
+      }
+    }
+
+    // Extract timestamp from data-ts attribute, datetime, or text
     let rawTs = tsEl ? (tsEl.getAttribute('data-ts') || tsEl.getAttribute('datetime') || tsEl.textContent.trim()) : '';
-    const sender = senderEl ? senderEl.textContent.trim() : 'Anonymous';
+    const sender = lastAuthor || 'Anonymous';
     const text = bodyEl ? (bodyEl.innerText || bodyEl.textContent || '').trim() : '';
 
     const permalinkEl = row.querySelector('a[href*="/archives/"]');
