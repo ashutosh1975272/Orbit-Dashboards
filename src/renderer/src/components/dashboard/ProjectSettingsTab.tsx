@@ -456,7 +456,7 @@ export default function ProjectSettingsTab({
                         <SourceStatusBadge status={src.status ?? 'connected'} lastReadAt={src.lastReadAt} />
                         <div>
                           <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>
-                            {src.workspaceName}
+                            {src.workspaceName === 'T0FJQUFLJ' ? 'excellencetech' : src.workspaceName === 'T0C6YS80MPZ' ? 'AgentWork' : (src.workspaceName || src.workspaceId)}
                           </div>
                           <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                             {src.kind === 'browser' ? 'Browser session' : 'Token'} · {src.channels.length} channels monitored
@@ -467,23 +467,6 @@ export default function ProjectSettingsTab({
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                         {src.kind === 'browser' ? (
                           <>
-                            <button
-                              type="button"
-                              className="dash-subtle"
-                              onClick={async () => {
-                                setSourceNotice(`Auto-detecting channels in ${src.workspaceName}...`)
-                                try {
-                                  await handleScrapeSource(src.id)
-                                  setSourceNotice(`Auto-detected & synced channels successfully.`)
-                                } catch (e: any) {
-                                  setSourceNotice(`Auto-detect failed: ${e.message}`)
-                                }
-                              }}
-                              style={{ fontSize: 12, padding: '4px 8px', color: '#38bdf8' }}
-                              title="Auto-detect and sync all channels in this workspace"
-                            >
-                              ⟳ Auto-Sync Channels
-                            </button>
                             <button
                               type="button"
                               className="dash-subtle"
@@ -508,9 +491,9 @@ export default function ProjectSettingsTab({
                               type="button"
                               className="dash-subtle"
                               disabled={scrapingSourceId === src.id || src.enabled === false}
-                              style={{ fontSize: 12, padding: '4px 8px' }}
+                              style={{ fontSize: 12, padding: '4px 8px', color: '#22c55e' }}
                               onClick={() => void handleScrapeSource(src.id)}
-                              title="Scrape Slack messages for this workspace"
+                              title="Auto-discover and scrape all public & private channels in this workspace"
                             >
                               {scrapingSourceId === src.id ? 'Scraping…' : '🕷 Scrape'}
                             </button>
