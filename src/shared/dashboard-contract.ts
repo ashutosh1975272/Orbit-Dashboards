@@ -67,6 +67,7 @@ export interface ProjectSourceChannel {
   id: string
   name: string
   isPrivate?: boolean
+  enabled?: boolean
 }
 
 export type ProjectSourceStatus =

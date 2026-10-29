@@ -202,6 +202,7 @@ export default function ExpandedWorkspace({
       >
         <WorkspaceSidebar
           projectId={project.id}
+          projectProfileId={project.profileId}
           view={view}
           nav={nav}
           channels={channelLists}

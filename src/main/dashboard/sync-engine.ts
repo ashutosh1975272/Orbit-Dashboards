@@ -437,7 +437,8 @@ export class DashboardSyncEngine {
               profileId: bSrc.profileId,
               workspaceId: bSrc.workspaceId
             })
-            for (const ch of bSrc.channels) {
+            const activeChannels = (bSrc.channels ?? []).filter((c) => c.enabled !== false)
+            for (const ch of activeChannels) {
               const messages = await reader.readChannelMessages(ch.id)
               channelsRead++
               if (messages.length > 0) {
@@ -681,17 +682,32 @@ export class DashboardSyncEngine {
         try {
           const discovered = await reader.listChannels()
           if (discovered.length > 0) {
-            targetChannels = discovered.map((c) => ({ id: c.id, name: c.name }))
+            // Preserve any user-toggled enabled states
+            const existingMap = new Map((bSrc.channels ?? []).map((c) => [c.id, c.enabled]))
+            const discoveredChannels = discovered.map((c) => ({
+              id: c.id,
+              name: c.name,
+              isPrivate: c.isPrivate,
+              // If user previously configured this channel, respect their choice; default to true
+              enabled: existingMap.has(c.id) ? existingMap.get(c.id) : true
+            }))
+
             // Persist discovered channels onto the source
             const updated = (project.sources ?? []).map((s) =>
-              s.id === bSrc.id ? { ...s, channels: targetChannels } : s
+              s.id === bSrc.id ? { ...s, channels: discoveredChannels } : s
             )
             void this.monitorStore.upsertProject({
               project: { ...project, sources: updated }
             })
+
+            // Only scrape channels that are enabled (enabled !== false)
+            targetChannels = discoveredChannels.filter((c) => c.enabled !== false)
+          } else {
+            targetChannels = (bSrc.channels ?? []).filter((c) => c.enabled !== false)
           }
         } catch {
-          // fallback to original list
+          // fallback to original list, filtering for enabled
+          targetChannels = (bSrc.channels ?? []).filter((c) => c.enabled !== false)
         }
 
         const totalChannels = targetChannels.length

@@ -1,9 +1,11 @@
 import type React from 'react'
-import { Fragment, useRef, useMemo } from 'react'
+import { Fragment, useRef, useMemo, useState } from 'react'
 import type { CardView } from './card-view'
 import NavIcon from './nav-icons'
 import { detailMeta } from './guide-model'
 import { useSidebarLayout } from './use-sidebar-layout'
+import { useProfileStore } from '../../hooks/useProfiles'
+import { useDashboardStore } from '../../hooks/useDashboard'
 import {
   INFO_GROUPS,
   NAV_CONNECTORS,
@@ -32,6 +34,7 @@ import {
 
 interface WorkspaceSidebarProps {
   projectId?: string
+  projectProfileId?: string
   view: CardView
   nav: WorkspaceNavState
   channels: ConnectorChannelLists
@@ -152,6 +155,7 @@ function Row({
 
 export default function WorkspaceSidebar({
   projectId = '',
+  projectProfileId,
   view,
   nav,
   channels,
@@ -166,6 +170,21 @@ export default function WorkspaceSidebar({
   const collapsed = nav.collapsed
   const asideRef = useRef<HTMLElement>(null)
   const { layout } = useSidebarLayout(projectId)
+  const profiles = useProfileStore((s) => s.profiles)
+  const [globalAccountsOpen, setGlobalAccountsOpen] = useState(true)
+
+  // Collect all globally available workspaces across profiles
+  const globalSlackWorkspaces = useMemo(() => {
+    return profiles.flatMap((p) =>
+      p.apps.slack.availableWorkspaces.map((w) => ({
+        profileId: p.id,
+        profileName: p.customName || p.displayName,
+        teamId: w.teamId,
+        teamName: w.teamName,
+        isProjectProfile: projectProfileId ? p.id === projectProfileId : false
+      }))
+    )
+  }, [profiles, projectProfileId])
 
   const activeSections = useMemo(() => {
     if (layout.mode === 'minimal') {
@@ -330,7 +349,62 @@ export default function WorkspaceSidebar({
                     )
                   })
                 ) : section.key === 'slack' ? (
-                  NAV_CONNECTORS.map((connector) => {
+                  <>
+                    {/* SECTION 1: GLOBAL ACCOUNTS */}
+                    <div className="ws-nav-group" style={{ marginBottom: 4 }}>
+                      <button
+                        type="button"
+                        className={`ws-nav-groupbtn ws-nav-connector${globalAccountsOpen ? ' is-open' : ''}`}
+                        aria-expanded={globalAccountsOpen}
+                        title="Workspaces available globally across all profiles in Cosmic"
+                        onClick={() => setGlobalAccountsOpen((prev) => !prev)}
+                      >
+                        <span className="ws-nav-icon">
+                          <NavIcon name="globe" />
+                        </span>
+                        <span className="ws-nav-label" style={{ fontWeight: 600 }}>Global Accounts</span>
+                        {globalSlackWorkspaces.length > 0 && (
+                          <span className="ws-nav-count">{globalSlackWorkspaces.length}</span>
+                        )}
+                        <Chevron open={globalAccountsOpen} />
+                      </button>
+                      {globalAccountsOpen && (
+                        <>
+                          {globalSlackWorkspaces.length === 0 ? (
+                            <p className="ws-nav-note">No global Slack workspaces signed in.</p>
+                          ) : (
+                            globalSlackWorkspaces.map((gw) => (
+                              <button
+                                key={`${gw.profileId}:${gw.teamId}`}
+                                type="button"
+                                className="ws-nav-subitem"
+                                title={`Open ${gw.teamName} (${gw.profileName}) in live workspace view`}
+                                onClick={() => {
+                                  useDashboardStore.getState().closeDashboard()
+                                  void useProfileStore.getState().openWorkspace(gw.profileId, 'slack', gw.teamId, {
+                                    x: 320,
+                                    y: 40,
+                                    width: window.innerWidth - 320,
+                                    height: window.innerHeight - 40
+                                  })
+                                }}
+                                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 12px 5px 28px' }}
+                              >
+                                <span className="ws-nav-label" style={{ fontSize: 12 }}>
+                                  🏢 {gw.teamName}
+                                </span>
+                                <span className="ws-nav-tag" style={{ fontSize: 10, opacity: 0.7 }}>
+                                  {gw.profileName}
+                                </span>
+                              </button>
+                            ))
+                          )}
+                        </>
+                      )}
+                    </div>
+
+                    {/* SECTION 2 & 3: OUR SLACK & CLIENT CONNECTORS */}
+                    {NAV_CONNECTORS.map((connector) => {
                     const list = channels[connector.key]
                     const allId = connector.allId
                     const entries = list?.entries ?? []
@@ -398,7 +472,8 @@ export default function WorkspaceSidebar({
                         )}
                       </div>
                     )
-                  })
+                  })}
+                  </>
                 ) : (
                   section.rows.map((row) => (
                     <Row

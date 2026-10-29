@@ -164,6 +164,22 @@ export default function ProjectSettingsTab({
     setTimeout(() => setSourceNotice(null), 3000)
   }
 
+  const handleToggleChannelEnabled = async (sourceId: string, channelId: string, currentEnabled: boolean): Promise<void> => {
+    const updatedSources = (project.sources ?? []).map((s) => {
+      if (s.id !== sourceId) return s
+      const updatedChannels = s.channels.map((ch) =>
+        ch.id === channelId ? { ...ch, enabled: !currentEnabled } : ch
+      )
+      return { ...s, channels: updatedChannels }
+    })
+    await useDashboardStore.getState().upsertProject({
+      ...project,
+      sources: updatedSources
+    })
+    setSourceNotice(`Channel ${currentEnabled ? 'deselected' : 'selected'} for monitoring`)
+    setTimeout(() => setSourceNotice(null), 3000)
+  }
+
   const handleAddBrowserSource = async (): Promise<void> => {
     if (!newSourceKey) return
     const [profId, teamId] = newSourceKey.split(':')
@@ -440,8 +456,8 @@ export default function ProjectSettingsTab({
                   )}
 
                   {(project.sources ?? []).map((src) => (
+                    <div key={src.id} style={{ display: 'flex', flexDirection: 'column' }}>
                     <div
-                      key={src.id}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -523,6 +539,59 @@ export default function ProjectSettingsTab({
                         </button>
                       </div>
                     </div>
+
+                    {/* Discovered Channels Checklist for Browser Source */}
+                    {src.kind === 'browser' && src.channels && src.channels.length > 0 && (
+                      <div
+                        style={{
+                          marginTop: -4,
+                          marginBottom: 8,
+                          padding: '12px 16px',
+                          background: 'rgba(255, 255, 255, 0.02)',
+                          borderRadius: '0 0 8px 8px',
+                          border: '1px solid var(--border)',
+                          borderTop: 'none'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>
+                            Monitored Channels ({src.channels.filter((c) => c.enabled !== false).length}/{src.channels.length} active)
+                          </span>
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                            Auto-discovered public &amp; private locked channels
+                          </span>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 6 }}>
+                          {src.channels.map((ch) => (
+                            <label
+                              key={ch.id}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 6,
+                                fontSize: 12,
+                                padding: '4px 8px',
+                                background: ch.enabled !== false ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+                                border: `1px solid ${ch.enabled !== false ? 'rgba(99, 102, 241, 0.3)' : 'var(--border)'}`,
+                                borderRadius: 4,
+                                cursor: 'pointer',
+                                color: ch.enabled !== false ? 'var(--text)' : 'var(--text-muted)'
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={ch.enabled !== false}
+                                onChange={() => void handleToggleChannelEnabled(src.id, ch.id, ch.enabled !== false)}
+                              />
+                              <span>
+                                {ch.isPrivate ? '🔒' : '#'} {ch.name || ch.id}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   ))}
                 </div>
               </section>
