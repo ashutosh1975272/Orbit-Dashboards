@@ -116,6 +116,17 @@ export interface DashboardProject {
   /** Additive multi-source model (SLK-1) */
   sources?: ProjectSource[]
   sourcePreference?: 'token_first' | 'browser_only'
+  /** Automation mode: per_approval = confirm dialog before scrape, autonomous = direct, scheduled = cron */
+  scrapeMode?: 'per_approval' | 'autonomous' | 'scheduled'
+  /** Cron or human string when scrapeMode === 'scheduled' */
+  scrapeSchedule?: string
+  /** Per-card visual automation overlay settings override */
+  automationOverride?: {
+    showLiveBorder?: boolean
+    borderStyle?: 'thin' | 'glow'
+    showCursorOverlay?: boolean
+    showMessageHighlight?: boolean
+  }
   /**
    * Our Slack channels this project reads. Empty means none; per-project
    * mapping replaces the legacy global pin set.
