@@ -24,5 +24,9 @@ export const SLACK_SELECTORS = {
   messageRow: '[data-qa="message_container"], .c-message_kit__message, .c-virtual_list__item',
   messageSender: '[data-qa="message_sender_name"], .c-message__sender_button',
   messageTimestamp: '[data-qa="timestamp"], .c-timestamp',
-  messageBody: '[data-qa="message-text"], .c-message_kit__blocks .p-rich_text_section, .p-rich_text_section'
+  messageBody: '[data-qa="message-text"], .c-message_kit__blocks .p-rich_text_section, .p-rich_text_section',
+
+  // Message composer input & send button (for active posting)
+  composerEditor: '.ql-editor[contenteditable="true"], [data-qa="message_input"], [role="textbox"][contenteditable="true"]',
+  composerSendButton: '[data-qa="texty_send_button"], button[aria-label="Send message"]'
 } as const

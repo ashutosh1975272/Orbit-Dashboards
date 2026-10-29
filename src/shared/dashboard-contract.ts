@@ -669,6 +669,7 @@ export type DashboardSendErrorCode =
   | 'channel_not_found'
   | 'invalid_text'
   | 'slack_error'
+  | 'browser_error'
   | 'unknown'
 
 export interface DashboardSendMessageResult {

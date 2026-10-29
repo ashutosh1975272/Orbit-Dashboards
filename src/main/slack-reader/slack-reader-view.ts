@@ -101,6 +101,25 @@ export class SlackReaderView {
     return deduplicateMessages(this.workspaceId, channelId, normalized)
   }
 
+  /**
+   * Navigates to the channel and posts a message via DOM input fallback.
+   */
+  async postChannelMessage(channelId: string, text: string): Promise<boolean> {
+    if (!this.view) await this.initialize()
+    const state = await this.checkState()
+    if (state !== 'logged_in') return false
+
+    const channelUrl = `https://app.slack.com/client/${this.workspaceId}/${channelId}`
+    const currentUrl = this.view!.webContents.getURL()
+
+    if (!currentUrl.includes(`/${this.workspaceId}/${channelId}`)) {
+      await this.view!.webContents.loadURL(channelUrl)
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+    }
+
+    return this.adapter.postMessageViaDom(this.view!, text)
+  }
+
   destroy(): void {
     if (this.view && !this.view.webContents.isDestroyed()) {
       this.view.webContents.close()

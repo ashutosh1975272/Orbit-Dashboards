@@ -497,15 +497,66 @@ export class DashboardChatService {
     }
 
     const token = workspace.token
+    const browserSource = (project.sources ?? []).find(
+      (s) => s.kind === 'browser' && s.enabled !== false && s.workspaceId === workspace.teamId
+    )
+
+    // Helper for browser DOM posting fallback
+    const tryPostViaBrowser = async (): Promise<DashboardSendMessageResult> => {
+      if (!browserSource?.profileId || !browserSource?.workspaceId) {
+        return { ok: false, code: 'missing_scope', error: MISSING_SCOPE_MESSAGE }
+      }
+      try {
+        const { SlackReaderView } = await import('../slack-reader/slack-reader-view')
+        const reader = new SlackReaderView({
+          profileId: browserSource.profileId,
+          workspaceId: browserSource.workspaceId
+        })
+        const ok = await reader.postChannelMessage(monitor.channelId, text)
+        reader.destroy()
+        if (!ok) {
+          return { ok: false, code: 'browser_error', error: 'Failed to post message via browser session.' }
+        }
+
+        const nowTs = `${(Date.now() / 1000).toFixed(6)}`
+        await this.deltaStore.appendMessages({
+          profileId: workspace.profileId,
+          teamId: workspace.teamId,
+          channelId: monitor.channelId,
+          channelName: monitor.channelName,
+          source,
+          messages: [{ ts: nowTs, user: project.selfUserId || 'me', text }]
+        })
+
+        return {
+          ok: true,
+          message: this.toChatMessage(
+            project,
+            { channelId: monitor.channelId, channelName: monitor.channelName },
+            { ts: nowTs, user: project.selfUserId || 'me', text },
+            null,
+            source
+          )
+        }
+      } catch (err) {
+        return { ok: false, code: 'browser_error', error: err instanceof Error ? err.message : String(err) }
+      }
+    }
+
     if (!token) {
+      if (browserSource) {
+        return tryPostViaBrowser()
+      }
       return { ok: false, code: 'not_connected', error: NOT_CONNECTED_MESSAGE }
     }
 
-    // Scopes are only known for the card's own OAuth link; for our workspace we
-    // let Slack answer, so a working token is never blocked by missing metadata.
+    // Scopes check
     if (source === 'client') {
       const scopes = await this.scopesFor(project, token)
       if (scopes && scopes.length > 0 && !scopes.includes('chat:write')) {
+        if (browserSource) {
+          return tryPostViaBrowser()
+        }
         return {
           ok: false,
           code: 'missing_scope',

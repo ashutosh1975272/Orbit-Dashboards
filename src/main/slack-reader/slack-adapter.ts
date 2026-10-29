@@ -137,4 +137,33 @@ export class SlackAdapter {
       return []
     }
   }
+
+  async postMessageViaDom(view: WebContentsView, text: string): Promise<boolean> {
+    if (view.webContents.isDestroyed()) return false
+    const script = `
+(function() {
+  const editor = document.querySelector('${SLACK_SELECTORS.composerEditor}');
+  if (!editor) return false;
+  editor.focus();
+  document.execCommand('selectAll', false, null);
+  document.execCommand('insertText', false, ${JSON.stringify(text)});
+  editor.dispatchEvent(new Event('input', { bubbles: true }));
+
+  setTimeout(() => {
+    const sendBtn = document.querySelector('${SLACK_SELECTORS.composerSendButton}');
+    if (sendBtn && !sendBtn.disabled) {
+      sendBtn.click();
+    } else {
+      editor.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
+    }
+  }, 300);
+  return true;
+})()
+`
+    try {
+      return Boolean(await view.webContents.executeJavaScript(script, true))
+    } catch {
+      return false
+    }
+  }
 }
