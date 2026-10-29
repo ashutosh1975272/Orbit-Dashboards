@@ -27,7 +27,7 @@ export const AutomationNotice: React.FC<AutomationNoticeProps> = ({
       <div style={{ fontSize: 13, color: '#fef08a', lineHeight: 1.5 }}>
         <strong>Passive Read-Only Automation Notice:</strong>
         <br />
-        Orbit will read visible messages from the selected channels using your local logged-in session in the background. It will <em>never</em> send messages, compose text, or take actions on your behalf.
+        Cosmic will read visible messages from the selected channels using your local logged-in session in the background. It will <em>never</em> send messages, compose text, or take actions on your behalf.
       </div>
       <label
         style={{

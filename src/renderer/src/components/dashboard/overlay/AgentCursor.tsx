@@ -35,7 +35,7 @@ export const AgentCursor: React.FC<AgentCursorProps> = ({ x, y, visible }) => {
         />
       </svg>
       <div className="bg-indigo-600/95 border border-indigo-400 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded shadow-lg backdrop-blur-sm whitespace-nowrap">
-        Orbit Reader
+        Cosmic Reader
       </div>
     </div>
   )

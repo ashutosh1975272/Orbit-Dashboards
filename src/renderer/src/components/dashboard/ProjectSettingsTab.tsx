@@ -601,7 +601,7 @@ export default function ProjectSettingsTab({
                     ) : null}
                     {tokenStatus.canSend === false ? (
                       <p className="ai-settings-error">
-                        Read-only: this token is missing the <b>chat:write</b> scope, so Orbit cannot post
+                        Read-only: this token is missing the <b>chat:write</b> scope, so Cosmic cannot post
                         replies. Add <b>chat:write</b> to the Slack app&apos;s User Token Scopes (OAuth
                         &amp; Permissions), reinstall or reconnect the workspace, then try again.
                       </p>

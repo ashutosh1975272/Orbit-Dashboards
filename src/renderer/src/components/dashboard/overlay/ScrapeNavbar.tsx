@@ -60,7 +60,7 @@ export const ScrapeNavbar: React.FC<ScrapeNavbarProps> = ({
       <div
         data-testid="scrape-navbar-collapsed"
         onClick={onToggleCollapse}
-        title="Click to expand Orbit Reader Navbar"
+        title="Click to expand Cosmic Reader Navbar"
         style={{
           height: '5px',
           width: '100%',
@@ -109,7 +109,7 @@ export const ScrapeNavbar: React.FC<ScrapeNavbarProps> = ({
             boxShadow: `0 0 6px ${dot.color}`
           }}
         />
-        <strong style={{ color: '#e2e8f0', letterSpacing: '-0.01em' }}>Orbit Reader</strong>
+        <strong style={{ color: '#e2e8f0', letterSpacing: '-0.01em' }}>Cosmic Reader</strong>
         <span style={{ color: 'rgba(255, 255, 255, 0.25)' }}>·</span>
         <span style={{ color: '#94a3b8' }}>{workspaceName}</span>
         {channelName && (

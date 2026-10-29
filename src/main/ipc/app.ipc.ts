@@ -97,13 +97,13 @@ export function registerAppIpc(deps: {
       silent: !settings.notificationSound,
       title: APP_DISPLAY_NAME,
       subtitle: 'Test',
-      body: 'New message preview — this is how Orbit alerts look.',
+      body: 'New message preview — this is how Cosmic alerts look.',
       onClick: () => undefined
     })
     if (result.ok) {
       return {
         ok: true,
-        message: 'Slack-style Orbit banner should appear at the top-right.'
+        message: 'Slack-style Cosmic banner should appear at the top-right.'
       }
     }
     return {

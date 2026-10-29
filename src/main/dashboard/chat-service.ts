@@ -95,7 +95,7 @@ function emptyActivity(): DashboardProjectActivity {
 }
 
 export const MISSING_SCOPE_MESSAGE =
-  "This Slack token is missing the chat:write scope, so Orbit cannot post replies. Add chat:write to the Slack app's User Token Scopes (OAuth & Permissions), reinstall or reconnect the workspace, then try again."
+  "This Slack token is missing the chat:write scope, so Cosmic cannot post replies. Add chat:write to the Slack app's User Token Scopes (OAuth & Permissions), reinstall or reconnect the workspace, then try again."
 
 export const NOT_CONNECTED_MESSAGE =
   'No Slack token is available for this workspace. Reconnect the workspace or add a manual token.'

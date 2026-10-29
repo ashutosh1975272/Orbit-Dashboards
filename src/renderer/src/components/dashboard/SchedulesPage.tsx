@@ -152,7 +152,7 @@ export default function SchedulesPage(): React.ReactElement {
     <div className="sched-page">
       {error ? <p className="sched-error">{error}</p> : null}
       <p className="dash-muted sched-note">
-        Schedules run for every card while Orbit is open. Nothing runs in the background after the
+        Schedules run for every card while Cosmic is open. Nothing runs in the background after the
         app quits.
       </p>
 

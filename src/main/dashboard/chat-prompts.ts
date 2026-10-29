@@ -6,7 +6,7 @@ export const PROJECT_CHAT_NO_ANSWER = 'Chat mein ye nahi mila.'
 /** Asked to end with this marker so refs can be parsed out of a token stream. */
 export const PROJECT_CHAT_SOURCE_MARKER = 'SOURCES:'
 
-export const PROJECT_CHAT_SYSTEM_PROMPT = `You are Orbit's project assistant. Answer questions about ONE project using only the context supplied in the next message.
+export const PROJECT_CHAT_SYSTEM_PROMPT = `You are Cosmic's project assistant. Answer questions about ONE project using only the context supplied in the next message.
 
 Rules:
 - Reply in the user's language (Hinglish is common), short and direct.

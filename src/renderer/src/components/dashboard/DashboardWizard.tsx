@@ -451,7 +451,7 @@ export default function DashboardWizard({
         <div className="wizard-body">
           <h3>Choose Connection Method</h3>
           <p className="wizard-sub">
-            Select how Orbit should read messages from your Slack workspace.
+            Select how Cosmic should read messages from your Slack workspace.
           </p>
           <SourcePicker value={sourceType} onChange={(val) => setSourceType(val)} />
           <div className="settings-actions" style={{ marginTop: 24 }}>
@@ -471,7 +471,7 @@ export default function DashboardWizard({
         <div className="wizard-body">
           <h3>Logged-in Slack Workspace</h3>
           <p className="wizard-sub">
-            Map a Slack workspace docked under your Google Profile in Orbit.
+            Map a Slack workspace docked under your Google Profile in Cosmic.
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <WorkspacePicker

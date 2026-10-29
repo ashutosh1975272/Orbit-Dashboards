@@ -627,7 +627,7 @@ export default function AgentChatPanel({
                 key={key}
               >
                 <div className="chat-msg-meta">
-                  <span>{message.role === 'user' ? 'You' : 'Orbit'}</span>
+                  <span>{message.role === 'user' ? 'You' : 'Cosmic'}</span>
                   <span>{timeLabel(message.atIso)}</span>
                   {message.stopped ? <span>stopped</span> : null}
                 </div>
@@ -672,7 +672,7 @@ export default function AgentChatPanel({
           {streaming ? (
             <div className="chat-msg is-assistant" aria-live="off">
               <div className="chat-msg-meta">
-                <span>Orbit</span>
+                <span>Cosmic</span>
               </div>
               <div className="chat-bubble">
                 {streamText ? (
