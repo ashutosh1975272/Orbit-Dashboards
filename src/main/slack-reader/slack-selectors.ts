@@ -14,8 +14,8 @@ export const SLACK_SELECTORS = {
   // Channel sidebar elements
   channelListContainer: '[data-qa="channel_sidebar_name_page"], .p-channel_sidebar__list',
   channelItem:
-    '[data-qa="channel_sidebar_name_page"] [role="treeitem"], .p-channel_sidebar__channel',
-  channelName: '.p-channel_sidebar__name, [data-qa="channel_sidebar_name"]',
+    '[data-qa="channel_sidebar_name_page"] [role="treeitem"], .p-channel_sidebar__channel, .p-channel_sidebar__item--user, [data-qa-channel-sidebar-item="true"]',
+  channelName: '.p-channel_sidebar__name, [data-qa="channel_sidebar_name"], span[data-qa="channel_sidebar_name"]',
   channelUnreadBadge:
     '.p-channel_sidebar__badge, [data-qa="channel-sidebar-unread-badge"], .c-mention_badge',
 

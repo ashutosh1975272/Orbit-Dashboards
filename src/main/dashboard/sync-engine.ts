@@ -633,7 +633,27 @@ export class DashboardSyncEngine {
         })
         this.activeWatchReader = reader
 
-        for (const ch of bSrc.channels) {
+        // If source has no channels, or if channels don't belong to this workspace, auto-discover live channels from sidebar
+        let targetChannels = bSrc.channels
+        if (!targetChannels || targetChannels.length === 0) {
+          try {
+            const discovered = await reader.listChannels()
+            if (discovered.length > 0) {
+              targetChannels = discovered.map((c) => ({ id: c.id, name: c.name }))
+              // Persist discovered channels onto the source
+              const updated = (project.sources ?? []).map((s) =>
+                s.id === bSrc.id ? { ...s, channels: targetChannels } : s
+              )
+              void this.monitorStore.upsertProject({
+                project: { ...project, sources: updated }
+              })
+            }
+          } catch {
+            // fallback to original list
+          }
+        }
+
+        for (const ch of targetChannels) {
           this.scrapeEventListener?.({
             type: 'navigate',
             channelName: ch.name || ch.id,
