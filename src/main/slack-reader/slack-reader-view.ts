@@ -113,7 +113,16 @@ export class SlackReaderView {
     })
 
     if (!currentUrl.includes(`/${this.workspaceId}/${channelId}`)) {
-      await this.view!.webContents.loadURL(channelUrl)
+      try {
+        await this.view!.webContents.loadURL(channelUrl)
+      } catch (err: any) {
+        // Chromium throws ERR_ABORTED (-3) if Slack's SPA client redirect intervenes.
+        // If the URL actually navigated or contains the channel, this is non-fatal.
+        const finalUrl = this.view!.webContents.getURL()
+        if (!finalUrl.includes(channelId) && !err.message?.includes('ERR_ABORTED')) {
+          throw err
+        }
+      }
       // Allow DOM to settle passively
       await new Promise((resolve) => setTimeout(resolve, 2500))
     }
