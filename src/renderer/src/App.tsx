@@ -21,6 +21,7 @@ import { PlatformSettingsPanel } from './components/dashboard/PlatformSettingsPa
 import { AddPlatformPage } from './components/dashboard/AddPlatformPage'
 import { AccountsManagementModal } from './components/dashboard/AccountsManagementModal'
 import { UnifiedSettingsModal, type SettingsTabKey } from './components/dashboard/UnifiedSettingsModal'
+import { NewProfileModal } from './components/dashboard/NewProfileModal'
 import { ScrapeNavbar, type NavbarState, type ScrapeSnippet } from './components/dashboard/overlay/ScrapeNavbar'
 import { sidebarToastFor } from './lib/sidebar-toast'
 import { modKey, modShift } from './lib/shortcut-label'
@@ -87,6 +88,7 @@ function App(): React.JSX.Element {
     appId: AppId
   } | null>(null)
   const [addPlatformOpen, setAddPlatformOpen] = useState(false)
+  const [newProfileModalOpen, setNewProfileModalOpen] = useState(false)
   const [accountsModalOpen, setAccountsModalOpen] = useState(false)
   const [activeCustomLinkId, setActiveCustomLinkId] = useState<string | null>(null)
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS)
@@ -708,7 +710,8 @@ function App(): React.JSX.Element {
       const meta = e.metaKey || e.ctrlKey
       if (meta && e.key === ',') {
         e.preventDefault()
-        setSettingsOpen((o) => !o)
+        setUnifiedSettingsTab('general')
+        setUnifiedSettingsOpen((o) => !o)
         return
       }
       if (meta && e.key.toLowerCase() === 'b') {
@@ -727,6 +730,10 @@ function App(): React.JSX.Element {
         return
       }
       if (e.key === 'Escape') {
+        if (unifiedSettingsOpen) {
+          setUnifiedSettingsOpen(false)
+          return
+        }
         if (settingsOpen) {
           setSettingsOpen(false)
           return
@@ -868,6 +875,11 @@ function App(): React.JSX.Element {
                 setPlatformSettings({ profileId, appId })
               }}
               onAddPlatform={() => setAddPlatformOpen(true)}
+              onNewProject={() => {
+                useDashboardStore.getState().openDashboard()
+                useDashboardStore.getState().openWizard()
+              }}
+              onNewProfile={() => setNewProfileModalOpen(true)}
               onOpenAccountsSettings={() => {
                 setUnifiedSettingsTab('general')
                 setUnifiedSettingsOpen(true)
@@ -961,18 +973,6 @@ function App(): React.JSX.Element {
                 </div>
               ) : null}
             </div>
-          ) : null}
-
-          {!browserAuthBusy && !locked && !showEmbed && !dashboardOpen && !wizardOpen ? (
-            <button
-              type="button"
-              className="settings-float-btn"
-              onClick={() => setSettingsOpen(true)}
-              title={`Settings (${modKey()},)`}
-              aria-label="Settings"
-            >
-              ⚙
-            </button>
           ) : null}
 
           {!browserAuthBusy && !showEmbed && !dashboardOpen && !locked ? (
@@ -1139,6 +1139,19 @@ function App(): React.JSX.Element {
         onOpenCustomLink={(pId, link) => {
           setUnifiedSettingsOpen(false)
           void handleSelectCustomLink(pId, link)
+        }}
+      />
+
+      <NewProfileModal
+        open={newProfileModalOpen}
+        onClose={() => setNewProfileModalOpen(false)}
+        onCreate={async (name, email) => {
+          const profile = await useProfileStore.getState().createProfile(email)
+          if (name.trim() && name.trim() !== email) {
+            await window.api.profiles.setCustomName(profile.id, name.trim())
+          }
+          await useProfileStore.getState().loadProfiles()
+          setToast(`Created profile ${name.trim() || email}`)
         }}
       />
 

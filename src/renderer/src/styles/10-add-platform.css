@@ -767,17 +767,20 @@
   color: var(--muted);
 }
 
-/* Nav add & accounts buttons in ProfileSidebar */
+/* Nav action stack buttons in ProfileSidebar (Vertical Stack) */
 .nav-add-section {
   margin: 12px 0 0 0;
   padding-top: 8px;
   border-top: 1px solid var(--border);
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.nav-add-btn {
-  flex: 1;
+.nav-action-btn,
+.nav-add-btn,
+.nav-accounts-btn {
+  width: 100%;
   padding: 8px 12px;
   display: flex;
   align-items: center;
@@ -790,23 +793,26 @@
   font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
+  transition: all 0.15s ease;
 }
 
-.nav-accounts-btn {
-  padding: 8px 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-page);
+.nav-action-btn.nav-action-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.nav-action-btn.nav-action-primary:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+}
+
+.nav-action-btn.nav-settings-btn {
   color: var(--text-faint);
-  font-size: 0.85rem;
-  font-weight: 500;
-  cursor: pointer;
 }
 
+.nav-action-btn:hover,
 .nav-add-btn:hover,
 .nav-accounts-btn:hover {
   border-color: var(--accent);

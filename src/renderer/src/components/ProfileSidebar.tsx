@@ -49,10 +49,14 @@ interface ProfileSidebarProps {
   onUnpin: (profileId: string, appId: AppId, teamId: string) => void
   onDismissError: () => void
   /** Open the platform settings panel for a given profile + app. */
-  onPlatformSettings: (profileId: string, appId: AppId) => void
+  onPlatformSettings?: (profileId: string, appId: AppId) => void
   /** Open the "+ Add" page for adding platforms / custom links. */
   onAddPlatform: () => void
-  /** Open the Accounts & Workspaces management hub. */
+  /** Open the wizard to create a new workspace project */
+  onNewProject?: () => void
+  /** Open the modal to create a new profile */
+  onNewProfile?: () => void
+  /** Open the Accounts & Workspaces management hub / Global settings. */
   onOpenAccountsSettings?: () => void
   /** Active custom link ID if one is currently opened in embed */
   activeCustomLinkId?: string | null
@@ -312,8 +316,10 @@ export const ProfileSidebar = memo(function ProfileSidebar({
   onPinFromAvailable,
   onUnpin,
   onDismissError,
-  onPlatformSettings,
+  onPlatformSettings: _onPlatformSettings,
   onAddPlatform,
+  onNewProject,
+  onNewProfile,
   onOpenAccountsSettings,
   activeCustomLinkId,
   onSelectCustomLink,
@@ -622,18 +628,6 @@ export const ProfileSidebar = memo(function ProfileSidebar({
                                 </span>
                               ) : null}
                             </button>
-                            <button
-                              type="button"
-                              className="nav-app-settings"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                onPlatformSettings(profile.id, appId)
-                              }}
-                              title="Settings"
-                              aria-label="Settings"
-                            >
-                              ⚙
-                            </button>
                           </div>
 
                           {appOpen && signedIn && supportsWorkspaces ? (
@@ -702,19 +696,41 @@ export const ProfileSidebar = memo(function ProfileSidebar({
       <div className="nav-add-section">
         <button
           type="button"
-          className="nav-add-btn"
+          className="nav-action-btn"
           onClick={onAddPlatform}
           title="Add platform or custom link"
           aria-label="Add platform or custom link"
         >
           + Add
         </button>
+        {onNewProject ? (
+          <button
+            type="button"
+            className="nav-action-btn nav-action-primary"
+            onClick={onNewProject}
+            title="Create New Project / Workspace"
+            aria-label="New Project"
+          >
+            + New Project
+          </button>
+        ) : null}
+        {onNewProfile ? (
+          <button
+            type="button"
+            className="nav-action-btn"
+            onClick={onNewProfile}
+            title="Create New Profile"
+            aria-label="New Profile"
+          >
+            + New Profile
+          </button>
+        ) : null}
         <button
           type="button"
-          className="nav-accounts-btn"
+          className="nav-action-btn nav-settings-btn"
           onClick={onOpenAccountsSettings}
-          title="Global Settings & Accounts Hub"
-          aria-label="Global Settings & Accounts Hub"
+          title="Global Settings Hub"
+          aria-label="Global Settings Hub"
         >
           ⚙ Settings
         </button>

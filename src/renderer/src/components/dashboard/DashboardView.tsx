@@ -35,23 +35,6 @@ function fmtAge(iso: string | null): string {
   return `${Math.round(hours / 24)}d ago`
 }
 
-function GearGlyph(): React.JSX.Element {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z"
-        stroke="currentColor"
-        strokeWidth="1.7"
-      />
-      <path
-        d="M19.4 13.5a7.7 7.7 0 0 0 0-3l2-1.5-2-3.5-2.4 1a7.8 7.8 0 0 0-2.6-1.5L14 2h-4l-.4 3a7.8 7.8 0 0 0-2.6 1.5l-2.4-1-2 3.5 2 1.5a7.7 7.7 0 0 0 0 3l-2 1.5 2 3.5 2.4-1a7.8 7.8 0 0 0 2.6 1.5L10 22h4l.4-3a7.8 7.8 0 0 0 2.6-1.5l2.4 1 2-3.5-2-1.5Z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
 
 function SyncGlyph(): React.JSX.Element {
   return (
@@ -638,16 +621,6 @@ export default function DashboardView(): React.ReactElement | null {
             </button>
 
             {schedulePaused ? <span className="dash-paused">Schedule paused</span> : null}
-
-            <button
-              type="button"
-              className="btn btn-secondary dash-settings-btn"
-              data-testid="global-settings-open"
-              onClick={() => setGlobalSettingsOpen(true)}
-            >
-              <GearGlyph />
-              Settings
-            </button>
           </div>
         </header>
 
