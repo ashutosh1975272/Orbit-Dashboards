@@ -125,6 +125,8 @@ export class DashboardSyncEngine {
   private readonly getExistingBrowserView?: (profileId: string, appId: 'slack') => any
   private scrapeEventListener: ((event: ScrapeStepEvent) => void) | null = null
   private activeWatchReader: SlackReaderView | null = null
+  private scrapeQueuePromise: Promise<any> = Promise.resolve()
+  private scrapeQueueLength = 0
 
   setScrapeEventListener(listener: ((event: ScrapeStepEvent) => void) | null): void {
     this.scrapeEventListener = listener
@@ -599,6 +601,33 @@ export class DashboardSyncEngine {
     projectId: string,
     sourceId?: string
   ): Promise<{ channelsRead: number; newMessages: number; status: string; error?: string }> {
+    this.scrapeQueueLength++
+    if (this.scrapeQueueLength > 1) {
+      this.scrapeEventListener?.({
+        type: 'queued',
+        queueLength: this.scrapeQueueLength - 1,
+        text: `Scrape queued (${this.scrapeQueueLength - 1} ahead)`
+      })
+    }
+
+    const task = async () => {
+      try {
+        return await this.executeSyncProjectSource(projectId, sourceId)
+      } finally {
+        this.scrapeQueueLength = Math.max(0, this.scrapeQueueLength - 1)
+      }
+    }
+
+    // Chain sequentially to guarantee strict FIFO execution
+    const execution = this.scrapeQueuePromise.then(task, task)
+    this.scrapeQueuePromise = execution.catch(() => {})
+    return execution
+  }
+
+  private async executeSyncProjectSource(
+    projectId: string,
+    sourceId?: string
+  ): Promise<{ channelsRead: number; newMessages: number; status: string; error?: string }> {
     const projects = await this.monitorStore.listProjects()
     const project = projects.find((p) => p.id === projectId)
     if (!project) return { channelsRead: 0, newMessages: 0, status: 'error', error: 'Project not found' }
@@ -623,15 +652,29 @@ export class DashboardSyncEngine {
       let runStatus: 'connected' | 'challenge' | 'needs-login' | 'adapter-broken' | 'error' = 'connected'
       let runError: string | undefined = undefined
 
+      const effectiveWorkspaceName =
+        bSrc.workspaceName === 'T0FJQUFLJ'
+          ? 'excellencetech'
+          : bSrc.workspaceName === 'T0C6YS80MPZ'
+            ? 'AgentWork'
+            : bSrc.workspaceName || bSrc.workspaceId
+
       try {
         const existingView = this.getExistingBrowserView?.(bSrc.profileId, 'slack')
         const reader = new SlackReaderView({
           profileId: bSrc.profileId,
           workspaceId: bSrc.workspaceId,
           existingView: existingView ?? null,
-          onEvent: (ev) => this.scrapeEventListener?.(ev)
+          onEvent: (ev) => this.scrapeEventListener?.({ ...ev, workspaceName: effectiveWorkspaceName })
         })
         this.activeWatchReader = reader
+
+        // Broadcast initial starting event
+        this.scrapeEventListener?.({
+          type: 'navigate',
+          workspaceName: effectiveWorkspaceName,
+          text: `Starting scrape for ${effectiveWorkspaceName}…`
+        })
 
         // Auto-discover live channels from sidebar if not matching or requested
         let targetChannels = bSrc.channels
@@ -651,15 +694,46 @@ export class DashboardSyncEngine {
           // fallback to original list
         }
 
+        const totalChannels = targetChannels.length
+        let channelIndex = 0
+
         for (const ch of targetChannels) {
+          channelIndex++
           this.scrapeEventListener?.({
             type: 'navigate',
+            workspaceName: effectiveWorkspaceName,
             channelName: ch.name || ch.id,
-            text: `Reading #${ch.name || ch.id}…`
+            scrollIndex: channelIndex,
+            maxScroll: totalChannels,
+            messageCount: newMessagesCount,
+            text: `Reading #${ch.name || ch.id} (${channelIndex}/${totalChannels})…`
           })
 
-          const messages = await reader.readChannelMessages(ch.id)
+          // Calculate 5-minute safety overlap cursor from DeltaStore
+          let overlapCursorTs = 0
+          try {
+            const existingDelta = await this.deltaStore.load(bSrc.profileId, bSrc.workspaceId, ch.id)
+            if (existingDelta?.cursor) {
+              const numericCursor = parseFloat(existingDelta.cursor)
+              if (!Number.isNaN(numericCursor) && numericCursor > 0) {
+                // 5 minutes = 300 seconds safety buffer
+                overlapCursorTs = Math.max(0, numericCursor - 300)
+              }
+            }
+          } catch {
+            // ignore
+          }
+
+          const rawScraped = await reader.readChannelMessages(ch.id)
           channelsRead++
+
+          // Filter against overlapCursorTs if present (ensures we re-evaluate past 5 min for boundary messages)
+          const messages = overlapCursorTs > 0
+            ? rawScraped.filter((m) => {
+                const nTs = parseFloat(m.ts)
+                return Number.isNaN(nTs) || nTs >= overlapCursorTs
+              })
+            : rawScraped
 
           if (messages.length > 0) {
             const appendRes = await this.deltaStore.appendMessages({
@@ -741,6 +815,7 @@ export class DashboardSyncEngine {
         // Emit final run completion event so buttons never stay stuck in "Scraping..."
         this.scrapeEventListener?.({
           type: 'run_finished',
+          workspaceName: effectiveWorkspaceName,
           channelName: bSrc.workspaceId,
           messageCount: newMessagesCount,
           text: runError

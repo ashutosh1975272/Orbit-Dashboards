@@ -6,11 +6,13 @@ import { deduplicateMessages, normalizeScrapedMessage } from './normalizer'
 import type { DashboardStoredMessage } from '../dashboard/delta-store'
 
 export interface ScrapeStepEvent {
-  type: 'navigate' | 'scroll' | 'highlight' | 'status' | 'run_finished' | 'run_failed' | 'paused' | 'waiting_for_user' | 'challenge' | 'read'
+  type: 'navigate' | 'scroll' | 'highlight' | 'status' | 'run_finished' | 'run_failed' | 'paused' | 'waiting_for_user' | 'challenge' | 'read' | 'queued'
+  workspaceName?: string
   channelName?: string
   scrollIndex?: number
   maxScroll?: number
   messageCount?: number
+  queueLength?: number
   bounds?: { x: number; y: number; width: number; height: number }
   text?: string
   snippet?: string

@@ -51,7 +51,20 @@ export function RunLogsModal({ open, projectId, projectName, onClose }: RunLogsM
   useEffect(() => {
     if (open) {
       void fetchLogs()
+
+      // Live subscription: auto-refresh whenever a scrape finishes or emits an event
+      if (window.api?.dashboard?.onScrapeEvent) {
+        const unsubscribe = window.api.dashboard.onScrapeEvent((event: any) => {
+          if (event.type === 'run_finished' || event.type === 'status' || event.type === 'queued') {
+            void fetchLogs()
+          }
+        })
+        return () => {
+          unsubscribe()
+        }
+      }
     }
+    return undefined
   }, [open, projectId])
 
   if (!open) return null

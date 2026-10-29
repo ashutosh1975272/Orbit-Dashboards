@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 
-export type NavbarState = 'reading' | 'waiting_for_user' | 'paused' | 'challenge' | 'finished' | 'idle'
+export type NavbarState = 'reading' | 'waiting_for_user' | 'paused' | 'challenge' | 'finished' | 'queued' | 'idle'
 
 export interface ScrapeSnippet {
   sender: string
@@ -31,6 +31,7 @@ const STATE_DOTS: Record<NavbarState, { color: string; label: string }> = {
   paused: { color: '#94a3b8', label: 'Paused' },
   challenge: { color: '#ef4444', label: 'Action required' },
   finished: { color: '#22c55e', label: 'Finished' },
+  queued: { color: '#a855f7', label: 'Queued' },
   idle: { color: '#64748b', label: 'Idle' }
 }
 
