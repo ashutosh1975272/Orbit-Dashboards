@@ -79,6 +79,8 @@ export class BrowserViewManager {
   private readonly views = new Map<string, WebContentsView>()
   private activeKey: string | null = null
   private secondaryKey: string | null = null
+  private cardEmbedKey: string | null = null
+  private cardEmbedBounds: Rectangle | null = null
   private lastBounds: Rectangle | null = null
   private secondaryBounds: Rectangle | null = null
   private embedHidden = false
@@ -931,6 +933,64 @@ export class BrowserViewManager {
     }
     this.secondaryKey = null
     this.secondaryBounds = null
+  }
+
+  async activateCardSlackEmbed(
+    profileId: string,
+    teamId: string,
+    mainWindow: BrowserWindow,
+    bounds: Rectangle
+  ): Promise<void> {
+    const key = viewKey(profileId, 'slack')
+    const view = this.getOrCreate(profileId, 'slack')
+    this.cardEmbedKey = key
+    this.cardEmbedBounds = bounds
+
+    if (!mainWindow.contentView.children.includes(view)) {
+      mainWindow.contentView.addChildView(view)
+    }
+    view.setBounds(bounds)
+
+    // Ensure we are navigated to this team workspace if not already there
+    const currentUrl = view.webContents.getURL()
+    if (!currentUrl || !currentUrl.includes(teamId)) {
+      try {
+        await this.navigateToWorkspace(profileId, 'slack', { teamId })
+      } catch (err) {
+        log.warn('Card live slack navigate failed or partially loaded', { profileId, teamId, err: String(err) })
+      }
+    }
+
+    this.noteActivity()
+    log.info('card live slack embed activated', { profileId, teamId, bounds })
+  }
+
+  updateCardSlackEmbedBounds(mainWindow: BrowserWindow, bounds: Rectangle): void {
+    this.cardEmbedBounds = bounds
+    if (this.cardEmbedKey) {
+      const view = this.views.get(this.cardEmbedKey)
+      if (view) {
+        if (!mainWindow.contentView.children.includes(view)) {
+          mainWindow.contentView.addChildView(view)
+        }
+        view.setBounds(bounds)
+      }
+    }
+  }
+
+  getCardEmbedBounds(): Rectangle | null {
+    return this.cardEmbedBounds
+  }
+
+  clearCardSlackEmbed(mainWindow: BrowserWindow): void {
+    if (!this.cardEmbedKey) return
+    const view = this.views.get(this.cardEmbedKey)
+    if (view && mainWindow.contentView.children.includes(view)) {
+      mainWindow.contentView.removeChildView(view)
+    }
+    this.cardEmbedKey = null
+    this.cardEmbedBounds = null
+    log.info('card live slack embed cleared')
   }
 
   updateSplitBounds(

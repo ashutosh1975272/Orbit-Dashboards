@@ -82,6 +82,9 @@ export const IpcChannels = {
   ProfileActivateApp: 'profile:activate-app',
   ProfileUpdateBounds: 'profile:update-bounds',
   ProfileSetEmbedVisible: 'profile:set-embed-visible',
+  ProfileActivateCardSlackEmbed: 'profile:activate-card-slack-embed',
+  ProfileUpdateCardSlackEmbedBounds: 'profile:update-card-slack-embed-bounds',
+  ProfileClearCardSlackEmbed: 'profile:clear-card-slack-embed',
   ProfileStartFirstLogin: 'profile:start-first-login',
   ProfileStartGoogleAuth: 'profile:start-google-auth',
   ProfileStartAppLogin: 'profile:start-app-login',
@@ -286,6 +289,9 @@ export interface IpcApi {
     ) => Promise<void>
     updateBounds: (bounds: ViewportBounds) => Promise<void>
     setEmbedVisible: (visible: boolean) => Promise<void>
+    activateCardSlackEmbed: (payload: { profileId: string; teamId: string; bounds: ViewportBounds }) => Promise<void>
+    updateCardSlackEmbedBounds: (bounds: ViewportBounds) => Promise<void>
+    clearCardSlackEmbed: () => Promise<void>
     startGoogleAuth: (profileId: string, bounds?: ViewportBounds) => Promise<Profile>
     startAppLogin: (profileId: string, appId: AppId, bounds?: ViewportBounds) => Promise<Profile>
     startFirstLogin: (profileId: string, bounds?: ViewportBounds) => Promise<Profile>

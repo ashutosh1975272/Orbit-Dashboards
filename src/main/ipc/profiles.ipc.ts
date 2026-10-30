@@ -608,6 +608,41 @@ export function registerProfileIpc(deps: ProfileIpcDeps): void {
     deps.browserViewManager.setEmbedVisible(mainWindow, payload.visible)
   })
 
+  handleInvoke(
+    IpcChannels.ProfileActivateCardSlackEmbed,
+    async (payload: { profileId: string; teamId: string; bounds: ViewportBounds }) => {
+      const mainWindow = deps.getMainWindow()
+      if (!mainWindow) {
+        return
+      }
+      await deps.browserViewManager.activateCardSlackEmbed(
+        payload.profileId,
+        payload.teamId,
+        mainWindow,
+        payload.bounds
+      )
+    }
+  )
+
+  handleInvoke(
+    IpcChannels.ProfileUpdateCardSlackEmbedBounds,
+    async (payload: { bounds: ViewportBounds }) => {
+      const mainWindow = deps.getMainWindow()
+      if (!mainWindow) {
+        return
+      }
+      deps.browserViewManager.updateCardSlackEmbedBounds(mainWindow, payload.bounds)
+    }
+  )
+
+  handleInvoke(IpcChannels.ProfileClearCardSlackEmbed, async () => {
+    const mainWindow = deps.getMainWindow()
+    if (!mainWindow) {
+      return
+    }
+    deps.browserViewManager.clearCardSlackEmbed(mainWindow)
+  })
+
   handleInvoke(IpcChannels.ProfileSyncWorkspaces, async (payload: SyncWorkspacesPayload) => {
     if (payload.appId === 'whatsapp') {
       const profile = await deps.profileStore.get(payload.profileId)

@@ -87,6 +87,11 @@ const api: IpcApi = {
       ipcRenderer.invoke(IpcChannels.ProfileUpdateBounds, bounds),
     setEmbedVisible: (visible: boolean) =>
       ipcRenderer.invoke(IpcChannels.ProfileSetEmbedVisible, { visible }),
+    activateCardSlackEmbed: (payload: { profileId: string; teamId: string; bounds: ViewportBounds }) =>
+      ipcRenderer.invoke(IpcChannels.ProfileActivateCardSlackEmbed, payload),
+    updateCardSlackEmbedBounds: (bounds: ViewportBounds) =>
+      ipcRenderer.invoke(IpcChannels.ProfileUpdateCardSlackEmbedBounds, { bounds }),
+    clearCardSlackEmbed: () => ipcRenderer.invoke(IpcChannels.ProfileClearCardSlackEmbed),
     startGoogleAuth: (profileId: string, bounds?: ViewportBounds) =>
       ipcRenderer.invoke(IpcChannels.ProfileStartGoogleAuth, { profileId, bounds }),
     startAppLogin: (profileId: string, appId: AppId, bounds?: ViewportBounds) =>

@@ -10,6 +10,7 @@ import DashboardPage from './DashboardPage'
 import NavIcon from './nav-icons'
 import { DetailBody, GuideDetailBody } from './guide-content'
 import SlackChatTab from './SlackChatTab'
+import CardLiveSlackEmbed from './CardLiveSlackEmbed'
 import ProjectSettingsTab from './ProjectSettingsTab'
 import AgentChatPanel from './AgentChatPanel'
 import { requestMessageJump } from './jump-to-message'
@@ -162,14 +163,13 @@ export default function WorkspaceContent({
     }
   } else if (nav.openGroup === 'slack') {
     if (sel && isGlobalWorkspaceId(sel)) {
-      // Global workspace selected: show embedded live Slack inside this card
+      // Global workspace selected: mount real live Slack WebContentsView inside this card
       const [, pId, tId] = sel.split(':')
       body = (
-        <SlackChatTab
-          key={`global:${pId}:${tId}`}
-          projectId={summary.projectId}
-          source="client"
-          lockedChannel={null}
+        <CardLiveSlackEmbed
+          key={`global-embed:${pId}:${tId}`}
+          profileId={pId}
+          teamId={tId}
         />
       )
     } else if (slackSourceOf(nav) === 'team' && !channels.teamConnected) {
