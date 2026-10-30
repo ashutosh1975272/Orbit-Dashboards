@@ -27,7 +27,6 @@ interface ExpandedWorkspaceProps {
   onScrape?: () => void
   scraping?: boolean
   onLogs?: () => void
-  onWatchLive?: () => void
   onSettings: () => void
   onEdit: () => void
   onRemove: () => void
@@ -60,7 +59,6 @@ export default function ExpandedWorkspace({
   onScrape,
   scraping = false,
   onLogs,
-  onWatchLive,
   onSettings,
   onEdit,
   onRemove,
@@ -192,13 +190,13 @@ export default function ExpandedWorkspace({
         onScrape={onScrape}
         scraping={scraping}
         onLogs={onLogs}
-        onWatchLive={onWatchLive}
         onSettings={onSettings}
         onEdit={onEdit}
         onRemove={onRemove}
         onToggle={handleToggle}
         pinned={pinned}
         onTogglePin={onTogglePin}
+        projectId={project.id}
       />
 
       <div

@@ -23,7 +23,6 @@ import { AccountsManagementModal } from './components/dashboard/AccountsManageme
 import { UnifiedSettingsModal, type SettingsTabKey } from './components/dashboard/UnifiedSettingsModal'
 import { NewProfileModal } from './components/dashboard/NewProfileModal'
 import { NewProjectModal } from './components/dashboard/NewProjectModal'
-import { ScrapeNavbar, type NavbarState, type ScrapeSnippet } from './components/dashboard/overlay/ScrapeNavbar'
 import { sidebarToastFor } from './lib/sidebar-toast'
 import { modKey, modShift } from './lib/shortcut-label'
 import { useProfileStore } from './hooks/useProfiles'
@@ -111,13 +110,6 @@ function App(): React.JSX.Element {
     profileId: string
     appId: AppId
   } | null>(null)
-  const [globalScrapeState, setGlobalScrapeState] = useState<NavbarState>('idle')
-  const [globalScrapeWorkspace, setGlobalScrapeWorkspace] = useState<string | undefined>()
-  const [globalScrapeChannel, setGlobalScrapeChannel] = useState<string | undefined>()
-  const [globalScrapeProgress, setGlobalScrapeProgress] = useState<string | undefined>()
-  const [globalScrapeStatus, setGlobalScrapeStatus] = useState<string | undefined>()
-  const [globalScrapeSnippets, setGlobalScrapeSnippets] = useState<ScrapeSnippet[]>([])
-  const [globalScrapeCollapsed, setGlobalScrapeCollapsed] = useState(false)
   const lastAppByProfile = useRef<Record<string, AppId>>({})
   const sidebarCollapsedRef = useRef(settings.sidebarCollapsed)
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -252,57 +244,6 @@ function App(): React.JSX.Element {
     })
   }, [])
 
-  // Universal Cosmic Scrape Event Listener for global header visibility
-  useEffect(() => {
-    if (!window.api?.dashboard?.onScrapeEvent) return undefined
-    const unsubscribe = window.api.dashboard.onScrapeEvent((event: any) => {
-      if (event.type === 'navigate' || event.type === 'status' || event.type === 'read') {
-        setGlobalScrapeState('reading')
-        if (event.workspaceName) setGlobalScrapeWorkspace(event.workspaceName)
-        if (event.channelName) setGlobalScrapeChannel(event.channelName)
-        if (event.scrollIndex && event.maxScroll) {
-          setGlobalScrapeProgress(`${event.scrollIndex}/${event.maxScroll}${event.messageCount ? ` · ${event.messageCount} msgs` : ''}`)
-        } else if (event.text) {
-          setGlobalScrapeStatus(event.text)
-        }
-        if (event.snippet) {
-          setGlobalScrapeSnippets((prev) => [
-            ...prev,
-            {
-              sender: event.sender || 'Anonymous',
-              snippet: event.snippet,
-              channelName: event.channelName,
-              ts: event.timestamp || new Date().toISOString()
-            }
-          ])
-        }
-      } else if (event.type === 'queued') {
-        setGlobalScrapeState('queued')
-        setGlobalScrapeStatus(event.text || `Queued (${event.queueLength || 1} ahead)`)
-      } else if (event.type === 'waiting_for_user') {
-        setGlobalScrapeState('waiting_for_user')
-        setGlobalScrapeStatus('Waiting for you (user active)')
-      } else if (event.type === 'paused') {
-        setGlobalScrapeState('paused')
-        setGlobalScrapeStatus('Paused')
-      } else if (event.type === 'challenge' || event.type === 'adapter_broken' || event.type === 'error') {
-        setGlobalScrapeState('challenge')
-        setGlobalScrapeStatus(event.text || 'Action required')
-      } else if (event.type === 'run_finished') {
-        setGlobalScrapeState('finished')
-        setGlobalScrapeStatus(event.text || 'Scraping finished')
-        setTimeout(() => {
-          setGlobalScrapeState('idle')
-          setGlobalScrapeStatus(undefined)
-          setGlobalScrapeProgress(undefined)
-        }, 5000)
-      }
-    })
-    return () => {
-      unsubscribe()
-    }
-  }, [])
-
   useEffect(() => {
     sidebarCollapsedRef.current = settings.sidebarCollapsed
   }, [settings.sidebarCollapsed])
@@ -386,7 +327,6 @@ function App(): React.JSX.Element {
 
   const browserAuthBusy = authPhase === 'google' || authPhase === 'slack'
   const dashboardOpen = useDashboardStore((s) => s.dashboardOpen)
-  const openDashboard = useDashboardStore((s) => s.openDashboard)
   const closeDashboard = useDashboardStore((s) => s.closeDashboard)
   const showDashboard = dashboardOpen && !browserAuthBusy
   const wizardOpen = useDashboardStore((s) => s.wizardOpenFor) != null
@@ -1005,24 +945,6 @@ function App(): React.JSX.Element {
         </div>
 
         <main className={`main-column${splitOn ? ' is-split' : ''}`} style={{ display: 'flex', flexDirection: 'column' }}>
-          {/* Universal Cosmic Scrape Header Bar: always visible whenever scraping or queued */}
-          <ScrapeNavbar
-            state={globalScrapeState}
-            workspaceName={globalScrapeWorkspace}
-            channelName={globalScrapeChannel}
-            progressText={globalScrapeProgress}
-            statusText={globalScrapeStatus}
-            snippets={globalScrapeSnippets}
-            collapsed={globalScrapeCollapsed}
-            onToggleCollapse={() => setGlobalScrapeCollapsed((v) => !v)}
-            onPause={() => setGlobalScrapeState('paused')}
-            onResume={() => setGlobalScrapeState('reading')}
-            onStop={() => {
-              setGlobalScrapeState('idle')
-              setGlobalScrapeStatus(undefined)
-            }}
-            onBackToDashboard={openDashboard}
-          />
           {browserAuthBusy && authPhase ? (
             <AuthChromePane
               phase={authPhase}

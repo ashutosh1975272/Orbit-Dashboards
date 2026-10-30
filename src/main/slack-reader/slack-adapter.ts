@@ -8,6 +8,7 @@ export interface ScrapedChannelItem {
   id: string
   name: string
   isPrivate: boolean
+  isDm?: boolean
   hasUnread: boolean
 }
 
@@ -42,14 +43,12 @@ export const LIST_CHANNELS_SCRIPT = `
   const channels = [];
   const items = document.querySelectorAll('${SLACK_SELECTORS.channelItem}');
   items.forEach((item) => {
-    // Exclude direct message containers and user rows
-    if (
+    // Detect if this is a direct message container or user row
+    const isUserItem =
       item.classList.contains('p-channel_sidebar__item--user') ||
-      item.querySelector('[data-qa-channel-sidebar-item="user"]') ||
-      item.closest('[data-qa="channel_sidebar_section_users"]')
-    ) {
-      return;
-    }
+      Boolean(item.querySelector('[data-qa-channel-sidebar-item="user"]')) ||
+      Boolean(item.closest('[data-qa="channel_sidebar_section_users"]')) ||
+      Boolean(item.closest('[data-qa="channel_sidebar_section_dms"]'));
 
     const nameEl = item.querySelector('${SLACK_SELECTORS.channelName}');
     const badgeEl = item.querySelector('${SLACK_SELECTORS.channelUnreadBadge}');
@@ -66,11 +65,6 @@ export const LIST_CHANNELS_SCRIPT = `
       id = name.toLowerCase().replace(/[^a-z0-9-_]/g, '');
     }
 
-    // Exclude Direct Message IDs (starting with D)
-    if (id.startsWith('D')) {
-      return;
-    }
-
     const ariaLabel = item.getAttribute('aria-label') || '';
     const isPrivate =
       ariaLabel.toLowerCase().includes('private') ||
@@ -78,10 +72,13 @@ export const LIST_CHANNELS_SCRIPT = `
       Boolean(item.querySelector('[data-qa="channel_icon_private"]')) ||
       Boolean(item.querySelector('.c-icon--lock'));
 
+    const isDm = isUserItem || id.startsWith('D') || ariaLabel.toLowerCase().includes('direct message');
+
     channels.push({
       id,
       name,
       isPrivate,
+      isDm,
       hasUnread: Boolean(badgeEl)
     });
   });
@@ -92,12 +89,14 @@ export const LIST_CHANNELS_SCRIPT = `
 /**
  * Passive script to read visible messages from the virtualized message list DOM.
  * Performs ZERO typing, ZERO sending, ZERO clicking.
+ * Strictly filters messages to the last 1 hour window.
  */
 export const READ_VISIBLE_MESSAGES_SCRIPT = `
 (function() {
   const rows = document.querySelectorAll('${SLACK_SELECTORS.messageRow}');
   const results = [];
   let lastAuthor = null;
+  const oneHourAgoSec = (Date.now() - 3600 * 1000) / 1000;
 
   rows.forEach((row) => {
     const senderEl = row.querySelector('${SLACK_SELECTORS.messageSender}');
@@ -121,6 +120,14 @@ export const READ_VISIBLE_MESSAGES_SCRIPT = `
     const permalink = permalinkEl ? permalinkEl.getAttribute('href') : '';
 
     if (rawTs && text) {
+      // Numerical timestamp parsing check for 1 hour window
+      const parsedNum = parseFloat(rawTs);
+      if (!isNaN(parsedNum) && parsedNum > 1000000000) {
+        if (parsedNum < oneHourAgoSec) {
+          return; // Skip messages older than 1 hour
+        }
+      }
+
       results.push({
         rawTs,
         sender,

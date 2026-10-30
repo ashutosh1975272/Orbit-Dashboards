@@ -505,26 +505,6 @@ export default function ProjectSettingsTab({
                             <button
                               type="button"
                               className="dash-subtle"
-                              onClick={() => {
-                                const targetProfileId = src.profileId || (project.profileId.startsWith('manual:') ? undefined : project.profileId)
-                                if (targetProfileId && src.workspaceId) {
-                                  useDashboardStore.getState().closeDashboard()
-                                  void useProfileStore.getState().openWorkspace(targetProfileId, 'slack', src.workspaceId, {
-                                    x: 320,
-                                    y: 40,
-                                    width: window.innerWidth - 320,
-                                    height: window.innerHeight - 40
-                                  })
-                                }
-                              }}
-                              style={{ fontSize: 12, padding: '4px 8px' }}
-                              title="Go to Slack session with live control strip"
-                            >
-                              👀 Watch Live
-                            </button>
-                            <button
-                              type="button"
-                              className="dash-subtle"
                               disabled={scrapingSourceId === src.id || src.enabled === false}
                               style={{ fontSize: 12, padding: '4px 8px', color: '#22c55e' }}
                               onClick={() => void handleScrapeSource(src.id)}

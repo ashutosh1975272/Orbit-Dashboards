@@ -63,22 +63,6 @@ function ProjectCardInner({
   const [scraping, setScraping] = useState(false)
   const [logsOpen, setLogsOpen] = useState(false)
 
-  const handleWatchLive = async (): Promise<void> => {
-    // Switch to authentic embedded Slack view in right pane (no popup modal)
-    useDashboardStore.getState().closeDashboard()
-    const browserSource = (project.sources ?? []).find((s) => s.kind === 'browser')
-    const targetProfileId = browserSource?.profileId || (project.profileId.startsWith('manual:') ? undefined : project.profileId)
-    const targetTeamId = browserSource?.workspaceId || project.teamId
-    if (targetProfileId && targetTeamId) {
-      await useProfileStore.getState().openWorkspace(targetProfileId, 'slack', targetTeamId, {
-        x: 320,
-        y: 40,
-        width: window.innerWidth - 320,
-        height: window.innerHeight - 40
-      })
-    }
-  }
-
   const handleScrape = async (): Promise<void> => {
     setScraping(true)
     try {
@@ -141,7 +125,6 @@ function ProjectCardInner({
         onScrape={() => void handleScrape()}
         scraping={scraping}
         onLogs={() => setLogsOpen(true)}
-        onWatchLive={() => void handleWatchLive()}
         onSettings={() => onOpenSettings(project.id)}
         onEdit={() => openWizard(project.id)}
         onRemove={() => onDelete(project.id)}
