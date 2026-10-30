@@ -100,6 +100,14 @@ async function destroyProfileFully(deps: ProfileIpcDeps, profileId: string): Pro
   for (const appId of ['slack', 'teams', 'whatsapp'] as AppId[]) {
     await session.fromPartition(partitionForProfile(profileId, appId)).clearStorageData()
   }
+  const existing = await deps.profileStore.get(profileId)
+  if (existing?.customLinks && existing.customLinks.length > 0) {
+    for (const link of existing.customLinks) {
+      if (link.partition) {
+        await session.fromPartition(link.partition).clearStorageData()
+      }
+    }
+  }
   await deps.tokenStore.deleteForProfile(profileId)
   await deps.profileStore.delete(profileId)
   await deps.onProfilesRemoved?.([profileId])
@@ -600,6 +608,41 @@ export function registerProfileIpc(deps: ProfileIpcDeps): void {
     deps.browserViewManager.setEmbedVisible(mainWindow, payload.visible)
   })
 
+  handleInvoke(
+    IpcChannels.ProfileActivateCardSlackEmbed,
+    async (payload: { profileId: string; teamId: string; bounds: ViewportBounds }) => {
+      const mainWindow = deps.getMainWindow()
+      if (!mainWindow) {
+        return
+      }
+      await deps.browserViewManager.activateCardSlackEmbed(
+        payload.profileId,
+        payload.teamId,
+        mainWindow,
+        payload.bounds
+      )
+    }
+  )
+
+  handleInvoke(
+    IpcChannels.ProfileUpdateCardSlackEmbedBounds,
+    async (payload: { bounds: ViewportBounds }) => {
+      const mainWindow = deps.getMainWindow()
+      if (!mainWindow) {
+        return
+      }
+      deps.browserViewManager.updateCardSlackEmbedBounds(mainWindow, payload.bounds)
+    }
+  )
+
+  handleInvoke(IpcChannels.ProfileClearCardSlackEmbed, async () => {
+    const mainWindow = deps.getMainWindow()
+    if (!mainWindow) {
+      return
+    }
+    deps.browserViewManager.clearCardSlackEmbed(mainWindow)
+  })
+
   handleInvoke(IpcChannels.ProfileSyncWorkspaces, async (payload: SyncWorkspacesPayload) => {
     if (payload.appId === 'whatsapp') {
       const profile = await deps.profileStore.get(payload.profileId)
@@ -747,6 +790,14 @@ export function registerProfileIpc(deps: ProfileIpcDeps): void {
       for (const appId of ['slack', 'teams', 'whatsapp'] as AppId[]) {
         await session.fromPartition(partitionForProfile(profileId, appId)).clearStorageData()
       }
+      const existing = await deps.profileStore.get(profileId)
+      if (existing?.customLinks && existing.customLinks.length > 0) {
+        for (const link of existing.customLinks) {
+          if (link.partition) {
+            await session.fromPartition(link.partition).clearStorageData()
+          }
+        }
+      }
       await deps.tokenStore.deleteForProfile(profileId)
     }
     await deps.onProfilesRemoved?.(ids)
@@ -792,4 +843,116 @@ export function registerProfileIpc(deps: ProfileIpcDeps): void {
     const mainWindow = deps.getMainWindow()
     if (mainWindow) deps.browserViewManager.clearSecondary(mainWindow)
   })
+
+  handleInvoke(
+    IpcChannels.ProfileAddCustomLink,
+    async (payload: { profileId: string; link: { name: string; url: string } }) => {
+      const updated = await deps.profileStore.addCustomLink(payload.profileId, payload.link)
+      notifyProfileUpdated(deps.getMainWindow, updated)
+      return updated
+    }
+  )
+
+  handleInvoke(
+    IpcChannels.ProfileUpdateCustomLink,
+    async (payload: {
+      profileId: string
+      linkId: string
+      patch: { name?: string; url?: string }
+    }) => {
+      const updated = await deps.profileStore.updateCustomLink(
+        payload.profileId,
+        payload.linkId,
+        payload.patch
+      )
+      notifyProfileUpdated(deps.getMainWindow, updated)
+      return updated
+    }
+  )
+
+  handleInvoke(
+    IpcChannels.ProfileRemoveCustomLink,
+    async (payload: { profileId: string; linkId: string }) => {
+      const existing = await deps.profileStore.get(payload.profileId)
+      const targetLink = existing?.customLinks?.find((l) => l.id === payload.linkId)
+      if (targetLink?.partition) {
+        await session.fromPartition(targetLink.partition).clearStorageData()
+      }
+      const updated = await deps.profileStore.removeCustomLink(payload.profileId, payload.linkId)
+      notifyProfileUpdated(deps.getMainWindow, updated)
+      return updated
+    }
+  )
+
+  handleInvoke(
+    IpcChannels.ProfileReorderCustomLinks,
+    async (payload: { profileId: string; orderedIds: string[] }) => {
+      const updated = await deps.profileStore.reorderCustomLinks(
+        payload.profileId,
+        payload.orderedIds
+      )
+      notifyProfileUpdated(deps.getMainWindow, updated)
+      return updated
+    }
+  )
+
+  handleInvoke(
+    IpcChannels.ProfileListCustomLinks,
+    async (payload: { profileId: string }) => {
+      return deps.profileStore.listCustomLinks(payload.profileId)
+    }
+  )
+
+  handleInvoke(
+    IpcChannels.ProfileSetHiddenInSidebar,
+    async (payload: { profileId: string; hidden: boolean }) => {
+      const updated = await deps.profileStore.setSidebarVisibility(payload.profileId, payload.hidden)
+      notifyProfileUpdated(deps.getMainWindow, updated)
+      return updated
+    }
+  )
+
+  handleInvoke(
+    IpcChannels.ProfileSetAccountScope,
+    async (payload: { profileId: string; scope: import('../../shared/types').ProfileScope }) => {
+      const updated = await deps.profileStore.setAccountScope(payload.profileId, payload.scope)
+      notifyProfileUpdated(deps.getMainWindow, updated)
+      return updated
+    }
+  )
+
+  handleInvoke(
+    IpcChannels.ProfileSetLinkHiddenInSidebar,
+    async (payload: { profileId: string; linkId: string; hidden: boolean }) => {
+      const updated = await deps.profileStore.setLinkSidebarVisibility(
+        payload.profileId,
+        payload.linkId,
+        payload.hidden
+      )
+      notifyProfileUpdated(deps.getMainWindow, updated)
+      return updated
+    }
+  )
+
+  handleInvoke(
+    IpcChannels.ProfileActivateCustomLink,
+    async (payload: {
+      profileId: string
+      linkId: string
+      url: string
+      bounds: ViewportBounds
+    }) => {
+      const mainWindow = deps.getMainWindow()
+      if (!mainWindow) throw new Error('Main window is not available')
+      closeChromeStayEmbed()
+      deps.browserViewManager.setEmbedVisible(mainWindow, true)
+      deps.browserViewManager.activateCustomLink(
+        payload.profileId,
+        payload.linkId,
+        payload.url,
+        mainWindow,
+        payload.bounds
+      )
+    }
+  )
 }

@@ -61,11 +61,27 @@ export interface ProfileApps {
   whatsapp: AppSession
 }
 
+export interface CustomLink {
+  id: string
+  name: string
+  url: string
+  order: number
+  createdAt: string
+  partition: string
+  hiddenInSidebar?: boolean
+}
+
+export const GLOBAL_PROFILE_ID = 'global-account-profile'
+
+export type ProfileScope = 'global' | 'individual' | 'both' | 'observer'
+
 export interface Profile {
   id: string
   displayName: string
   /** Optional friendly label; UI prefers this over displayName (email). */
   customName?: string
+  /** Scope of profile: global (main sidebar & shared pool) vs individual (filtered in dashboard projects) vs both */
+  accountScope?: ProfileScope
   createdAt: string
   avatarColor: string
   /** Optional photo URL (e.g. captured after Google/Slack sign-in). */
@@ -74,17 +90,41 @@ export interface Profile {
   sortOrder?: number
   /** When true, skip tray/desktop notifications for this profile. */
   muted?: boolean
+  /** When true, hide profile row from left sidebar */
+  hiddenInSidebar?: boolean
+  /** When true, indicates this is a Global Account aggregator profile */
+  isGlobalProfile?: boolean
   /**
    * Google account cookies ready (Chrome password + 2SV).
    * App logins (Slack/Teams) happen separately after the user picks an app.
    */
   googleAuthStatus: 'not-signed-in' | 'signing-in' | 'signed-in'
   apps: ProfileApps
+  customLinks?: CustomLink[]
 }
 
 export function profileDisplayLabel(profile: Profile): string {
   const custom = profile.customName?.trim()
   return custom || profile.displayName
+}
+
+/** Strictly check if a profile is a Global Company Account */
+export function isGlobalAccountProfile(profile: Profile): boolean {
+  if (profile.id === GLOBAL_PROFILE_ID || profile.isGlobalProfile === true) return true
+  const scope = profile.accountScope
+  if (scope === 'global' || scope === 'both') return true
+  // Any profile visible in the main sidebar (hiddenInSidebar !== true) and not explicitly marked individual is Global
+  if (profile.hiddenInSidebar !== true && scope !== 'individual') return true
+  return false
+}
+
+/** Strictly check if a profile is an Individual Profile */
+export function isIndividualProfile(profile: Profile): boolean {
+  const scope = profile.accountScope
+  if (scope === 'both') return true
+  if (isGlobalAccountProfile(profile)) return false
+  if (scope === 'observer') return false
+  return scope === 'individual' || profile.hiddenInSidebar === true
 }
 
 export interface ProfileSessionStatusPayload {
@@ -258,7 +298,39 @@ export function appLabel(appId: AppId): string {
   return 'WhatsApp'
 }
 
+/** Cleans up raw titles or legacy captured strings like "channel (Channel) - Workspace" into a clean workspace name. */
+export function sanitizeWorkspaceName(raw?: string): string {
+  if (!raw) return ''
+  let cleaned = raw.replace(/\s+/g, ' ').trim()
+  // Reject notification/badge patterns
+  if (/\d+\s+new\s+items?/i.test(cleaned) || /^new\s+item/i.test(cleaned) || /^\(\d+\)/.test(cleaned)) {
+    return ''
+  }
+  // Strip trailing " | Slack" or " - Slack"
+  cleaned = cleaned.replace(/\s*[|—–-]\s*Slack\s*$/i, '').trim()
+  // Strip Slack channel prefix pattern: "channel (Channel) - WorkspaceName" or "#channel - WorkspaceName"
+  if (cleaned.includes(' - ')) {
+    const parts = cleaned.split(' - ')
+    cleaned = parts[parts.length - 1]!.trim()
+  } else if (cleaned.includes(' | ')) {
+    const parts = cleaned.split(' | ')
+    cleaned = parts[parts.length - 1]!.trim()
+  }
+  return cleaned
+}
+
+export function sidebarAppLabel(appId: AppId): string {
+  return appLabel(appId)
+}
+
 /** WhatsApp has a single Web session — no workspace tree. */
 export function appSupportsWorkspaces(appId: AppId): boolean {
   return appId === 'slack' || appId === 'teams'
+}
+
+/** Workspace → cards mapping (persisted in workspace-mappings.json). */
+export interface WorkspaceMapping {
+  workspaceId: string
+  projectIds: string[]
+  updatedAt: string
 }

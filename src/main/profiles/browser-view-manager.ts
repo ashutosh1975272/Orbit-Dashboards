@@ -56,6 +56,10 @@ export function viewKey(profileId: string, appId: AppId): string {
   return `${profileId}:${appId}`
 }
 
+export function customLinkKey(profileId: string, linkId: string): string {
+  return `link:${profileId}:${linkId}`
+}
+
 export type WorkspaceSeenHandler = (
   profileId: string,
   appId: AppId,
@@ -75,6 +79,8 @@ export class BrowserViewManager {
   private readonly views = new Map<string, WebContentsView>()
   private activeKey: string | null = null
   private secondaryKey: string | null = null
+  private cardEmbedKey: string | null = null
+  private cardEmbedBounds: Rectangle | null = null
   private lastBounds: Rectangle | null = null
   private secondaryBounds: Rectangle | null = null
   private embedHidden = false
@@ -93,6 +99,10 @@ export class BrowserViewManager {
 
   setActivityHandler(handler: (() => void) | null): void {
     this.activityHandler = handler
+  }
+
+  getExistingView(profileId: string, appId: AppId): WebContentsView | null {
+    return this.views.get(viewKey(profileId, appId)) ?? null
   }
 
   noteActivity(): void {
@@ -834,6 +844,57 @@ export class BrowserViewManager {
     log.info('browser view activated', { profileId, appId })
   }
 
+  activateCustomLink(
+    profileId: string,
+    linkId: string,
+    url: string,
+    mainWindow: BrowserWindow,
+    bounds: Rectangle
+  ): void {
+    const key = customLinkKey(profileId, linkId)
+    let view = this.views.get(key)
+    if (!view || view.webContents.isDestroyed()) {
+      view = new WebContentsView({
+        webPreferences: {
+          partition: `persist:profile-${profileId}-link-${linkId}`,
+          contextIsolation: true,
+          nodeIntegration: false,
+          sandbox: true
+        }
+      })
+      view.webContents.setWindowOpenHandler(({ url: openUrl }) => {
+        void view?.webContents.loadURL(openUrl)
+        return { action: 'deny' }
+      })
+      void view.webContents.loadURL(url)
+      this.views.set(key, view)
+    }
+
+    this.lastBounds = bounds
+
+    if (this.activeKey && this.activeKey !== key) {
+      const prev = this.views.get(this.activeKey)
+      if (prev) {
+        mainWindow.contentView.removeChildView(prev)
+      }
+      this.lastEmittedThemeKey = null
+    }
+
+    this.activeKey = key
+
+    if (this.embedHidden) {
+      log.info('custom link view activated (hidden for overlay)', { profileId, linkId })
+      return
+    }
+
+    if (!mainWindow.contentView.children.includes(view)) {
+      mainWindow.contentView.addChildView(view)
+    }
+    view.setBounds(bounds)
+    this.noteActivity()
+    log.info('custom link view activated', { profileId, linkId, url })
+  }
+
   activateSecondary(
     profileId: string,
     appId: AppId,
@@ -872,6 +933,64 @@ export class BrowserViewManager {
     }
     this.secondaryKey = null
     this.secondaryBounds = null
+  }
+
+  async activateCardSlackEmbed(
+    profileId: string,
+    teamId: string,
+    mainWindow: BrowserWindow,
+    bounds: Rectangle
+  ): Promise<void> {
+    const key = viewKey(profileId, 'slack')
+    const view = this.getOrCreate(profileId, 'slack')
+    this.cardEmbedKey = key
+    this.cardEmbedBounds = bounds
+
+    if (!mainWindow.contentView.children.includes(view)) {
+      mainWindow.contentView.addChildView(view)
+    }
+    view.setBounds(bounds)
+
+    // Ensure we are navigated to this team workspace if not already there
+    const currentUrl = view.webContents.getURL()
+    if (!currentUrl || !currentUrl.includes(teamId)) {
+      try {
+        await this.navigateToWorkspace(profileId, 'slack', { teamId })
+      } catch (err) {
+        log.warn('Card live slack navigate failed or partially loaded', { profileId, teamId, err: String(err) })
+      }
+    }
+
+    this.noteActivity()
+    log.info('card live slack embed activated', { profileId, teamId, bounds })
+  }
+
+  updateCardSlackEmbedBounds(mainWindow: BrowserWindow, bounds: Rectangle): void {
+    this.cardEmbedBounds = bounds
+    if (this.cardEmbedKey) {
+      const view = this.views.get(this.cardEmbedKey)
+      if (view) {
+        if (!mainWindow.contentView.children.includes(view)) {
+          mainWindow.contentView.addChildView(view)
+        }
+        view.setBounds(bounds)
+      }
+    }
+  }
+
+  getCardEmbedBounds(): Rectangle | null {
+    return this.cardEmbedBounds
+  }
+
+  clearCardSlackEmbed(mainWindow: BrowserWindow): void {
+    if (!this.cardEmbedKey) return
+    const view = this.views.get(this.cardEmbedKey)
+    if (view && mainWindow.contentView.children.includes(view)) {
+      mainWindow.contentView.removeChildView(view)
+    }
+    this.cardEmbedKey = null
+    this.cardEmbedBounds = null
+    log.info('card live slack embed cleared')
   }
 
   updateSplitBounds(
@@ -1026,6 +1145,21 @@ export class BrowserViewManager {
     }
     if (this.secondaryKey?.startsWith(`${profileId}:`)) {
       this.secondaryKey = null
+    }
+    // Destroy custom links associated with this profile
+    const prefix = `link:${profileId}:`
+    for (const key of [...this.views.keys()]) {
+      if (key.startsWith(prefix)) {
+        const view = this.views.get(key)
+        if (mainWindow && this.activeKey === key && view) {
+          mainWindow.contentView.removeChildView(view)
+          this.activeKey = null
+        }
+        if (view && !view.webContents.isDestroyed()) {
+          view.webContents.close()
+        }
+        this.views.delete(key)
+      }
     }
     log.info('browser views destroyed for profile', { profileId })
   }

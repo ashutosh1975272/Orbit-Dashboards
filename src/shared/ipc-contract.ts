@@ -1,10 +1,41 @@
 import type {
+  DashboardAiModelsQueryPayload,
+  DashboardAiModelsResult,
+  DashboardAiSettingsQueryPayload,
+  DashboardAiSettingsSavePayload,
+  DashboardAiSettingsView,
+  DashboardAiTestResult,
+  DashboardGlobalConfig,
   DashboardListChannelsPayload,
   DashboardAppClientConfig,
+  DashboardChatMessage,
+  DashboardChatPage,
+  DashboardChatQueryPayload,
+  DashboardChatTokenStatus,
+  DashboardProjectChatChunkEvent,
+  DashboardProjectChatDoneEvent,
+  DashboardProjectChatErrorEvent,
+  DashboardProjectChatHistoryResult,
+  DashboardProjectChatPayload,
+  DashboardProjectChatStartResult,
+  DashboardProjectChatStatus,
+  DashboardProjectActivity,
+  DashboardSendErrorCode,
+  DashboardSendMessagePayload,
+  DashboardSendMessageResult,
   InsightHistoryEntryContract,
   DashboardManualToken,
+  DashboardMarkViewedPayload,
+  DashboardPinnedOrderPayload,
+  DashboardRunSchedulePayload,
+  DashboardSchedulesState,
   DashboardSnapshot,
   DashboardSyncProgressPayload,
+  DashboardUpdateSchedulePayload,
+  DashboardTeamWorkspace,
+  DashboardTeamWorkspaceCandidate,
+  DashboardTeamWorkspaceChannelsPayload,
+  DashboardTeamWorkspaceConnectPayload,
   DashboardViewSetPayload,
   ManualTokenPayload,
   ProjectDeletePayload,
@@ -36,6 +67,7 @@ import type {
   ViewportBounds,
   WorkspacePayload,
   WorkspaceThemePayload,
+  WorkspaceMapping,
   StartGoogleAuthPayload
 } from './types'
 
@@ -50,6 +82,9 @@ export const IpcChannels = {
   ProfileActivateApp: 'profile:activate-app',
   ProfileUpdateBounds: 'profile:update-bounds',
   ProfileSetEmbedVisible: 'profile:set-embed-visible',
+  ProfileActivateCardSlackEmbed: 'profile:activate-card-slack-embed',
+  ProfileUpdateCardSlackEmbedBounds: 'profile:update-card-slack-embed-bounds',
+  ProfileClearCardSlackEmbed: 'profile:clear-card-slack-embed',
   ProfileStartFirstLogin: 'profile:start-first-login',
   ProfileStartGoogleAuth: 'profile:start-google-auth',
   ProfileStartAppLogin: 'profile:start-app-login',
@@ -69,6 +104,15 @@ export const IpcChannels = {
   ProfileImportMetadata: 'profile:import-metadata',
   ProfileActivateSplit: 'profile:activate-split',
   ProfileClearSplit: 'profile:clear-split',
+  ProfileAddCustomLink: 'profile:add-custom-link',
+  ProfileUpdateCustomLink: 'profile:update-custom-link',
+  ProfileRemoveCustomLink: 'profile:remove-custom-link',
+  ProfileReorderCustomLinks: 'profile:reorder-custom-links',
+  ProfileListCustomLinks: 'profile:list-custom-links',
+  ProfileSetHiddenInSidebar: 'profile:set-hidden-in-sidebar',
+  ProfileSetAccountScope: 'profile:set-account-scope',
+  ProfileSetLinkHiddenInSidebar: 'profile:set-link-hidden-in-sidebar',
+  ProfileActivateCustomLink: 'profile:activate-custom-link',
   ProfileSessionStatusChanged: 'profile:session-status-changed',
   ProfileUpdated: 'profile:updated',
   ProfileAuthProgress: 'profile:auth-progress',
@@ -98,11 +142,13 @@ export const IpcChannels = {
   SlackHistoryForChannel: 'slack:history-for-channel',
 
   DashboardGetSnapshot: 'dashboard:get-snapshot',
+  DashboardMarkViewed: 'dashboard:mark-viewed',
   DashboardGetAppConfig: 'dashboard:get-app-config',
   DashboardGetHistory: 'dashboard:get-history',
   DashboardGetRecent: 'dashboard:get-recent',
   DashboardListChannels: 'dashboard:list-channels',
   DashboardViewSet: 'dashboard:view-set',
+  DashboardPinnedOrderSet: 'dashboard:pinned-order-set',
   DashboardUpsertProject: 'dashboard:upsert-project',
   DashboardDeleteProject: 'dashboard:delete-project',
   DashboardSyncNow: 'dashboard:sync-now',
@@ -110,10 +156,49 @@ export const IpcChannels = {
   DashboardValidateManualToken: 'dashboard:validate-manual-token',
   DashboardSnapshotChanged: 'dashboard:snapshot-changed',
   DashboardSyncProgress: 'dashboard:sync-progress',
+  DashboardSchedulesGet: 'dashboard:schedules-get',
+  DashboardSchedulesUpdate: 'dashboard:schedules-update',
+  DashboardSchedulesRun: 'dashboard:schedules-run',
+  DashboardSchedulesChanged: 'dashboard:schedules-changed',
 
   DashboardSidebarGet: 'dashboard:sidebar-get',
   DashboardSidebarSet: 'dashboard:sidebar-set',
-  DashboardSidebarUpdate: 'dashboard:sidebar-update'
+  DashboardSidebarUpdate: 'dashboard:sidebar-update',
+  DashboardGetMessages: 'dashboard:get-messages',
+  DashboardSendMessage: 'dashboard:send-message',
+  DashboardChatTokenStatus: 'dashboard:chat-token-status',
+  DashboardProjectActivity: 'dashboard:project-activity',
+  DashboardProjectChat: 'dashboard:project-chat',
+  DashboardProjectChatClear: 'dashboard:project-chat-clear',
+  DashboardProjectChatCancel: 'dashboard:project-chat-cancel',
+  DashboardProjectChatHistory: 'dashboard:project-chat-history',
+  DashboardProjectChatStatus: 'dashboard:project-chat-status',
+  DashboardProjectChatChunk: 'dashboard:project-chat-chunk',
+  DashboardProjectChatDone: 'dashboard:project-chat-done',
+  DashboardProjectChatError: 'dashboard:project-chat-error',
+
+  DashboardGetAiSettings: 'dashboard:get-ai-settings',
+  DashboardSaveAiSettings: 'dashboard:save-ai-settings',
+  DashboardListAiModels: 'dashboard:list-ai-models',
+  DashboardTestAi: 'dashboard:test-ai',
+  DashboardConfigGet: 'dashboard:config-get',
+  DashboardConfigChanged: 'dashboard:config-changed',
+
+  DashboardTeamWorkspaceGet: 'dashboard:team-workspace-get',
+  DashboardTeamWorkspaceCandidates: 'dashboard:team-workspace-candidates',
+  DashboardTeamWorkspaceConnect: 'dashboard:team-workspace-connect',
+  DashboardTeamWorkspaceChannels: 'dashboard:team-workspace-channels',
+  DashboardTeamWorkspaceClear: 'dashboard:team-workspace-clear',
+  DashboardWorkspaceMappingList: 'dashboard:workspace-mapping-list',
+  DashboardWorkspaceMappingGet: 'dashboard:workspace-mapping-get',
+  DashboardWorkspaceMappingSave: 'dashboard:workspace-mapping-save',
+  DashboardWorkspaceMappingDelete: 'dashboard:workspace-mapping-delete',
+  DashboardGetProjects: 'dashboard:get-projects',
+  DashboardSyncSource: 'dashboard:sync-source',
+  DashboardGetRunLogs: 'dashboard:get-run-logs',
+  DashboardStartWatchLive: 'dashboard:start-watch-live',
+  DashboardStopWatchLive: 'dashboard:stop-watch-live',
+  DashboardScrapeEvent: 'dashboard:scrape-event'
 } as const
 
 export type IpcChannel = (typeof IpcChannels)[keyof typeof IpcChannels]
@@ -140,6 +225,18 @@ export interface AppSettings {
     label: string
     at: string
   }>
+  sidebarLook: 'ancient' | 'new-cosmic'
+  showLookSwitcher: boolean
+  showRecentSection: boolean
+  sidebarButtons: {
+    addWebsite: boolean
+    newProject: boolean
+    newProfile: boolean
+    observer: boolean
+    profilesHub: boolean
+  }
+  showScrapeProgressLine?: boolean
+  showGoogleEmailInputInSidebar?: boolean
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -152,7 +249,19 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   idleSleepMinutes: 30,
   splitViewEnabled: false,
   notificationSound: false,
-  recentWorkspaces: []
+  recentWorkspaces: [],
+  sidebarLook: 'ancient',
+  showLookSwitcher: true,
+  showRecentSection: true,
+  showScrapeProgressLine: true,
+  showGoogleEmailInputInSidebar: true,
+  sidebarButtons: {
+    addWebsite: true,
+    newProject: true,
+    newProfile: true,
+    observer: true,
+    profilesHub: true
+  }
 }
 
 export type AdminStatus = {
@@ -184,8 +293,29 @@ export interface IpcApi {
       secondary: { profileId: string; appId: AppId; bounds: ViewportBounds }
     ) => Promise<void>
     clearSplit: () => Promise<void>
+    addCustomLink: (profileId: string, link: { name: string; url: string }) => Promise<Profile>
+    updateCustomLink: (
+      profileId: string,
+      linkId: string,
+      patch: { name?: string; url?: string }
+    ) => Promise<Profile>
+    removeCustomLink: (profileId: string, linkId: string) => Promise<Profile>
+    reorderCustomLinks: (profileId: string, orderedIds: string[]) => Promise<Profile>
+    listCustomLinks: (profileId: string) => Promise<import('./types').CustomLink[]>
+    setHiddenInSidebar: (profileId: string, hidden: boolean) => Promise<Profile>
+    setAccountScope: (profileId: string, scope: import('./types').ProfileScope) => Promise<Profile>
+    setLinkHiddenInSidebar: (profileId: string, linkId: string, hidden: boolean) => Promise<Profile>
+    activateCustomLink: (
+      profileId: string,
+      linkId: string,
+      url: string,
+      bounds: ViewportBounds
+    ) => Promise<void>
     updateBounds: (bounds: ViewportBounds) => Promise<void>
     setEmbedVisible: (visible: boolean) => Promise<void>
+    activateCardSlackEmbed: (payload: { profileId: string; teamId: string; bounds: ViewportBounds }) => Promise<void>
+    updateCardSlackEmbedBounds: (bounds: ViewportBounds) => Promise<void>
+    clearCardSlackEmbed: () => Promise<void>
     startGoogleAuth: (profileId: string, bounds?: ViewportBounds) => Promise<Profile>
     startAppLogin: (profileId: string, appId: AppId, bounds?: ViewportBounds) => Promise<Profile>
     startFirstLogin: (profileId: string, bounds?: ViewportBounds) => Promise<Profile>
@@ -249,6 +379,11 @@ export interface IpcApi {
   }
   dashboard: {
     getSnapshot: () => Promise<DashboardSnapshot>
+    markViewed: (payload: DashboardMarkViewedPayload) => Promise<string>
+    getSchedules: () => Promise<DashboardSchedulesState>
+    updateSchedules: (payload: DashboardUpdateSchedulePayload) => Promise<DashboardSchedulesState>
+    runSchedule: (payload: DashboardRunSchedulePayload) => Promise<DashboardSchedulesState>
+    onSchedulesChanged: (callback: (state: DashboardSchedulesState) => void) => () => void
     getAppConfig: () => Promise<DashboardAppClientConfig>
     getHistory: (payload: { projectId: string }) => Promise<InsightHistoryEntryContract[]>
     getRecent: () => Promise<RecentActivity[]>
@@ -259,25 +394,131 @@ export interface IpcApi {
     addManualToken: (payload: ManualTokenPayload) => Promise<DashboardSnapshot>
     validateManualToken: (payload: ManualTokenPayload) => Promise<ValidateTokenResultPayload>
     setView: (payload: DashboardViewSetPayload) => Promise<void>
+    setPinnedOrder: (payload: DashboardPinnedOrderPayload) => Promise<DashboardSnapshot>
     onSnapshotChanged: (callback: (snapshot: DashboardSnapshot) => void) => () => void
     onSyncProgress: (callback: (payload: DashboardSyncProgressPayload) => void) => () => void
     getSidebarState: (projectId: string) => Promise<ProjectSidebarState>
     setSidebarState: (projectId: string, state: ProjectSidebarState) => Promise<void>
-    updateSidebarState: (projectId: string, sidebar: 'left' | 'right', patch: Partial<SidebarState>) => Promise<SidebarState>
+    updateSidebarState: (
+      projectId: string,
+      sidebar: 'left' | 'right',
+      patch: Partial<SidebarState>
+    ) => Promise<SidebarState>
+    getMessages: (payload: DashboardChatQueryPayload) => Promise<DashboardChatPage>
+    sendMessage: (payload: DashboardSendMessagePayload) => Promise<DashboardSendMessageResult>
+    getChatTokenStatus: (projectId: string) => Promise<DashboardChatTokenStatus>
+    getProjectActivity: (projectId: string) => Promise<DashboardProjectActivity>
+    projectChat: (payload: DashboardProjectChatPayload) => Promise<DashboardProjectChatStartResult>
+    cancelProjectChat: (payload: { projectId: string; runId?: string }) => Promise<{ ok: boolean }>
+    getProjectChatHistory: (projectId: string) => Promise<DashboardProjectChatHistoryResult>
+    clearProjectChat: (projectId: string) => Promise<{ ok: boolean }>
+    getProjectChatStatus: (projectId: string) => Promise<DashboardProjectChatStatus>
+    onProjectChatChunk: (callback: (event: DashboardProjectChatChunkEvent) => void) => () => void
+    onProjectChatDone: (callback: (event: DashboardProjectChatDoneEvent) => void) => () => void
+    onProjectChatError: (callback: (event: DashboardProjectChatErrorEvent) => void) => () => void
+    getAiSettings: (payload?: DashboardAiSettingsQueryPayload) => Promise<DashboardAiSettingsView>
+    saveAiSettings: (payload: DashboardAiSettingsSavePayload) => Promise<DashboardAiSettingsView>
+    listAiModels: (payload?: DashboardAiModelsQueryPayload) => Promise<DashboardAiModelsResult>
+    testAi: (payload?: DashboardAiSettingsQueryPayload) => Promise<DashboardAiTestResult>
+    getGlobalConfig: () => Promise<DashboardGlobalConfig>
+    onConfigChanged: (callback: (config: DashboardGlobalConfig) => void) => () => void
+    getTeamWorkspace: () => Promise<DashboardTeamWorkspace>
+    listTeamWorkspaceCandidates: () => Promise<DashboardTeamWorkspaceCandidate[]>
+    connectTeamWorkspace: (
+      payload: DashboardTeamWorkspaceConnectPayload
+    ) => Promise<DashboardTeamWorkspace>
+    setTeamWorkspaceChannels: (
+      payload: DashboardTeamWorkspaceChannelsPayload
+    ) => Promise<DashboardTeamWorkspace>
+    clearTeamWorkspace: () => Promise<DashboardTeamWorkspace>
+    listWorkspaceMappings: () => Promise<WorkspaceMapping[]>
+    getWorkspaceMapping: (workspaceId: string) => Promise<string[] | null>
+    saveWorkspaceMapping: (payload: {
+      workspaceId: string
+      projectIds: string[]
+    }) => Promise<void>
+    deleteWorkspaceMapping: (workspaceId: string) => Promise<boolean>
+    getProjects: () => Promise<{ id: string; name: string; clientName: string; teamId: string; profileId: string }[]>
+    syncSource: (payload: { projectId: string; sourceId?: string }) => Promise<{
+      channelsRead: number
+      newMessages: number
+      status: string
+      error?: string
+    }>
+    getRunLogs: (payload: { projectId: string; limit?: number }) => Promise<Array<{
+      runId: string
+      ts: string
+      trigger: 'scheduled' | 'manual'
+      projectId: string
+      sourceId: string
+      sourceKind: 'token' | 'browser'
+      workspaceId: string
+      channelsRead: number
+      newMessages: number
+      snippets?: Array<{
+        channelId: string
+        channelName?: string
+        sender: string
+        ts: string
+        snippet: string
+      }>
+      durationMs: number
+      status: string
+      error?: string
+    }>>
+    startWatchLive: (payload: {
+      projectId: string
+      bounds: { x: number; y: number; width: number; height: number }
+    }) => Promise<{ ok: boolean; error?: string }>
+    stopWatchLive: () => Promise<void>
+    onScrapeEvent: (
+      callback: (event: {
+        type: 'navigate' | 'scroll' | 'highlight' | 'status'
+        channelName?: string
+        scrollIndex?: number
+        maxScroll?: number
+        messageCount?: number
+        bounds?: { x: number; y: number; width: number; height: number }
+        text?: string
+      }) => void
+    ) => () => void
   }
 }
 
 export type {
   ActivateAppPayload,
+  DashboardAiModelsQueryPayload,
+  DashboardAiModelsResult,
+  DashboardAiSettingsQueryPayload,
+  DashboardAiSettingsSavePayload,
+  DashboardAiSettingsView,
   DashboardListChannelsPayload,
+  DashboardMarkViewedPayload,
   ActivateProfilePayload,
   AppId,
   ChannelHistoryPayload,
   CreateProfileInput,
   CurrentWorkspaceInfo,
+  DashboardChatMessage,
+  DashboardChatPage,
+  DashboardChatQueryPayload,
+  DashboardChatTokenStatus,
+  DashboardProjectChatChunkEvent,
+  DashboardProjectChatDoneEvent,
+  DashboardProjectChatErrorEvent,
+  DashboardProjectChatHistoryResult,
+  DashboardProjectChatPayload,
+  DashboardProjectChatStartResult,
+  DashboardProjectChatStatus,
+  DashboardProjectActivity,
   DashboardManualToken,
+  DashboardSendErrorCode,
+  DashboardSendMessagePayload,
+  DashboardSendMessageResult,
   DashboardSnapshot,
   DashboardSyncProgressPayload,
+  DashboardTeamWorkspace,
+  DashboardTeamWorkspaceCandidate,
   DashboardViewSetPayload,
   ManualTokenPayload,
   OpenWorkspacePayload,
@@ -297,6 +538,7 @@ export type {
   UnpinWorkspacePayload,
   ValidateTokenResultPayload,
   ViewportBounds,
+  WorkspaceMapping,
   WorkspacePayload,
   WorkspaceThemePayload
 }

@@ -17,6 +17,14 @@ import { useDashboardStore } from './hooks/useDashboard'
 import { SettingsPanel } from './components/SettingsPanel'
 import { SidebarPanelIcon } from './components/SidebarPanelIcon'
 import { SlackViewport } from './components/SlackViewport'
+import { PlatformSettingsPanel } from './components/dashboard/PlatformSettingsPanel'
+import { AddPlatformPage } from './components/dashboard/AddPlatformPage'
+import { AccountsManagementModal } from './components/dashboard/AccountsManagementModal'
+import { UnifiedSettingsModal, type SettingsTabKey } from './components/dashboard/UnifiedSettingsModal'
+import { NewProfileModal } from './components/dashboard/NewProfileModal'
+import { NewProjectModal } from './components/dashboard/NewProjectModal'
+import { sidebarToastFor } from './lib/sidebar-toast'
+import { modKey, modShift } from './lib/shortcut-label'
 import { useProfileStore } from './hooks/useProfiles'
 import {
   applyAppBrandTheme,
@@ -73,6 +81,18 @@ function App(): React.JSX.Element {
   )
   const [cmdkOpen, setCmdkOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [unifiedSettingsOpen, setUnifiedSettingsOpen] = useState(false)
+  const [unifiedSettingsTab, setUnifiedSettingsTab] = useState<SettingsTabKey>('general')
+  const [platformSettings, setPlatformSettings] = useState<{
+    profileId: string
+    appId: AppId
+  } | null>(null)
+  const [addPlatformOpen, setAddPlatformOpen] = useState(false)
+  const [newProfileModalOpen, setNewProfileModalOpen] = useState(false)
+  const [initialNewProfileEmail, setInitialNewProfileEmail] = useState<string | null>(null)
+  const [newProjectModalOpen, setNewProjectModalOpen] = useState(false)
+  const [accountsModalOpen, setAccountsModalOpen] = useState(false)
+  const [activeCustomLinkId, setActiveCustomLinkId] = useState<string | null>(null)
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS)
   const [locked, setLocked] = useState(false)
   const [unlocking, setUnlocking] = useState(false)
@@ -92,6 +112,8 @@ function App(): React.JSX.Element {
     appId: AppId
   } | null>(null)
   const lastAppByProfile = useRef<Record<string, AppId>>({})
+  const sidebarCollapsedRef = useRef(settings.sidebarCollapsed)
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const {
     profiles,
@@ -224,13 +246,27 @@ function App(): React.JSX.Element {
   }, [])
 
   useEffect(() => {
-    let hideTimer: ReturnType<typeof setTimeout> | null = null
-    return window.api.app.onToast((message) => {
-      if (hideTimer) clearTimeout(hideTimer)
-      setToast(message)
-      hideTimer = setTimeout(() => setToast(null), 4500)
-    })
+    sidebarCollapsedRef.current = settings.sidebarCollapsed
+  }, [settings.sidebarCollapsed])
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
+    }
   }, [])
+
+  const showToast = useCallback((message: string, ms = 4500): void => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
+    setToast(message)
+    toastTimerRef.current = setTimeout(() => {
+      toastTimerRef.current = null
+      setToast(null)
+    }, ms)
+  }, [])
+
+  useEffect(() => {
+    return window.api.app.onToast((message) => showToast(message))
+  }, [showToast])
 
   useEffect(() => {
     return window.api.app.onSettingsChanged((next) => {
@@ -292,6 +328,8 @@ function App(): React.JSX.Element {
 
   const browserAuthBusy = authPhase === 'google' || authPhase === 'slack'
   const dashboardOpen = useDashboardStore((s) => s.dashboardOpen)
+  const closeDashboard = useDashboardStore((s) => s.closeDashboard)
+  const showDashboard = dashboardOpen && !browserAuthBusy
   const wizardOpen = useDashboardStore((s) => s.wizardOpenFor) != null
   const splitOn =
     settings.splitViewEnabled && Boolean(splitSecondary) && !browserAuthBusy && !locked
@@ -301,13 +339,17 @@ function App(): React.JSX.Element {
   const showEmbed = Boolean(
     adminAuthenticated &&
     activeProfile &&
-    activeAppId &&
+    (activeAppId || activeCustomLinkId) &&
     !dashboardOpen &&
     !wizardOpen &&
     !browserAuthBusy &&
     !locked &&
     !settingsOpen &&
+    !unifiedSettingsOpen &&
     !cmdkOpen &&
+    !platformSettings &&
+    !addPlatformOpen &&
+    !accountsModalOpen &&
     !showOnboarding
   )
 
@@ -377,25 +419,35 @@ function App(): React.JSX.Element {
     [settings.sidebarWidth]
   )
 
-  const setSidebarCollapsed = useCallback((collapsed: boolean) => {
-    void window.api.app.setSettings({ sidebarCollapsed: collapsed }).then((s) => {
-      setSettings(s)
-      if (!s.sidebarCollapsed) {
-        applySidebarWidth(s.sidebarWidth)
-      }
-      if (collapsed) {
-        setToast('Sidebar hidden — press ⌘B or use the left panel button to show it again.')
-      }
-      window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(() => {
-          const bounds = viewportBounds()
-          if (useProfileStore.getState().activeAppId) {
-            void window.api.profiles.updateBounds(bounds)
+  const setSidebarCollapsed = useCallback(
+    (collapsed: boolean) => {
+      void window.api.app.setSettings({ sidebarCollapsed: collapsed }).then((s) => {
+        const previousCollapsed = sidebarCollapsedRef.current
+        sidebarCollapsedRef.current = s.sidebarCollapsed
+        setSettings(s)
+        if (!s.sidebarCollapsed) {
+          applySidebarWidth(s.sidebarWidth)
+          if (toastTimerRef.current) {
+            clearTimeout(toastTimerRef.current)
+            toastTimerRef.current = null
           }
+          setToast(null)
+        } else {
+          const message = sidebarToastFor(previousCollapsed, s.sidebarCollapsed)
+          if (message) showToast(message, 6000)
+        }
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => {
+            const bounds = viewportBounds()
+            if (useProfileStore.getState().activeAppId) {
+              void window.api.profiles.updateBounds(bounds)
+            }
+          })
         })
       })
-    })
-  }, [])
+    },
+    [showToast]
+  )
 
   const handleAuthDockBounds = useCallback((bounds: ViewportBounds) => {
     void window.api.profiles.syncChromeEmbedBounds(bounds)
@@ -412,6 +464,7 @@ function App(): React.JSX.Element {
 
   const handleSelectProfile = useCallback(
     async (profileId: string) => {
+      setActiveCustomLinkId(null)
       if (profileId === activeProfileId) {
         return
       }
@@ -427,9 +480,23 @@ function App(): React.JSX.Element {
     [activeProfileId, activateProfile, selectApp]
   )
 
+  const handleSelectCustomLink = useCallback(
+    async (profileId: string, link: import('../../shared/types').CustomLink) => {
+      closeDashboard()
+      setActiveCustomLinkId(link.id)
+      useProfileStore.setState({ activeProfileId: profileId, activeAppId: null })
+      const bounds = viewportBounds()
+      await window.api.profiles.activateCustomLink(profileId, link.id, link.url, bounds)
+      setStatusLine(`Viewing ${link.name} · ${link.url}`)
+    },
+    [closeDashboard]
+  )
+
   const handleSidebarSelectApp = useCallback(
     (profileId: string, appId: AppId) => {
+      setActiveCustomLinkId(null)
       void (async () => {
+        closeDashboard()
         const refreshed = useProfileStore.getState().profiles.find((p) => p.id === profileId)
         const signedIn = refreshed?.apps[appId].sessionStatus === 'signed-in'
 
@@ -466,63 +533,82 @@ function App(): React.JSX.Element {
         )
       })()
     },
-    [selectApp, startAppLogin]
+    [closeDashboard, selectApp, startAppLogin]
   )
 
   const handleAddGoogle = useCallback(async () => {
     const hint = email.trim()
-    if (!hint) {
-      setStatusLine('Enter a Google email first.')
-      return
-    }
-    setLocalAuthPhase('google')
-    setStatusLine('Opening Chrome…')
-    try {
-      const profile = await createProfile(hint)
-      const latest = useProfileStore.getState().profiles.find((p) => p.id === profile.id) ?? profile
-      const googleOk = latest.googleAuthStatus === 'signed-in'
-      const slackOk = latest.apps.slack.sessionStatus === 'signed-in'
+    setInitialNewProfileEmail(hint || null)
+    setEmail('')
+    setNewProfileModalOpen(true)
+  }, [email])
 
-      // Same email already on the dashboard — open that profile; do not re-auth
-      // (re-importing Chrome cookies was logging Slack out).
-      if (googleOk) {
-        await activateProfile(profile.id, viewportBounds())
-        setEmail('')
-        setStatusLine(
-          slackOk
-            ? 'This email is already signed in — opened that profile.'
-            : 'Google already signed in for this email. Open Slack under this profile.'
-        )
-        return
-      }
+  const handleCreateAndAuthProfile = useCallback(
+    async (displayName: string, targetEmail: string, mode?: 'under_global' | 'individual' | 'both') => {
+      const hint = targetEmail.trim()
+      if (!hint) return
+      setLocalAuthPhase('google')
+      setStatusLine('Opening Chrome for Google authentication…')
+      try {
+        const profile = await createProfile(hint)
+        const targetProfileId = profile.id
+        const finalDisplayName = displayName.trim() || hint
+        await window.api.profiles.setCustomName(profile.id, finalDisplayName)
 
-      // Clear any reused-profile ✓ before Chrome opens.
-      useProfileStore.setState((s) => ({
-        profiles: s.profiles.map((p) =>
-          p.id === profile.id ? { ...p, googleAuthStatus: 'signing-in' } : p
-        )
-      }))
-      await activateProfile(profile.id, viewportBounds())
-      await nextPaint()
-      await new Promise((r) => setTimeout(r, 50))
-      setStatusLine('Waiting for Google / 2SV…')
-      await startGoogleAuth(profile.id, viewportBounds())
-      await loadProfiles()
-      const updated = useProfileStore.getState().profiles.find((p) => p.id === profile.id)
-      if (updated?.googleAuthStatus === 'signed-in') {
-        setEmail('')
-        setStatusLine('Google done. Open Slack under this profile to continue.')
-      } else if (!updated) {
-        setStatusLine('Cancelled — unsigned profile removed.')
-      } else {
-        setStatusLine('Google sign-in did not finish. Try again.')
+        // Set account scope: 'global' for global pool, 'individual' for individual client profiles, or 'both'
+        const scope = mode === 'under_global' ? 'global' : mode === 'both' ? 'both' : 'individual'
+        await window.api.profiles.setAccountScope(targetProfileId, scope)
+        await loadProfiles()
+
+        const latest = useProfileStore.getState().profiles.find((p) => p.id === targetProfileId)
+        const googleOk = latest?.googleAuthStatus === 'signed-in'
+
+        if (googleOk) {
+          await activateProfile(targetProfileId, viewportBounds())
+          setToast(
+            mode === 'both'
+              ? `Profile ${finalDisplayName} linked to Global & Individual accounts!`
+              : mode === 'under_global'
+                ? `Account ${finalDisplayName} linked to Global accounts!`
+                : `Profile ${finalDisplayName} ready.`
+          )
+          return
+        }
+
+        useProfileStore.setState((s) => ({
+          profiles: s.profiles.map((p) =>
+            p.id === targetProfileId ? { ...p, googleAuthStatus: 'signing-in' } : p
+          )
+        }))
+        await activateProfile(targetProfileId, viewportBounds())
+        await nextPaint()
+        await new Promise((r) => setTimeout(r, 50))
+        setStatusLine('Waiting for Google / 2SV…')
+        await startGoogleAuth(targetProfileId, viewportBounds())
+        await loadProfiles()
+        const updated = useProfileStore.getState().profiles.find((p) => p.id === targetProfileId)
+        if (updated?.googleAuthStatus === 'signed-in') {
+          setToast(
+            mode === 'both'
+              ? `Google verified! Account available in Global and Individual profiles.`
+              : mode === 'under_global'
+                ? `Google verified and added to Global Accounts!`
+                : `Google verified! Profile ${displayName || hint} created.`
+          )
+          setStatusLine('Google done. Open Slack under this profile to continue.')
+        } else if (!updated) {
+          setStatusLine('Cancelled — unsigned profile removed.')
+        } else {
+          setStatusLine('Google sign-in did not finish. Try again.')
+        }
+      } catch (err) {
+        setStatusLine(String(err))
+      } finally {
+        setLocalAuthPhase(null)
       }
-    } catch (err) {
-      setStatusLine(String(err))
-    } finally {
-      setLocalAuthPhase(null)
-    }
-  }, [email, createProfile, activateProfile, startGoogleAuth, loadProfiles])
+    },
+    [createProfile, activateProfile, startGoogleAuth, loadProfiles]
+  )
 
   const handleCancelChrome = useCallback(() => {
     void window.api.profiles.cancelAuthBusy(activeProfileId ?? undefined)
@@ -534,6 +620,9 @@ function App(): React.JSX.Element {
 
   const handleOpenWorkspace = useCallback(
     (profileId: string, appId: AppId, teamId: string) => {
+      // Opening a workspace paints the native Slack view; the dashboard must
+      // close first so React and the embed stay in sync (same as app rows).
+      closeDashboard()
       void (async () => {
         await openWorkspace(profileId, appId, teamId, viewportBounds())
         const profile = useProfileStore.getState().profiles.find((p) => p.id === profileId)
@@ -549,7 +638,7 @@ function App(): React.JSX.Element {
         setSettings(next)
       })()
     },
-    [openWorkspace]
+    [closeDashboard, openWorkspace]
   )
 
   const emptyCopy = useMemo(() => {
@@ -583,7 +672,8 @@ function App(): React.JSX.Element {
       const meta = e.metaKey || e.ctrlKey
       if (meta && e.key === ',') {
         e.preventDefault()
-        setSettingsOpen((o) => !o)
+        setUnifiedSettingsTab('general')
+        setUnifiedSettingsOpen((o) => !o)
         return
       }
       if (meta && e.key.toLowerCase() === 'b') {
@@ -602,6 +692,10 @@ function App(): React.JSX.Element {
         return
       }
       if (e.key === 'Escape') {
+        if (unifiedSettingsOpen) {
+          setUnifiedSettingsOpen(false)
+          return
+        }
         if (settingsOpen) {
           setSettingsOpen(false)
           return
@@ -739,6 +833,37 @@ function App(): React.JSX.Element {
                 void unpinWorkspace(profileId, appId, teamId)
               }}
               onDismissError={clearError}
+              onPlatformSettings={(profileId, appId) => {
+                setPlatformSettings({ profileId, appId })
+              }}
+              onAddPlatform={() => setAddPlatformOpen(true)}
+              onNewProject={() => {
+                useDashboardStore.getState().openDashboard()
+                setNewProjectModalOpen(true)
+              }}
+              onNewProfile={() => setNewProfileModalOpen(true)}
+              onObserver={() => {
+                setToast('Observer Mode enabled. Observer channel streams active.')
+              }}
+              onOpenAccountsSettings={() => {
+                setUnifiedSettingsTab('general')
+                setUnifiedSettingsOpen(true)
+              }}
+              onOpenProfilesHub={() => {
+                setAccountsModalOpen(true)
+              }}
+              activeCustomLinkId={activeCustomLinkId}
+              onSelectCustomLink={handleSelectCustomLink}
+              sidebarLook={settings.sidebarLook ?? 'ancient'}
+              showLookSwitcher={settings.showLookSwitcher ?? true}
+              showRecentSection={settings.showRecentSection ?? true}
+              showGoogleEmailInputInSidebar={settings.showGoogleEmailInputInSidebar ?? true}
+              sidebarButtons={settings.sidebarButtons}
+              onLookChange={(look) => {
+                void window.api.app.setSettings({ sidebarLook: look }).then((next) => {
+                  setSettings(next)
+                })
+              }}
             />
             <div
               className="sidebar-resizer"
@@ -773,7 +898,7 @@ function App(): React.JSX.Element {
               type="button"
               className="sidebar-reopen"
               onClick={() => setSidebarCollapsed(false)}
-              title={`Show sidebar (⌘B) · ${APP_DISPLAY_NAME}`}
+              title={`Show sidebar (${modKey()}B) · ${APP_DISPLAY_NAME}`}
               aria-label="Show sidebar"
               tabIndex={settings.sidebarCollapsed ? 0 : -1}
             >
@@ -782,7 +907,7 @@ function App(): React.JSX.Element {
           </aside>
         </div>
 
-        <main className={`main-column${splitOn ? ' is-split' : ''}`}>
+        <main className={`main-column${splitOn ? ' is-split' : ''}`} style={{ display: 'flex', flexDirection: 'column' }}>
           {browserAuthBusy && authPhase ? (
             <AuthChromePane
               phase={authPhase}
@@ -797,7 +922,7 @@ function App(): React.JSX.Element {
             </div>
           ) : null}
 
-          {dashboardOpen ? (
+          {showDashboard ? (
             <DashboardView />
           ) : showEmbed ? (
             <div className={`main-embed${splitOn ? ' is-split' : ''}`}>
@@ -810,26 +935,14 @@ function App(): React.JSX.Element {
             </div>
           ) : null}
 
-          {!browserAuthBusy && !locked && !showEmbed && !dashboardOpen && !wizardOpen ? (
-            <button
-              type="button"
-              className="settings-float-btn"
-              onClick={() => setSettingsOpen(true)}
-              title="Settings (⌘,)"
-              aria-label="Settings"
-            >
-              ⚙
-            </button>
-          ) : null}
-
           {!browserAuthBusy && !showEmbed && !dashboardOpen && !locked ? (
             <div className="empty-main">
               <img className="empty-main-icon" src={appIcon} alt="" aria-hidden />
               <h1>{emptyCopy.title}</h1>
               <p>{emptyCopy.body}</p>
               <p className="empty-main-hint">
-                Shortcuts: ⌘K jump · ⌘B sidebar · ⌘, settings · ⌘1–9 profiles · ⌘⇧S/T/W apps · ⌘L
-                lock
+                Shortcuts: {modKey()}K jump · {modKey()}B sidebar · {modKey()}, settings ·{' '}
+                {modKey()}1–9 profiles · {modShift()}S/T/W apps · {modKey()}L lock
               </p>
             </div>
           ) : null}
@@ -914,6 +1027,121 @@ function App(): React.JSX.Element {
           })
         }}
       />
+
+      {/* Unified Global Settings Hub: single source of truth for all global configs */}
+      <UnifiedSettingsModal
+        open={unifiedSettingsOpen && !locked}
+        initialTab={unifiedSettingsTab}
+        settings={settings}
+        onClose={() => setUnifiedSettingsOpen(false)}
+        onChangeSettings={(patch) => {
+          void window.api.app.setSettings(patch).then((s) => {
+            setSettings(s)
+            applyDocumentTheme(s.theme)
+            applySidebarDensity(s.sidebarDensity)
+            applySidebarWidth(s.sidebarWidth)
+            if (!s.splitViewEnabled) setSplitSecondary(null)
+          })
+        }}
+        onClearAllProfiles={() => {
+          void window.api.profiles.clearAll().then(async () => {
+            useProfileStore.setState({
+              profiles: [],
+              activeProfileId: null,
+              activeAppId: null
+            })
+            const s = await window.api.app.getSettings()
+            setSettings(s)
+          })
+        }}
+        onExportProfiles={() => {
+          void window.api.profiles.exportMetadata().then((list) => {
+            const blob = new Blob([JSON.stringify(list, null, 2)], {
+              type: 'application/json'
+            })
+            const a = document.createElement('a')
+            a.href = URL.createObjectURL(blob)
+            a.download = 'cosmic-profiles.json'
+            a.click()
+          })
+        }}
+        onImportProfiles={() => {
+          const input = document.createElement('input')
+          input.type = 'file'
+          input.accept = 'application/json,.json'
+          input.onchange = () => {
+            const file = input.files?.[0]
+            if (!file) return
+            void file.text().then(async (text) => {
+              const parsed = JSON.parse(text) as Profile[]
+              const list = await window.api.profiles.importMetadata(parsed)
+              useProfileStore.setState({ profiles: list })
+              setToast(`Imported — ${list.length} profiles total (sessions still need sign-in).`)
+            })
+          }
+          input.click()
+        }}
+        onAdminLogout={() => {
+          void window.api.app.adminLogout().then(() => {
+            setAdminAuthenticated(false)
+            void window.api.profiles.setEmbedVisible(false)
+          })
+        }}
+        onAddGoogleAccount={() => {
+          setUnifiedSettingsOpen(false)
+          setNewProfileModalOpen(true)
+        }}
+        onSelectProfile={(id) => {
+          setUnifiedSettingsOpen(false)
+          void handleSelectProfile(id)
+        }}
+        onOpenCustomLink={(pId, link) => {
+          setUnifiedSettingsOpen(false)
+          void handleSelectCustomLink(pId, link)
+        }}
+      />
+
+      <NewProfileModal
+        open={newProfileModalOpen}
+        onClose={() => {
+          setNewProfileModalOpen(false)
+          setInitialNewProfileEmail(null)
+        }}
+        onCreate={handleCreateAndAuthProfile}
+        initialEmail={initialNewProfileEmail || undefined}
+      />
+
+      {platformSettings ? (
+        <PlatformSettingsPanel
+          open={true}
+          profileId={platformSettings.profileId}
+          appId={platformSettings.appId}
+          onClose={() => setPlatformSettings(null)}
+        />
+      ) : null}
+
+      {newProjectModalOpen ? (
+        <NewProjectModal
+          open={true}
+          onClose={() => setNewProjectModalOpen(false)}
+        />
+      ) : null}
+
+      {addPlatformOpen ? (
+        <AddPlatformPage open={true} onClose={() => setAddPlatformOpen(false)} />
+      ) : null}
+
+      {accountsModalOpen ? (
+        <AccountsManagementModal
+          open={true}
+          onClose={() => setAccountsModalOpen(false)}
+          onAddGoogleAccount={() => {
+            setNewProfileModalOpen(true)
+          }}
+          onSelectProfile={(id) => void handleSelectProfile(id)}
+          onOpenCustomLink={(pId, link) => void handleSelectCustomLink(pId, link)}
+        />
+      ) : null}
 
       {showOnboarding && !locked ? (
         <div className="onboarding-backdrop">

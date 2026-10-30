@@ -1,12 +1,14 @@
 import { memo, useMemo, useState } from 'react'
 import { APP_DISPLAY_NAME } from '../../../shared/brand'
-import type { AppId, AppSession, AppSessionStatus, Profile } from '../../../shared/types'
+import type { AppId, AppSession, AppSessionStatus, CustomLink, Profile } from '../../../shared/types'
 import {
   APP_IDS,
-  appLabel,
   appSupportsWorkspaces,
-  profileDisplayLabel
+  profileDisplayLabel,
+  sanitizeWorkspaceName,
+  sidebarAppLabel
 } from '../../../shared/types'
+import { modKey } from '../lib/shortcut-label'
 import { formatUnreadBadge, unreadKey } from '../lib/unread-badge'
 import { AppIcon } from './AppIcon'
 import { SidebarPanelIcon } from './SidebarPanelIcon'
@@ -46,8 +48,52 @@ interface ProfileSidebarProps {
   onPinFromAvailable: (profileId: string, appId: AppId, teamId: string) => void
   onUnpin: (profileId: string, appId: AppId, teamId: string) => void
   onDismissError: () => void
+  /** Open the platform settings panel for a given profile + app. */
+  onPlatformSettings?: (profileId: string, appId: AppId) => void
+  /** Open the "+ Add" page for adding platforms / custom links. */
+  onAddPlatform: () => void
+  /** Open the wizard to create a new workspace project */
+  onNewProject?: () => void
+  /** Open the modal to create a new profile */
+  onNewProfile?: () => void
+  /** Trigger the Observer action/mode */
+  onObserver?: () => void
+  /** Open the Accounts & Workspaces management hub / Global settings. */
+  onOpenAccountsSettings?: () => void
+  /** Open the Profiles & Accounts management hub */
+  onOpenProfilesHub?: () => void
+  /** Active custom link ID if one is currently opened in embed */
+  activeCustomLinkId?: string | null
+  /** Select and view a custom link */
+  onSelectCustomLink?: (profileId: string, link: CustomLink) => void
   /** Optional slot rendered after the Recents strip (dashboard entry point). */
   dashboardSlot?: React.ReactNode
+  /** Customization settings for the sidebar */
+  sidebarLook?: 'ancient' | 'new-cosmic'
+  showLookSwitcher?: boolean
+  showRecentSection?: boolean
+  showGoogleEmailInputInSidebar?: boolean
+  sidebarButtons?: {
+    addWebsite?: boolean
+    newProject?: boolean
+    newProfile?: boolean
+    observer?: boolean
+    profilesHub?: boolean
+  }
+  onLookChange?: (look: 'ancient' | 'new-cosmic') => void
+}
+
+function platformStatusDot(sessionStatus: AppSessionStatus): {
+  label: string
+  kind: 'connected' | 'needs-login' | 'signing-in'
+} {
+  if (sessionStatus === 'signed-in') {
+    return { label: 'Connected', kind: 'connected' }
+  }
+  if (sessionStatus === 'not-signed-in') {
+    return { label: 'Needs login', kind: 'needs-login' }
+  }
+  return { label: 'Signing in…', kind: 'signing-in' }
 }
 
 function isBusy(status: AppSessionStatus): boolean {
@@ -96,21 +142,24 @@ function displayWorkspaceName(ws: {
   teamId: string
   lastChannelName?: string
 }): string {
-  const name = ws.teamName?.trim()
+  const sanitized = sanitizeWorkspaceName(ws.teamName)
+  const name = sanitized || ws.teamName?.trim()
   const generic =
     !name ||
-    /^(microsoft teams|teams|teams org|organization|teams-home)$/i.test(name) ||
+    /^(microsoft teams|teams|teams org|organization|teams-home|unknown)$/i.test(name) ||
+    /^\d+\s+new\s+items?/i.test(name) ||
+    /^new\s+item/i.test(name) ||
     /^tenant-/i.test(name) ||
     /^T[A-Z0-9]+$/i.test(name)
 
   if (!generic) {
     return name
   }
-  if (ws.lastChannelName?.trim()) {
-    return ws.lastChannelName.trim()
-  }
   if (ws.teamDomain?.trim()) {
     return ws.teamDomain.trim()
+  }
+  if (ws.lastChannelName?.trim()) {
+    return sanitizeWorkspaceName(ws.lastChannelName.trim()) || ws.lastChannelName.trim()
   }
   if (ws.teamId === 'teams-home') {
     return 'Personal'
@@ -267,7 +316,7 @@ export const ProfileSidebar = memo(function ProfileSidebar({
   email,
   onEmailChange,
   googleBusy,
-  statusLine,
+  statusLine: _statusLine,
   unreadCounts,
   recentWorkspaces,
   onAddGoogle,
@@ -283,19 +332,72 @@ export const ProfileSidebar = memo(function ProfileSidebar({
   onOpenWorkspace,
   onPinFromAvailable,
   onUnpin,
-  onDismissError,
-  dashboardSlot
+  onDismissError: _onDismissError,
+  onPlatformSettings: _onPlatformSettings,
+  onAddPlatform,
+  onNewProject,
+  onNewProfile,
+  onObserver,
+  onOpenAccountsSettings,
+  onOpenProfilesHub,
+  activeCustomLinkId,
+  onSelectCustomLink,
+  dashboardSlot,
+  sidebarLook: propSidebarLook,
+  showLookSwitcher = true,
+  showRecentSection = true,
+  showGoogleEmailInputInSidebar = true,
+  sidebarButtons = {
+    addWebsite: true,
+    newProject: true,
+    newProfile: true,
+    observer: true,
+    profilesHub: true
+  },
+  onLookChange
 }: ProfileSidebarProps): React.JSX.Element {
   const [profileExpanded, setProfileExpanded] = useState<Record<string, boolean>>({})
   const [appExpanded, setAppExpanded] = useState<Record<string, boolean>>({})
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [dragId, setDragId] = useState<string | null>(null)
+  const activeLook = propSidebarLook ?? 'ancient'
+
+  const handleSetLook = (look: 'ancient' | 'new-cosmic'): void => {
+    onLookChange?.(look)
+  }
   const profileIdSet = useMemo(() => new Set(profiles.map((p) => p.id)), [profiles])
-  const visibleRecents = useMemo(
-    () => recentWorkspaces.filter((r) => profileIdSet.has(r.profileId)).slice(0, 5),
-    [recentWorkspaces, profileIdSet]
-  )
+  const visibleRecents = useMemo(() => {
+    const fromHistory = recentWorkspaces.filter((r) => profileIdSet.has(r.profileId))
+    if (fromHistory.length > 0) {
+      return fromHistory.slice(0, 5)
+    }
+
+    // Fallback: If no explicit history is recorded yet, surface available / pinned workspaces
+    const fallbackList: RecentWorkspace[] = []
+    for (const p of profiles) {
+      for (const appId of APP_IDS) {
+        const session = p.apps[appId]
+        if (!session) continue
+        const allWs = [
+          ...session.pinnedWorkspaces.map((w) => ({ ...w, lastSeenAt: undefined })),
+          ...session.availableWorkspaces
+        ]
+        for (const ws of allWs) {
+          if (!fallbackList.some((existing) => existing.profileId === p.id && existing.teamId === ws.teamId)) {
+            fallbackList.push({
+              profileId: p.id,
+              appId,
+              teamId: ws.teamId,
+              label: displayWorkspaceName(ws),
+              at: ws.lastSeenAt || p.createdAt
+            })
+          }
+        }
+      }
+    }
+    return fallbackList.slice(0, 5)
+  }, [recentWorkspaces, profileIdSet, profiles])
 
   const isProfileOpen = (profileId: string): boolean => {
     if (profileId in profileExpanded) {
@@ -331,16 +433,79 @@ export const ProfileSidebar = memo(function ProfileSidebar({
               type="button"
               className="btn ghost icon-btn"
               onClick={onToggleSidebar}
-              title="Hide sidebar (⌘B)"
+              title={`Hide sidebar (${modKey()}B)`}
               aria-label="Hide sidebar"
             >
               <SidebarPanelIcon />
             </button>
           </div>
         </div>
+
+        {/* View Looks Switcher: Ancient Look (default) vs New Cosmic */}
+        {showLookSwitcher ? (
+          <div
+            className="sidebar-looks-switcher"
+            role="group"
+            aria-label="Sidebar Appearance Look"
+            style={{
+              display: 'flex',
+              gap: '4px',
+              marginTop: '10px',
+              background: 'rgba(0, 0, 0, 0.28)',
+              padding: '3px',
+              borderRadius: '8px',
+              border: '1px solid rgba(255, 255, 255, 0.07)'
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => handleSetLook('ancient')}
+              aria-pressed={activeLook === 'ancient'}
+              style={{
+                flex: 1,
+                padding: '5px 8px',
+                fontSize: '11px',
+                fontWeight: 600,
+                borderRadius: '6px',
+                border: activeLook === 'ancient' ? '1px solid var(--accent)' : '1px solid transparent',
+                background: activeLook === 'ancient' ? 'color-mix(in srgb, var(--accent) 22%, transparent)' : 'transparent',
+                color: activeLook === 'ancient' ? '#fff' : 'var(--text-faint)',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                textAlign: 'center'
+              }}
+              title="Ancient Look (Default established theme)"
+            >
+              Ancient Look
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSetLook('new-cosmic')}
+              aria-pressed={activeLook === 'new-cosmic'}
+              style={{
+                flex: 1,
+                padding: '5px 8px',
+                fontSize: '11px',
+                fontWeight: 600,
+                borderRadius: '6px',
+                border: activeLook === 'new-cosmic' ? '1px solid var(--accent)' : '1px solid transparent',
+                background: activeLook === 'new-cosmic' ? 'color-mix(in srgb, var(--accent) 22%, transparent)' : 'transparent',
+                color: activeLook === 'new-cosmic' ? '#fff' : 'var(--text-faint)',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                textAlign: 'center'
+              }}
+              title="New Cosmic Look (Futuristic exploration)"
+            >
+              New Cosmic
+            </button>
+          </div>
+        ) : null}
       </div>
 
-      {visibleRecents.length > 0 ? (
+      {dashboardSlot}
+
+      {showRecentSection && visibleRecents.length > 0 ? (
         <div className="recent-strip" aria-label="Recent workspaces">
           <div className="recent-strip-head">
             <p className="recent-label">Recent</p>
@@ -370,7 +535,8 @@ export const ProfileSidebar = memo(function ProfileSidebar({
                     type="button"
                     className="recent-item"
                     onClick={() => {
-                      onSelect(r.profileId)
+                      // Opening the workspace already activates its profile/app;
+                      // a second onSelect here races it and can clear activeAppId.
                       if (app) {
                         onOpenWorkspace(r.profileId, app, r.teamId)
                       }
@@ -389,7 +555,7 @@ export const ProfileSidebar = memo(function ProfileSidebar({
                       <span className="ws-title">{title}</span>
                       <span className="ws-sub">
                         {profileName}
-                        {app ? ` · ${appLabel(app)}` : ''}
+                        {app ? ` · ${sidebarAppLabel(app)}` : ''}
                       </span>
                     </span>
                   </button>
@@ -400,43 +566,47 @@ export const ProfileSidebar = memo(function ProfileSidebar({
         </div>
       ) : null}
 
-      {dashboardSlot}
-
-      <label className="field-label" htmlFor="google-email">
-        Google email
-      </label>
-      <input
-        id="google-email"
-        className="field-input"
-        type="email"
-        placeholder="name@gmail.com"
-        value={email}
-        disabled={googleBusy}
-        onChange={(e) => onEmailChange(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') onAddGoogle()
-        }}
-      />
-      <button
-        type="button"
-        className="btn primary block btn-apply"
-        disabled={googleBusy}
-        onClick={onAddGoogle}
-        aria-label="Continue with Google"
-      >
-        {googleBusy ? 'Signing in…' : 'Continue with Google'}
-      </button>
-      {googleBusy ? (
-        <button type="button" className="btn secondary block" onClick={onCancelGoogle}>
-          Cancel sign-in
-        </button>
+      {showGoogleEmailInputInSidebar ? (
+        <>
+          <label className="field-label" htmlFor="google-email">
+            Google email
+          </label>
+          <input
+            id="google-email"
+            className="field-input"
+            type="email"
+            placeholder="name@gmail.com"
+            value={email}
+            disabled={googleBusy}
+            onChange={(e) => onEmailChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') onAddGoogle()
+            }}
+          />
+          <button
+            type="button"
+            className="btn primary block btn-apply"
+            disabled={googleBusy}
+            onClick={onAddGoogle}
+            aria-label="Continue with Google"
+          >
+            {googleBusy ? 'Signing in…' : 'Continue with Google'}
+          </button>
+          {googleBusy ? (
+            <button type="button" className="btn secondary block" onClick={onCancelGoogle}>
+              Cancel sign-in
+            </button>
+          ) : null}
+        </>
       ) : null}
 
       <ul className="nav-tree">
         {profiles.length === 0 ? (
           <li className="empty-hint">No profiles yet.</li>
         ) : (
-          profiles.map((profile) => {
+          profiles
+            .filter((p) => !p.hiddenInSidebar)
+            .map((profile) => {
             const profileOpen = isProfileOpen(profile.id)
             const profileActive = profile.id === activeProfileId
             const label = profileDisplayLabel(profile)
@@ -493,6 +663,23 @@ export const ProfileSidebar = memo(function ProfileSidebar({
                         {profileOpen ? '▼' : '▶'}
                       </span>
                       <span className="nav-profile-name">{label}</span>
+                      {(profile.isGlobalProfile || profile.id === 'global-account-profile') && (
+                        <span
+                          style={{
+                            fontSize: '9.5px',
+                            fontWeight: 700,
+                            padding: '1px 5px',
+                            borderRadius: '4px',
+                            background: 'rgba(99, 102, 241, 0.2)',
+                            color: '#a5b4fc',
+                            border: '1px solid rgba(99, 102, 241, 0.35)',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.04em'
+                          }}
+                        >
+                          Global
+                        </span>
+                      )}
                       <ProfileAuthMark googleAuthStatus={profile.googleAuthStatus} />
                       {profile.muted ? (
                         <span
@@ -552,29 +739,41 @@ export const ProfileSidebar = memo(function ProfileSidebar({
                             onOpenInSplit(profile.id, appId)
                           }}
                         >
-                          <button
-                            type="button"
-                            className="nav-app-select"
-                            onClick={() => {
-                              onSelectApp(profile.id, appId)
-                              if (signedIn && supportsWorkspaces) {
-                                setAppExpanded((prev) => ({
-                                  ...prev,
-                                  [`${profile.id}:${appId}`]: true
-                                }))
-                              }
-                            }}
-                            title="Right-click: open in split"
-                          >
-                            <AppIcon appId={appId} className="nav-app-icon" size={12} />
-                            <span className="nav-app-label">{appLabel(appId)}</span>
-                            <AppStatusMark status={session.sessionStatus} />
-                            {formatUnreadBadge(unreadCounts[unreadKey(profile.id, appId)] ?? 0) ? (
-                              <span className="unread-badge" aria-label="Unread">
-                                {formatUnreadBadge(unreadCounts[unreadKey(profile.id, appId)] ?? 0)}
-                              </span>
-                            ) : null}
-                          </button>
+                          <div className="nav-app-row">
+                            <button
+                              type="button"
+                              className="nav-app-select"
+                              onClick={() => {
+                                onSelectApp(profile.id, appId)
+                                if (signedIn && supportsWorkspaces) {
+                                  setAppExpanded((prev) => ({
+                                    ...prev,
+                                    [`${profile.id}:${appId}`]: true
+                                  }))
+                                }
+                              }}
+                              title="Right-click: open in split"
+                            >
+                              <AppIcon appId={appId} className="nav-app-icon" size={12} />
+                              <span className="nav-app-label">{sidebarAppLabel(appId)}</span>
+                              <AppStatusMark status={session.sessionStatus} />
+                              {(() => {
+                                const st = platformStatusDot(session.sessionStatus)
+                                return (
+                                  <span
+                                    className={`platform-status-dot platform-status-${st.kind}`}
+                                    title={st.label}
+                                    aria-label={st.label}
+                                  />
+                                )
+                              })()}
+                              {formatUnreadBadge(unreadCounts[unreadKey(profile.id, appId)] ?? 0) ? (
+                                <span className="unread-badge" aria-label="Unread">
+                                  {formatUnreadBadge(unreadCounts[unreadKey(profile.id, appId)] ?? 0)}
+                                </span>
+                              ) : null}
+                            </button>
+                          </div>
 
                           {appOpen && signedIn && supportsWorkspaces ? (
                             <WorkspaceBranch
@@ -590,6 +789,47 @@ export const ProfileSidebar = memo(function ProfileSidebar({
                         </li>
                       )
                     })}
+
+                    {/* Custom Links Rows */}
+                    {(profile.customLinks ?? [])
+                      .filter((link) => !link.hiddenInSidebar)
+                      .map((link) => {
+                        const isLinkActive =
+                          profileActive && activeCustomLinkId === link.id
+
+                        return (
+                          <li
+                            key={link.id}
+                            className={`nav-app${isLinkActive ? ' is-active' : ''}`}
+                          >
+                            <div className="nav-app-row">
+                              <button
+                                type="button"
+                                className="nav-app-select"
+                                onClick={() => {
+                                  onSelect(profile.id)
+                                  onSelectCustomLink?.(profile.id, link)
+                                }}
+                                title={`Open ${link.name} (${link.url})`}
+                              >
+                                <span
+                                  style={{
+                                    fontSize: '0.82rem',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    width: '16px',
+                                    marginRight: '2px'
+                                  }}
+                                >
+                                  🌐
+                                </span>
+                                <span className="nav-app-label">{link.name}</span>
+                              </button>
+                            </div>
+                          </li>
+                        )
+                      })}
                   </ul>
                 ) : null}
               </li>
@@ -598,9 +838,89 @@ export const ProfileSidebar = memo(function ProfileSidebar({
         )}
       </ul>
 
-      <p className="sidebar-status" onClick={onDismissError} role="status">
-        {statusLine}
-      </p>
+      <div className="nav-action-compact-container">
+        {/* Configurable Action: + Website */}
+        {sidebarButtons.addWebsite !== false ? (
+          <button
+            type="button"
+            className="nav-action-compact-btn"
+            onClick={onAddPlatform}
+            title="Add Website or Web Platform"
+            aria-label="Add Website"
+          >
+            <span className="nav-btn-icon">🌐</span>
+            <span className="nav-btn-text">+ Website</span>
+          </button>
+        ) : null}
+
+        {/* Configurable Action: + Project */}
+        {sidebarButtons.newProject !== false && onNewProject ? (
+          <button
+            type="button"
+            className="nav-action-compact-btn"
+            onClick={onNewProject}
+            title="Create New Project / Workspace"
+            aria-label="New Project"
+          >
+            <span className="nav-btn-icon">📁</span>
+            <span className="nav-btn-text">+ Project</span>
+          </button>
+        ) : null}
+
+        {/* Configurable Action: + Profile */}
+        {sidebarButtons.newProfile !== false && onNewProfile ? (
+          <button
+            type="button"
+            className="nav-action-compact-btn"
+            onClick={onNewProfile}
+            title="Create New Profile / Account"
+            aria-label="New Profile"
+          >
+            <span className="nav-btn-icon">👤</span>
+            <span className="nav-btn-text">+ Profile</span>
+          </button>
+        ) : null}
+
+        {/* Permanent Action: ⚙️ Settings */}
+        <button
+          type="button"
+          className="nav-action-compact-btn nav-settings-btn"
+          onClick={onOpenAccountsSettings}
+          title="Global Settings Hub"
+          aria-label="Settings"
+        >
+          <span className="nav-btn-icon">⚙️</span>
+          <span className="nav-btn-text">Settings</span>
+        </button>
+
+        {/* Configurable Action: 🔭 Observer */}
+        {sidebarButtons.observer !== false && onObserver ? (
+          <button
+            type="button"
+            className="nav-action-compact-btn"
+            onClick={onObserver}
+            title="Observer Mode &amp; Channels"
+            aria-label="Observer"
+          >
+            <span className="nav-btn-icon">🔭</span>
+            <span className="nav-btn-text">Observer</span>
+          </button>
+        ) : null}
+
+        {/* Configurable Action: 👥 Profiles */}
+        {sidebarButtons.profilesHub !== false ? (
+          <button
+            type="button"
+            className="nav-action-compact-btn"
+            onClick={onOpenProfilesHub || onOpenAccountsSettings}
+            title="Profiles &amp; Accounts Management"
+            aria-label="Profiles"
+          >
+            <span className="nav-btn-icon">👥</span>
+            <span className="nav-btn-text">Profiles</span>
+          </button>
+        ) : null}
+      </div>
     </aside>
   )
 })

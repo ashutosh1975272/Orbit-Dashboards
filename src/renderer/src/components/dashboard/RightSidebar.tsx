@@ -75,7 +75,7 @@ export default function RightSidebar({
       number: 1,
       title: 'Needs Reply & Open Questions',
       hint: data.needsReplyOpenQuestions.needsReply
-        ? `⚠ Needs reply (${data.needsReplyOpenQuestions.urgency}) • ${data.needsReplyOpenQuestions.openQuestions.length} open question${data.needsReplyOpenQuestions.openQuestions.length !== 1 ? 's' : ''}`
+        ? `Needs reply (${data.needsReplyOpenQuestions.urgency} urgency), ${data.needsReplyOpenQuestions.openQuestions.length} open question${data.needsReplyOpenQuestions.openQuestions.length !== 1 ? 's' : ''}`
         : data.needsReplyOpenQuestions.openQuestions.length > 0
         ? `${data.needsReplyOpenQuestions.openQuestions.length} open question${data.needsReplyOpenQuestions.openQuestions.length !== 1 ? 's' : ''}`
         : 'No reply needed, no open questions',
@@ -86,7 +86,7 @@ export default function RightSidebar({
               <span className={`dash-chip px-2 py-1 rounded-full text-xs font-medium border ${getUrgencyClass(data.needsReplyOpenQuestions.urgency)}`}>
                 Needs my reply
               </span>
-              <span className="text-xs text-muted-dark uppercase tracking-wider">{data.needsReplyOpenQuestions.urgency} urgency</span>
+              <span className="text-xs text-muted-dark">{data.needsReplyOpenQuestions.urgency} urgency</span>
             </div>
           ) : (
             <p className="text-sm text-green-400 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">✓ No reply needed from you</p>
@@ -94,7 +94,7 @@ export default function RightSidebar({
 
           {data.needsReplyOpenQuestions.lastClientMessage && (
             <div className="pt-2 border-t border-border-dark/50 space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-dark block">Last Client Message</span>
+              <span className="text-xs font-semibold text-muted-dark block">Last Client Message</span>
               <div className="p-3 bg-surface-2-dark border border-border-dark rounded-lg space-y-2">
                 <p className="text-sm text-text-dark italic">"{data.needsReplyOpenQuestions.lastClientMessage.quote}"</p>
                 <div className="flex flex-wrap gap-3 text-xs text-muted-dark">
@@ -107,7 +107,7 @@ export default function RightSidebar({
 
           {data.needsReplyOpenQuestions.openQuestions.length > 0 ? (
             <div className="pt-2 border-t border-border-dark/50 space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-dark block">Open Questions</span>
+              <span className="text-xs font-semibold text-muted-dark block">Open Questions</span>
               <ul className="space-y-2">
                 {data.needsReplyOpenQuestions.openQuestions.map((q, i) => (
                   <li key={i} className="flex items-start gap-3 p-2 bg-surface-2-dark border border-border-dark rounded">
@@ -213,7 +213,7 @@ export default function RightSidebar({
           </div>
           {data.moodSignals.moodQuote && (
             <div className="pt-2 border-t border-border-dark/50 space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-dark block">Client Quote</span>
+              <span className="text-xs font-semibold text-muted-dark block">Client Quote</span>
               <blockquote className="text-sm text-muted-dark italic border-l-2 border-accent pl-3 py-1 bg-surface-2-dark rounded-r-lg">
                 "{data.moodSignals.moodQuote}"
               </blockquote>
@@ -226,26 +226,26 @@ export default function RightSidebar({
     {
       number: 6,
       title: 'Activity',
-      hint: `24h: ${data.activity.messages24h} • 7d: ${data.activity.messages7d} • Last client: ${data.activity.lastClientMessage ? formatTimeAgo(data.activity.lastClientMessage.whenIso) : 'never'} • My reply: ${data.activity.myLastReply ? formatTimeAgo(data.activity.myLastReply.whenIso) : 'never'}`,
+      hint: `24h: ${data.activity.messages24h}, 7d: ${data.activity.messages7d}, last client ${data.activity.lastClientMessage ? formatTimeAgo(data.activity.lastClientMessage.whenIso) : 'never'}, my reply ${data.activity.myLastReply ? formatTimeAgo(data.activity.myLastReply.whenIso) : 'never'}`,
       content: (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-2">
             <div className="flex flex-col items-center gap-1 p-3 bg-surface-2-dark border border-border-dark rounded-lg text-center">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-dark">Messages (24h)</span>
+              <span className="text-xs font-semibold text-muted-dark">Messages (24h)</span>
               <span className="text-xl font-bold text-text-dark">{data.activity.messages24h}</span>
             </div>
             <div className="flex flex-col items-center gap-1 p-3 bg-surface-2-dark border border-border-dark rounded-lg text-center">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-dark">Messages (7d)</span>
+              <span className="text-xs font-semibold text-muted-dark">Messages (7d)</span>
               <span className="text-xl font-bold text-text-dark">{data.activity.messages7d}</span>
             </div>
             <div className="flex flex-col items-center gap-1 p-3 bg-surface-2-dark border border-border-dark rounded-lg text-center">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-dark">Last Client Msg</span>
+              <span className="text-xs font-semibold text-muted-dark">Last Client Msg</span>
               <span className="text-sm font-bold text-text-dark">
                 {data.activity.lastClientMessage ? formatTimeAgo(data.activity.lastClientMessage.whenIso) : 'never'}
               </span>
             </div>
             <div className="flex flex-col items-center gap-1 p-3 bg-surface-2-dark border border-border-dark rounded-lg text-center">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-dark">My Last Reply</span>
+              <span className="text-xs font-semibold text-muted-dark">My Last Reply</span>
               <span className="text-sm font-bold text-text-dark">
                 {data.activity.myLastReply ? formatTimeAgo(data.activity.myLastReply.whenIso) : 'never'}
               </span>
@@ -254,7 +254,7 @@ export default function RightSidebar({
 
           {data.activity.lastClientMessage && (
             <div className="pt-2 border-t border-border-dark/50 space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-dark block">Last Client Message</span>
+              <span className="text-xs font-semibold text-muted-dark block">Last Client Message</span>
               <div className="p-3 bg-surface-2-dark border border-border-dark rounded-lg space-y-2">
                 <p className="text-sm text-text-dark italic">"{data.activity.lastClientMessage.quote}"</p>
                 <div className="flex flex-wrap gap-3 text-xs text-muted-dark">
@@ -267,7 +267,7 @@ export default function RightSidebar({
 
           {data.activity.myLastReply && (
             <div className="pt-2 border-t border-border-dark/50 space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-dark block">My Last Reply</span>
+              <span className="text-xs font-semibold text-muted-dark block">My Last Reply</span>
               <div className="p-3 bg-surface-2-dark border border-border-dark rounded-lg space-y-2">
                 <p className="text-sm text-text-dark italic">"{data.activity.myLastReply.quote}"</p>
                 <div className="flex flex-wrap gap-3 text-xs text-muted-dark">

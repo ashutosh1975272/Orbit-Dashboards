@@ -20,71 +20,73 @@ function formatTime(iso: string): string {
 
 export default function CentreContent({ centre }: CentreContentProps): React.ReactElement {
   return (
-    <div className="dash-centre-content flex flex-col gap-4">
-      {/* SUMMARY panel */}
-      <div className="dash-panel" style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-panel)', borderRadius: '14px', padding: '16px 20px' }}>
-        <span className="dash-panel-label" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700, color: 'var(--text-label)', display: 'block', marginBottom: '12px' }}>Summary</span>
+    <div className="centre-stack">
+      <section className="centre-section">
+        <h4 className="centre-label">Summary</h4>
         {centre.situationLine && (
-          <p style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text)', lineHeight: 1.4, marginBottom: '8px' }} data-testid="dash-situation">
+          <p className="centre-situation" data-testid="dash-situation">
             {centre.situationLine}
           </p>
         )}
         {centre.recentLine && (
-          <p style={{ fontSize: '14px', color: 'var(--text-soft)', marginBottom: '12px' }} data-testid="dash-recent-line">
-            <span style={{ color: 'var(--accent)', fontWeight: 700 }}>Just changed:</span> {centre.recentLine}
+          <p className="centre-recent" data-testid="dash-recent-line">
+            <span className="centre-recent-key">Just changed</span>
+            {centre.recentLine}
           </p>
         )}
         {centre.nextStep && (
-          <div style={{ marginTop: '4px', padding: '12px 16px', borderRadius: '10px', background: 'var(--accent)', color: 'var(--on-accent)', fontSize: '15px', fontWeight: 600 }} data-testid="dash-next-step">
-            <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '4px', opacity: 0.8 }}>Next Step</span>
-            {centre.nextStep}
+          <div className="centre-next" data-testid="dash-next-step">
+            <span className="centre-next-label">Next step</span>
+            <p className="centre-next-text">{centre.nextStep}</p>
           </div>
         )}
-      </div>
+      </section>
 
-      {/* HIGHLIGHTS panel */}
       {centre.highlights.length > 0 && (
-        <div className="dash-panel" style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-panel)', borderRadius: '14px', padding: '16px 20px' }}>
-          <span className="dash-panel-label" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700, color: 'var(--text-label)', display: 'block', marginBottom: '12px' }}>Highlights</span>
-          {centre.highlights.slice(0, 3).map((h, i) => (
-            <div key={i} style={{ padding: '8px 0', borderTop: i > 0 ? '1px solid var(--border-panel)' : 'none', display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '14px', color: 'var(--text)', flex: 1, minWidth: '200px' }}>{h.what}</span>
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                {h.who && `${h.who}`}{h.whenIso && ` · ${formatTime(h.whenIso)}`}
-              </span>
-            </div>
-          ))}
-        </div>
+        <section className="centre-section">
+          <h4 className="centre-label">Highlights</h4>
+          <ul className="centre-highlights">
+            {centre.highlights.slice(0, 3).map((h, i) => {
+              const meta = [h.who, h.whenIso ? formatTime(h.whenIso) : null].filter(Boolean).join(', ')
+              return (
+                <li key={i} className="centre-highlight">
+                  <span className="centre-highlight-what">{h.what}</span>
+                  {meta ? <span className="centre-highlight-meta">{meta}</span> : null}
+                </li>
+              )
+            })}
+          </ul>
+        </section>
       )}
 
-      {/* LAST CLIENT MESSAGE panel */}
-      <div className="dash-panel" style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-panel)', borderRadius: '14px', padding: '16px 20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-          <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700, color: 'var(--text-label)' }}>Last Client Message</span>
+      <section className="centre-section">
+        <div className="centre-section-head">
+          <h4 className="centre-label">Last client message</h4>
           {centre.needsReply && (
-            <span style={{ fontSize: '12px', fontWeight: 600, color: '#ff9a9a' }}>Needs my reply · {centre.urgency} urgency</span>
+            <span className="centre-reply">
+              <span className="centre-flag">Needs my reply</span>
+              <span className="centre-urgency">{centre.urgency} urgency</span>
+            </span>
           )}
         </div>
         {centre.lastClientMessage ? (
           <>
-            <p style={{ fontSize: '15px', color: 'var(--text)', lineHeight: 1.5, marginBottom: '8px' }}>
-              "{centre.lastClientMessage.quote}"
-            </p>
-            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-              {centre.lastClientMessage.who} · {formatTime(centre.lastClientMessage.whenIso)}
+            <p className="centre-quote">“{centre.lastClientMessage.quote}”</p>
+            <p className="centre-meta">
+              {centre.lastClientMessage.who}, {formatTime(centre.lastClientMessage.whenIso)}
             </p>
             {centre.openQuestions.length > 0 && (
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+              <ul className="centre-questions">
                 {centre.openQuestions.slice(0, 3).map((q, i) => (
-                  <li key={i} style={{ fontSize: '13px', color: '#f5c46b', marginBottom: '4px' }}>? {q}</li>
+                  <li key={i}>{q}</li>
                 ))}
               </ul>
             )}
           </>
         ) : (
-          <p style={{ fontSize: '14px', color: 'var(--text-muted)', fontStyle: 'italic' }}>No client message yet</p>
+          <p className="centre-empty">No client message yet</p>
         )}
-      </div>
+      </section>
     </div>
   )
 }

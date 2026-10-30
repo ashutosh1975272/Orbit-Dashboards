@@ -13,7 +13,8 @@ const USER_SCOPES = [
   'channels:history',
   'groups:read',
   'groups:history',
-  'team:read'
+  'team:read',
+  'chat:write'
 ].join(',')
 
 export interface OauthConfig {

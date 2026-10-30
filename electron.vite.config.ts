@@ -33,6 +33,9 @@ export default defineConfig({
     }
   },
   renderer: {
+    define: {
+      __ORBIT_DEMO__: JSON.stringify(process.env.ORBIT_DEMO_DATA ?? '')
+    },
     resolve: {
       alias: {
         '@renderer': resolve('src/renderer/src'),

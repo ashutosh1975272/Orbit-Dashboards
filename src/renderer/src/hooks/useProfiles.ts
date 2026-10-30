@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type {
+import {
   AppId,
   AppSessionStatus,
   Profile,
@@ -98,7 +98,10 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     set({ loading: true, error: null })
     try {
       const profiles = await window.api.profiles.list()
-      set({ profiles, loading: false })
+      const currentActive = get().activeProfileId
+      const hasCurrent = profiles.some((p) => p.id === currentActive)
+      const defaultActive = hasCurrent ? currentActive : (profiles[0]?.id ?? null)
+      set({ profiles, activeProfileId: defaultActive, loading: false })
       await get().loadWorkspacesForAll()
     } catch (err) {
       set({ loading: false, error: String(err) })

@@ -18,6 +18,8 @@ interface MonitorFile {
   manualTokenMeta?: Record<string, ManualTokenMeta>
   /** v2.2 — channelId → owning workspace id (enforces 1 workspace = 1 card). */
   channelOwners?: Record<string, string>
+  /** Client-projects page: user-owned Pinned order (newest pin last). */
+  pinnedOrder?: string[]
   syncIntervalSeconds?: number
   updatedAt?: string
 }
@@ -28,9 +30,13 @@ interface EncryptedVault {
   decrypt(b64: string): string
 }
 
+/** A raw Slack token an older build left on disk before saves were blocked. */
+const PLAINTEXT_TOKEN_RE = /^xox[a-zA-Z]-[A-Za-z0-9-]+$/
+
 let vault: EncryptedVault | null = null
 
-async function getVault(): Promise<EncryptedVault> {
+async function getVaultOverride(override: EncryptedVault | null): Promise<EncryptedVault> {
+  if (override) return override
   if (!vault) {
     const { safeStorage } = (await import('electron')) as typeof import('electron')
     vault = {
@@ -46,13 +52,20 @@ export class MonitorStore {
   private readonly filePath: string
   private encryptionAvailable: boolean
 
-  constructor(options: { rootDir: string; encryptionAvailable: boolean }) {
+  private vaultOverride: EncryptedVault | null
+  constructor(options: { rootDir: string; encryptionAvailable: boolean; vault?: EncryptedVault }) {
     this.filePath = join(options.rootDir, 'monitors.json')
     this.encryptionAvailable = options.encryptionAvailable
+    this.vaultOverride = options.vault ?? null
   }
 
   async listProjects(): Promise<DashboardProject[]> {
-    return (await this.read()).projects
+    const data = await this.read()
+    return data.projects.map((p) => ({
+      ...p,
+      sources: Array.isArray(p.sources) ? p.sources : [],
+      sourcePreference: p.sourcePreference ?? 'token_first'
+    }))
   }
 
   async upsertProject(input: {
@@ -77,31 +90,44 @@ export class MonitorStore {
       incoming.teamId && incoming.teamId !== 'manual'
         ? incoming.teamId
         : (meta?.teamId ?? incoming.teamId)
+
+    // Check if project has valid sources configured (e.g. browser source)
+    const hasSources = Array.isArray(incoming.sources) && incoming.sources.length > 0
+    const primarySource = hasSources ? incoming.sources![0] : undefined
+    const effectiveTeamId = teamId || primarySource?.workspaceId
+    const effectiveTeamName = teamName || primarySource?.workspaceName
+
     // v2.3 — hard rule: a card without a real workspace is never stored.
     // Without it every workspace would share one message bucket.
-    if (!teamId || teamId === 'manual') {
+    if (!effectiveTeamId || effectiveTeamId === 'manual') {
       throw new Error(
         'Workspace unknown — reconnect the connector so the card can be bound to one workspace.'
       )
     }
-    if (existing?.teamName && teamName && existing.teamName !== teamName) {
+    if (existing?.teamName && effectiveTeamName && existing.teamName !== effectiveTeamName && !hasSources) {
       throw new Error(
         `“${existing.name}” belongs to workspace ${existing.teamName}. A card can only watch one workspace — create a separate card instead.`
       )
     }
 
-    // v2.2 — reject channels owned by a different workspace.
+    // v2.2 — reject channels owned by a different workspace (token monitors).
     const owners = data.channelOwners ?? {}
-    for (const monitor of incoming.monitors) {
+    for (const monitor of incoming.monitors ?? []) {
       const owner = owners[monitor.channelId]
-      if (owner && teamId && owner !== teamId) {
+      if (owner && effectiveTeamId && owner !== effectiveTeamId) {
         throw new Error(
           `Channel #${monitor.channelName} belongs to another workspace. One card = one workspace — pick channels from a single workspace.`
         )
       }
     }
 
-    const stamped = { ...incoming, teamName, teamId } as typeof incoming
+    const stamped = {
+      ...incoming,
+      teamName: effectiveTeamName,
+      teamId: effectiveTeamId,
+      sources: Array.isArray(incoming.sources) ? incoming.sources : (existing?.sources ?? []),
+      sourcePreference: incoming.sourcePreference ?? existing?.sourcePreference ?? 'token_first'
+    } as typeof incoming
     if ('id' in stamped && stamped.id) {
       const incomingId = stamped.id
       const found = data.projects.find((p) => p.id === incomingId)
@@ -133,37 +159,66 @@ export class MonitorStore {
   async deleteProject(projectId: string): Promise<void> {
     const data = await this.read()
     data.projects = data.projects.filter((p) => p.id !== projectId)
+    data.pinnedOrder = (data.pinnedOrder ?? []).filter((id) => id !== projectId)
     await this.write(data)
   }
 
-  /** os-encrypted when safeStorage available (encrypt b64) else plaintext JSON. */
+  /** Pinned order survives restarts; unknown/deleted ids are ignored on read. */
+  async readPinnedOrder(): Promise<string[]> {
+    const data = await this.read()
+    const projectIds = new Set(data.projects.map((project) => project.id))
+    return [...new Set(data.pinnedOrder ?? [])].filter((id) => projectIds.has(id))
+  }
+
+  async setPinnedOrder(order: string[]): Promise<string[]> {
+    const data = await this.read()
+    const projectIds = new Set(data.projects.map((project) => project.id))
+    const cleaned = [...new Set(order)].filter((id) => projectIds.has(id))
+    data.pinnedOrder = cleaned
+    await this.write(data)
+    return cleaned
+  }
+
+  /**
+   * Manual tokens are written encrypted or not at all. Without OS encryption the
+   * whole save fails — the metadata is not left behind either, so a rejected
+   * token never half-registers in the UI.
+   */
   async saveManualToken(
     key: string,
     token: string,
     meta?: ManualTokenMeta
   ): Promise<{ plaintext: boolean }> {
-    if (meta) {
-      const data = await this.read()
-      data.manualTokenMeta = { ...(data.manualTokenMeta ?? {}), [key]: meta }
-      await this.write(data)
-    }
     if (!this.encryptionAvailable) {
-      return { plaintext: await this.savePlain(key, token) }
+      throw new Error('OS encryption unavailable')
     }
     const data = await this.read()
+    if (meta) data.manualTokenMeta = { ...(data.manualTokenMeta ?? {}), [key]: meta }
     data.manualTokens = {
       ...data.manualTokens,
-      [key]: (await getVault()).encrypt(token)
+      [key]: (await getVaultOverride(this.vaultOverride)).encrypt(token)
     }
     await this.write(data)
     return { plaintext: false }
   }
 
-  private async savePlain(key: string, token: string): Promise<boolean> {
+  /**
+   * A build before the save path blocked it could leave a Slack token on disk as
+   * plaintext. Once the OS vault is available, seal those entries and re-save.
+   * Returns how many secrets were rewritten; 0 when there was nothing to do.
+   */
+  async migrateLegacyPlaintext(): Promise<number> {
+    if (!this.encryptionAvailable) return 0
+    const vault = await getVaultOverride(this.vaultOverride)
     const data = await this.read()
-    data.manualTokens = { ...data.manualTokens, [key]: token }
-    await this.write(data)
-    return true
+    let moved = 0
+    for (const [key, raw] of Object.entries(data.manualTokens)) {
+      if (!PLAINTEXT_TOKEN_RE.test(raw.trim())) continue
+      data.manualTokens[key] = vault.encrypt(raw.trim())
+      moved += 1
+    }
+    if (moved > 0) await this.write(data)
+    return moved
   }
 
   async getManualToken(key: string): Promise<string | null> {
@@ -171,7 +226,7 @@ export class MonitorStore {
     if (raw === null) return null
     if (!this.encryptionAvailable) return raw
     try {
-      return (await getVault()).decrypt(raw.replace(/[\r\n]/g, ''))
+      return (await getVaultOverride(this.vaultOverride)).decrypt(raw.replace(/[\r\n]/g, ''))
     } catch {
       // legacy plaintext entry written by the fallback path
       return raw.split('\u0000').join('')
