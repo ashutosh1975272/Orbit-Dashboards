@@ -73,7 +73,7 @@ export interface CustomLink {
 
 export const GLOBAL_PROFILE_ID = 'global-account-profile'
 
-export type ProfileScope = 'global' | 'individual'
+export type ProfileScope = 'global' | 'individual' | 'observer'
 
 export interface Profile {
   id: string

@@ -5,6 +5,7 @@ import ProjectPinButton from './ProjectPinButton'
 
 interface CompactCardProps {
   summary: CardSummary
+  profileName?: string | null
   onToggle: () => void
   onExpandSection?: (section: number) => void
   onSync: (id: string) => void
@@ -88,6 +89,7 @@ function isInteractive(target: EventTarget | null): boolean {
  *  hidden or rendered as an em dash — never as a fabricated zero. */
 export default function CompactCard({
   summary,
+  profileName,
   onToggle,
   onExpandSection,
   onSync,
@@ -198,6 +200,27 @@ export default function CompactCard({
               <span className="proj-row-ws" title={workspaceName}>
                 {workspaceName}
               </span>
+              {profileName ? (
+                <span
+                  className="proj-row-profile-tag"
+                  title={`Belongs to individual profile: ${profileName}`}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 3,
+                    fontSize: '10.5px',
+                    padding: '1px 6px',
+                    borderRadius: '4px',
+                    background: 'rgba(56, 189, 248, 0.12)',
+                    color: '#38bdf8',
+                    border: '1px solid rgba(56, 189, 248, 0.25)',
+                    fontWeight: 600,
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  👤 {profileName}
+                </span>
+              ) : null}
               {clientName && clientName !== workspaceName ? (
                 <span className="proj-row-client" title={clientName}>
                   {clientName}

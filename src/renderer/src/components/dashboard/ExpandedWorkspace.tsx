@@ -21,6 +21,7 @@ interface ExpandedWorkspaceProps {
   summary: CardSummary
   project: DashboardProject
   snapshot: DashboardProjectSnapshot
+  profileName?: string | null
   syncing: boolean
   onSync: () => void
   onScrape?: () => void
@@ -53,6 +54,7 @@ export default function ExpandedWorkspace({
   summary,
   project,
   snapshot,
+  profileName,
   syncing,
   onSync,
   onScrape,
@@ -182,6 +184,7 @@ export default function ExpandedWorkspace({
         name={identity.name}
         workspaceName={identity.teamName}
         clientName={identity.clientName}
+        profileName={profileName}
         aiBadge={view.aiBadge}
         flags={headFlags}
         syncing={syncing}

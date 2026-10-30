@@ -161,9 +161,13 @@ export default function DashboardWizard({
   const profiles = useProfileStore((s) => s.profiles)
   const workspaceOptions = useMemo<ProfileWorkspaceOption[]>(() => {
     const list: ProfileWorkspaceOption[] = []
-    // Workspaces for projects must come from individual separate profiles, NOT Global Account
+    // Workspaces for projects must come from individual separate profiles, NOT Global Account or Observer
     const individualProfiles = profiles.filter(
-      (p) => p.id !== GLOBAL_PROFILE_ID && !p.isGlobalProfile && p.accountScope !== 'global'
+      (p) =>
+        p.id !== GLOBAL_PROFILE_ID &&
+        !p.isGlobalProfile &&
+        p.accountScope !== 'global' &&
+        p.accountScope !== 'observer'
     )
     for (const p of individualProfiles) {
       for (const w of p.apps.slack.availableWorkspaces) {

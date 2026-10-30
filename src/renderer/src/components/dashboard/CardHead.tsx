@@ -16,6 +16,7 @@ interface CardHeadProps {
   name: string
   workspaceName: string
   clientName: string
+  profileName?: string | null
   aiBadge?: string
   flags?: CardHeadFlag[]
   viewMode?: CardViewMode
@@ -48,6 +49,7 @@ export default function CardHead({
   name,
   workspaceName,
   clientName,
+  profileName,
   aiBadge,
   flags,
   viewMode: _viewMode = 'insights',
@@ -95,6 +97,27 @@ export default function CardHead({
         </div>
         <div className="ws-head-meta">
           <span className="ws-head-ws">{workspaceName}</span>
+          {profileName ? (
+            <span
+              className="ws-head-profile-tag"
+              title={`Belongs to individual profile: ${profileName}`}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                fontSize: 11,
+                padding: '1px 7px',
+                borderRadius: 4,
+                background: 'rgba(56, 189, 248, 0.12)',
+                color: '#38bdf8',
+                border: '1px solid rgba(56, 189, 248, 0.25)',
+                fontWeight: 600,
+                whiteSpace: 'nowrap'
+              }}
+            >
+              👤 {profileName}
+            </span>
+          ) : null}
           {clientName && clientName !== workspaceName ? (
             <span className="ws-head-client">{clientName}</span>
           ) : null}

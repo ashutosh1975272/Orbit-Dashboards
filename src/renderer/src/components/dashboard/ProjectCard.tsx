@@ -90,12 +90,18 @@ function ProjectCardInner({
 
   const view = useMemo(() => buildCardView(snapshot, index), [snapshot, index])
   const summary = useMemo(() => buildCardSummary(snapshot, index), [snapshot, index])
+  const profiles = useProfileStore((s) => s.profiles)
+  const profileName = useMemo(() => {
+    const p = profiles.find((prof) => prof.id === project.profileId)
+    return p?.customName || p?.displayName || null
+  }, [profiles, project.profileId])
 
   if (!expanded) {
     return (
       <>
         <CompactCard
           summary={summary}
+          profileName={profileName}
           onToggle={onToggle}
           onExpandSection={onExpandSection}
           onSync={(id) => void syncNow(id)}
@@ -129,6 +135,7 @@ function ProjectCardInner({
         summary={summary}
         project={project}
         snapshot={snapshot}
+        profileName={profileName}
         syncing={syncing}
         onSync={() => void syncNow(project.id)}
         onScrape={() => void handleScrape()}
