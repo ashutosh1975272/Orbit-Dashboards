@@ -69,6 +69,7 @@ export default function CardHead({
 }: CardHeadProps): React.ReactElement {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const [lineVisible, setLineVisible] = useState(true)
   const [scrapeEvent, setScrapeEvent] = useState<{
     channelName?: string
     scrollIndex?: number
@@ -77,6 +78,23 @@ export default function CardHead({
     text?: string
     status?: 'reading' | 'idle' | 'finished'
   }>({ status: 'idle' })
+
+  // Check global setting for scraping line visibility
+  useEffect(() => {
+    void window.api?.app?.getSettings?.().then((settings) => {
+      if (typeof settings?.showScrapeProgressLine === 'boolean') {
+        setLineVisible(settings.showScrapeProgressLine)
+      }
+    })
+    const unsub = window.api?.app?.onSettingsChanged?.((settings) => {
+      if (typeof settings?.showScrapeProgressLine === 'boolean') {
+        setLineVisible(settings.showScrapeProgressLine)
+      }
+    })
+    return () => {
+      unsub?.()
+    }
+  }, [])
 
   useEffect(() => {
     if (!window.api?.dashboard?.onScrapeEvent) return undefined
@@ -277,57 +295,92 @@ export default function CardHead({
         </div>
       </div>
       {(scraping || scrapeEvent.status === 'reading') && (
-        <div
-          data-testid="in-card-scrape-bar"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '6px 12px',
-            background: 'linear-gradient(90deg, rgba(34, 197, 94, 0.12), rgba(99, 102, 241, 0.12))',
-            borderTop: '1px solid rgba(34, 197, 94, 0.25)',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-            fontSize: 12,
-            color: '#e2e8f0',
-            width: '100%',
-            boxSizing: 'border-box'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
-            <span
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                background: '#22c55e',
-                boxShadow: '0 0 8px #22c55e',
-                flexShrink: 0,
-                animation: 'pulse 1.5s infinite ease-in-out'
-              }}
-            />
-            <span style={{ fontWeight: 600, color: '#4ade80' }}>Reader Scraper:</span>
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {scrapeEvent.channelName ? `Reading #${scrapeEvent.channelName}` : 'Starting reader...'}
-              {scrapeEvent.scrollIndex && scrapeEvent.maxScroll
-                ? ` (${scrapeEvent.scrollIndex}/${scrapeEvent.maxScroll})`
-                : ''}
-              {scrapeEvent.messageCount !== undefined
-                ? ` · ${scrapeEvent.messageCount} msgs found (last 1h)`
-                : ''}
-            </span>
+        lineVisible ? (
+          <div
+            data-testid="in-card-scrape-bar"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '6px 12px',
+              background: 'linear-gradient(90deg, rgba(34, 197, 94, 0.12), rgba(99, 102, 241, 0.12))',
+              borderTop: '1px solid rgba(34, 197, 94, 0.25)',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+              fontSize: 12,
+              color: '#e2e8f0',
+              width: '100%',
+              boxSizing: 'border-box'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  background: '#22c55e',
+                  boxShadow: '0 0 8px #22c55e',
+                  flexShrink: 0,
+                  animation: 'pulse 1.5s infinite ease-in-out'
+                }}
+              />
+              <span style={{ fontWeight: 600, color: '#4ade80' }}>Reader Scraper:</span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {scrapeEvent.channelName ? `Reading #${scrapeEvent.channelName}` : 'Starting reader...'}
+                {scrapeEvent.scrollIndex && scrapeEvent.maxScroll
+                  ? ` (${scrapeEvent.scrollIndex}/${scrapeEvent.maxScroll})`
+                  : ''}
+                {scrapeEvent.messageCount !== undefined
+                  ? ` · ${scrapeEvent.messageCount} msgs found (last 1h)`
+                  : ''}
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+              <span style={{ fontSize: 11, color: '#94a3b8' }}>Scraping public, private & DMs</span>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                style={{ padding: '2px 8px', fontSize: 11, height: 22, color: '#94a3b8' }}
+                onClick={() => setLineVisible(false)}
+                title="Hide scraping progress line"
+              >
+                Hide Line
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                style={{ padding: '2px 8px', fontSize: 11, height: 22, color: '#f87171' }}
+                onClick={() => setScrapeEvent({ status: 'idle' })}
+                title="Dismiss status"
+              >
+                Dismiss
+              </button>
+            </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-            <span style={{ fontSize: 11, color: '#94a3b8' }}>Scraping public, private & DMs</span>
+        ) : (
+          <div
+            style={{
+              padding: '3px 12px',
+              background: 'rgba(34, 197, 94, 0.08)',
+              borderTop: '1px solid rgba(34, 197, 94, 0.2)',
+              fontSize: 11,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              color: '#4ade80'
+            }}
+          >
+            <span>Scraping running in background...</span>
             <button
               type="button"
               className="btn btn-ghost btn-sm"
-              style={{ padding: '2px 8px', fontSize: 11, height: 22, color: '#f87171' }}
-              onClick={() => setScrapeEvent({ status: 'idle' })}
+              style={{ padding: '1px 6px', fontSize: 10, height: 20, color: '#4ade80' }}
+              onClick={() => setLineVisible(true)}
             >
-              Dismiss
+              Show Line
             </button>
           </div>
-        </div>
+        )
       )}
     </header>
   )

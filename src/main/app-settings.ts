@@ -79,6 +79,10 @@ export function normalizeAppSettings(parsed: Partial<AppSettings>): AppSettings 
       typeof parsed.showRecentSection === 'boolean'
         ? parsed.showRecentSection
         : DEFAULT_APP_SETTINGS.showRecentSection,
+    showScrapeProgressLine:
+      typeof parsed.showScrapeProgressLine === 'boolean'
+        ? parsed.showScrapeProgressLine
+        : DEFAULT_APP_SETTINGS.showScrapeProgressLine ?? true,
     sidebarButtons:
       parsed.sidebarButtons && typeof parsed.sidebarButtons === 'object'
         ? {

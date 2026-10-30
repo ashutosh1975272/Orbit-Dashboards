@@ -235,6 +235,7 @@ export interface AppSettings {
     observer: boolean
     profilesHub: boolean
   }
+  showScrapeProgressLine?: boolean
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -251,6 +252,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   sidebarLook: 'ancient',
   showLookSwitcher: true,
   showRecentSection: true,
+  showScrapeProgressLine: true,
   sidebarButtons: {
     addWebsite: true,
     newProject: true,

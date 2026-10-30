@@ -374,6 +374,20 @@ export function UnifiedSettingsModal({
                       onChange={(e) => onChangeSettings({ splitViewEnabled: e.target.checked })}
                     />
                   </label>
+
+                  <label className="settings-row">
+                    <span>
+                      Show scraping progress line in cards
+                      <span style={{ display: 'block', fontSize: '11px', color: '#64748b' }}>
+                        Displays real-time channel &amp; message reader progress above embedded workspace views
+                      </span>
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={settings.showScrapeProgressLine ?? true}
+                      onChange={(e) => onChangeSettings({ showScrapeProgressLine: e.target.checked })}
+                    />
+                  </label>
                 </div>
               </div>
             )}
