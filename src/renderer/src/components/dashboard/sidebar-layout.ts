@@ -69,11 +69,12 @@ export const SIDEBAR_REGISTRY: SidebarSection[] = [
   },
   {
     key: 'slack',
-    label: 'Slack',
+    label: 'Accounts',
     icon: 'slack',
     items: [
-      { id: 's:client', label: 'Client Slack', icon: 'slack', status: 'ready' },
-      { id: 's:team', label: 'Our Slack', icon: 'users', status: 'ready' },
+      { id: 's:global', label: 'Global Accounts', icon: 'globe', status: 'ready' },
+      { id: 's:team', label: 'My Accounts', icon: 'users', status: 'ready' },
+      { id: 's:client', label: 'Client Accounts', icon: 'slack', status: 'ready' },
       { id: 'c:upwork', label: 'Upwork', icon: 'upwork', status: 'soon' },
       { id: 'c:teams', label: 'Microsoft Teams', icon: 'teams', status: 'soon' },
       { id: 'c:whatsapp', label: 'WhatsApp', icon: 'whatsapp', status: 'soon' },

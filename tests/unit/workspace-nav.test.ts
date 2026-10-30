@@ -32,7 +32,7 @@ describe('nav model shape (v6)', () => {
     expect(NAV_SECTIONS.map((s) => s.key)).toEqual(['xomni', 'slack', 'info', 'viz'])
     expect(NAV_SECTIONS.map((s) => s.label)).toEqual([
       'Xomni',
-      'Slack',
+      'Accounts',
       'Project info',
       'Visualizations'
     ])
@@ -49,8 +49,8 @@ describe('nav model shape (v6)', () => {
       'discord'
     ])
     expect(NAV_CONNECTORS.map((c) => c.label)).toEqual([
-      'Our Slack',
-      'Client Slack',
+      'My Accounts',
+      'Client Accounts',
       'Upwork',
       'Microsoft Teams',
       'WhatsApp',

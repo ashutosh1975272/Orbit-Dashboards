@@ -76,7 +76,7 @@ describe('WorkspaceSidebar layout mode reactivity', () => {
 
     expect(screen.getAllByText('Dashboard').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Xomni').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Slack').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Accounts').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Project info').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Visualizations').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Settings').length).toBeGreaterThan(0)

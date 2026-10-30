@@ -50,8 +50,8 @@ export default function CardHead({
   clientName,
   aiBadge,
   flags,
-  viewMode = 'insights',
-  onViewModeChange,
+  viewMode: _viewMode = 'insights',
+  onViewModeChange: _onViewModeChange,
   syncing,
   onSync,
   onScrape,
@@ -109,52 +109,6 @@ export default function CardHead({
       </div>
 
       <div className="ws-head-actions">
-        {/* DUAL VIEW MODE SWITCHER */}
-        {onViewModeChange && (
-          <div
-            style={{
-              display: 'inline-flex',
-              padding: 2,
-              borderRadius: 6,
-              background: 'rgba(255, 255, 255, 0.06)',
-              border: '1px solid var(--border)'
-            }}
-          >
-            <button
-              type="button"
-              className={`btn btn-ghost${viewMode === 'insights' ? ' is-active' : ''}`}
-              style={{
-                fontSize: 12,
-                padding: '3px 8px',
-                borderRadius: 4,
-                background: viewMode === 'insights' ? 'var(--accent-btn)' : 'transparent',
-                color: viewMode === 'insights' ? '#fff' : 'var(--text-muted)',
-                fontWeight: viewMode === 'insights' ? 600 : 400
-              }}
-              onClick={() => onViewModeChange('insights')}
-              title="Extracted data, situation cards, action items, and charts"
-            >
-              📊 Data &amp; Insights
-            </button>
-            <button
-              type="button"
-              className={`btn btn-ghost${viewMode === 'live' ? ' is-active' : ''}`}
-              style={{
-                fontSize: 12,
-                padding: '3px 8px',
-                borderRadius: 4,
-                background: viewMode === 'live' ? 'var(--accent-btn)' : 'transparent',
-                color: viewMode === 'live' ? '#fff' : 'var(--text-muted)',
-                fontWeight: viewMode === 'live' ? 600 : 400
-              }}
-              onClick={() => onViewModeChange('live')}
-              title="Direct live Slack tab inside this workspace card"
-            >
-              💻 Live Slack Tab
-            </button>
-          </div>
-        )}
-
         {onTogglePin ? (
           <ProjectPinButton
             pinned={pinned}

@@ -85,19 +85,19 @@ export interface NavConnector {
 export const NAV_CONNECTORS: NavConnector[] = [
   {
     key: 'team',
-    label: 'Our Slack',
+    label: 'My Accounts',
     icon: 'users',
     wired: true,
     allId: 's:team',
-    note: 'Our own Slack workspace is connected once for all cards, from Global settings. The channels mapped to this project appear here.'
+    note: 'Our own team workspace and internal accounts mapped to this project appear here.'
   },
   {
     key: 'client',
-    label: 'Client Slack',
+    label: 'Client Accounts',
     icon: 'slack',
     wired: true,
     allId: 's:client',
-    note: 'This project’s client Slack workspace has no channels to list yet.'
+    note: 'This project’s client communication accounts and channels appear here.'
   },
   {
     key: 'upwork',
@@ -241,7 +241,7 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     key: 'slack',
-    label: 'Slack',
+    label: 'Accounts',
     icon: 'inbox',
     rows: [
       {

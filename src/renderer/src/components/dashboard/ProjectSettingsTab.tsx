@@ -788,7 +788,7 @@ export default function ProjectSettingsTab({
                         checked={!layout.custom.hiddenItems?.['slack']?.includes('global_accounts')}
                         onChange={() => handleToggleSubItem('slack', 'global_accounts')}
                       />
-                      <span><b>Global Accounts</b> (workspaces signed-in across all profiles)</span>
+                      <span><b>Global Accounts</b> (workspaces &amp; links signed-in across all profiles)</span>
                     </label>
 
                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
@@ -797,7 +797,7 @@ export default function ProjectSettingsTab({
                         checked={!layout.custom.hiddenItems?.['slack']?.includes('our_slack')}
                         onChange={() => handleToggleSubItem('slack', 'our_slack')}
                       />
-                      <span><b>Our Slack</b> (internal team channels)</span>
+                      <span><b>My Accounts</b> (internal team channels &amp; accounts)</span>
                     </label>
 
                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
@@ -806,7 +806,7 @@ export default function ProjectSettingsTab({
                         checked={!layout.custom.hiddenItems?.['slack']?.includes('client_slack')}
                         onChange={() => handleToggleSubItem('slack', 'client_slack')}
                       />
-                      <span><b>Client Slack</b> (client communication channels)</span>
+                      <span><b>Client Accounts</b> (client communication channels &amp; accounts)</span>
                     </label>
 
                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
@@ -815,7 +815,7 @@ export default function ProjectSettingsTab({
                         checked={!layout.custom.hiddenItems?.['slack']?.includes('other_platforms')}
                         onChange={() => handleToggleSubItem('slack', 'other_platforms')}
                       />
-                      <span><b>Other Connectors</b> (Discord, Teams, WhatsApp, Upwork, Google Chat)</span>
+                      <span><b>Other Platforms &amp; Connectors</b> (Upwork, Discord, Teams, WhatsApp, Google Chat)</span>
                     </label>
                   </div>
                 </div>

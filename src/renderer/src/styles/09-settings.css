@@ -194,7 +194,7 @@
 /* Expanded workspace header */
 .ws-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px 16px;
   flex-wrap: wrap;
@@ -205,8 +205,8 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
-  flex: 1 1 0;
-  min-width: 0;
+  flex: 1 1 240px;
+  min-width: 200px;
 }
 
 .ws-head-title {
@@ -223,7 +223,9 @@
   font-weight: 650;
   line-height: 1.25;
   color: var(--text);
-  overflow-wrap: break-word;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   min-width: 0;
 }
 
@@ -302,8 +304,9 @@
 .ws-head-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   margin-left: auto;
 }
 

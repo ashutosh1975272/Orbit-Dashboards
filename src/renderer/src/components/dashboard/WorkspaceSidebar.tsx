@@ -156,7 +156,7 @@ function Row({
 
 export default function WorkspaceSidebar({
   projectId = '',
-  projectProfileId,
+  projectProfileId: _projectProfileId,
   view,
   nav,
   channels,
@@ -175,18 +175,28 @@ export default function WorkspaceSidebar({
   const profiles = useProfileStore((s) => s.profiles)
   const [globalAccountsOpen, setGlobalAccountsOpen] = useState(true)
 
-  // Collect all globally available workspaces across profiles
-  const globalSlackWorkspaces = useMemo(() => {
-    return profiles.flatMap((p) =>
-      p.apps.slack.availableWorkspaces.map((w) => ({
+  // Collect all globally available workspaces and links grouped across profiles
+  const globalProfileGroups = useMemo(() => {
+    return profiles.map((p) => {
+      const pName = p.customName || p.displayName
+      const slackWorkspaces = p.apps?.slack?.availableWorkspaces ?? []
+      const customLinks = p.customLinks ?? []
+      return {
         profileId: p.id,
-        profileName: p.customName || p.displayName,
-        teamId: w.teamId,
-        teamName: w.teamName,
-        isProjectProfile: projectProfileId ? p.id === projectProfileId : false
-      }))
+        profileName: pName,
+        slackWorkspaces,
+        customLinks,
+        hasItems: slackWorkspaces.length > 0 || customLinks.length > 0
+      }
+    }).filter((g) => g.hasItems)
+  }, [profiles])
+
+  const totalGlobalItemsCount = useMemo(() => {
+    return globalProfileGroups.reduce(
+      (sum, g) => sum + g.slackWorkspaces.length + g.customLinks.length,
+      0
     )
-  }, [profiles, projectProfileId])
+  }, [globalProfileGroups])
 
   const activeSections = useMemo(() => {
     if (layout.mode === 'minimal') {
@@ -359,47 +369,99 @@ export default function WorkspaceSidebar({
                         type="button"
                         className={`ws-nav-groupbtn ws-nav-connector${globalAccountsOpen ? ' is-open' : ''}`}
                         aria-expanded={globalAccountsOpen}
-                        title="Workspaces available globally across all profiles in Cosmic"
+                        title="Workspaces and links available across all profiles"
                         onClick={() => setGlobalAccountsOpen((prev) => !prev)}
                       >
                         <span className="ws-nav-icon">
                           <NavIcon name="globe" />
                         </span>
                         <span className="ws-nav-label" style={{ fontWeight: 600 }}>Global Accounts</span>
-                        {globalSlackWorkspaces.length > 0 && (
-                          <span className="ws-nav-count">{globalSlackWorkspaces.length}</span>
+                        {totalGlobalItemsCount > 0 && (
+                          <span className="ws-nav-count">{totalGlobalItemsCount}</span>
                         )}
                         <Chevron open={globalAccountsOpen} />
                       </button>
                       {globalAccountsOpen && (
                         <>
-                          {globalSlackWorkspaces.length === 0 ? (
-                            <p className="ws-nav-note">No global Slack workspaces signed in.</p>
+                          {globalProfileGroups.length === 0 ? (
+                            <p className="ws-nav-note">No global accounts or workspaces configured.</p>
                           ) : (
-                            globalSlackWorkspaces.map((gw) => (
-                              <button
-                                key={`${gw.profileId}:${gw.teamId}`}
-                                type="button"
-                                className="ws-nav-subitem"
-                                title={`Open ${gw.teamName} (${gw.profileName}) in live workspace view`}
-                                onClick={() => {
-                                  useDashboardStore.getState().closeDashboard()
-                                  void useProfileStore.getState().openWorkspace(gw.profileId, 'slack', gw.teamId, {
-                                    x: 320,
-                                    y: 40,
-                                    width: window.innerWidth - 320,
-                                    height: window.innerHeight - 40
-                                  })
-                                }}
-                                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 12px 5px 28px' }}
-                              >
-                                <span className="ws-nav-label" style={{ fontSize: 12 }}>
-                                  🏢 {gw.teamName}
-                                </span>
-                                <span className="ws-nav-tag" style={{ fontSize: 10, opacity: 0.7 }}>
-                                  {gw.profileName}
-                                </span>
-                              </button>
+                            globalProfileGroups.map((group) => (
+                              <div key={group.profileId} style={{ marginBottom: 4 }}>
+                                <div
+                                  style={{
+                                    fontSize: 10.5,
+                                    fontWeight: 700,
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.04em',
+                                    color: 'var(--text-faint, #64748b)',
+                                    padding: '4px 12px 2px 24px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 6
+                                  }}
+                                >
+                                  <span>👤 {group.profileName}</span>
+                                </div>
+                                {group.slackWorkspaces.map((gw) => (
+                                  <button
+                                    key={`${group.profileId}:${gw.teamId}`}
+                                    type="button"
+                                    className="ws-nav-subitem"
+                                    title={`Open ${gw.teamName} (${group.profileName}) in live workspace view`}
+                                    onClick={() => {
+                                      useDashboardStore.getState().closeDashboard()
+                                      void useProfileStore.getState().openWorkspace(group.profileId, 'slack', gw.teamId, {
+                                        x: 320,
+                                        y: 40,
+                                        width: window.innerWidth - 320,
+                                        height: window.innerHeight - 40
+                                      })
+                                    }}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      padding: '4px 12px 4px 28px',
+                                      width: '100%',
+                                      textAlign: 'left'
+                                    }}
+                                  >
+                                    <span className="ws-nav-label" style={{ fontSize: 12 }}>
+                                      🏢 {gw.teamName}
+                                    </span>
+                                    <span className="ws-nav-tag" style={{ fontSize: 10, opacity: 0.7 }}>
+                                      Slack
+                                    </span>
+                                  </button>
+                                ))}
+                                {group.customLinks.map((link) => (
+                                  <button
+                                    key={link.id}
+                                    type="button"
+                                    className="ws-nav-subitem"
+                                    title={`Open ${link.name}: ${link.url}`}
+                                    onClick={() => {
+                                      window.open(link.url, '_blank')
+                                    }}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      padding: '4px 12px 4px 28px',
+                                      width: '100%',
+                                      textAlign: 'left'
+                                    }}
+                                  >
+                                    <span className="ws-nav-label" style={{ fontSize: 12 }}>
+                                      🔗 {link.name}
+                                    </span>
+                                    <span className="ws-nav-tag" style={{ fontSize: 10, opacity: 0.7 }}>
+                                      Link
+                                    </span>
+                                  </button>
+                                ))}
+                              </div>
                             ))
                           )}
                         </>
