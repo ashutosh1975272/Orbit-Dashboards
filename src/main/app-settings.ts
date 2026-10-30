@@ -83,6 +83,10 @@ export function normalizeAppSettings(parsed: Partial<AppSettings>): AppSettings 
       typeof parsed.showScrapeProgressLine === 'boolean'
         ? parsed.showScrapeProgressLine
         : DEFAULT_APP_SETTINGS.showScrapeProgressLine ?? true,
+    showGoogleEmailInputInSidebar:
+      typeof parsed.showGoogleEmailInputInSidebar === 'boolean'
+        ? parsed.showGoogleEmailInputInSidebar
+        : DEFAULT_APP_SETTINGS.showGoogleEmailInputInSidebar ?? true,
     sidebarButtons:
       parsed.sidebarButtons && typeof parsed.sidebarButtons === 'object'
         ? {

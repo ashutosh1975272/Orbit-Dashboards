@@ -482,6 +482,22 @@ export function UnifiedSettingsModal({
                           }
                         />
                       </label>
+
+                      <label className="settings-row">
+                        <span>
+                          Show Google Email Sign-In in Sidebar
+                          <span style={{ display: 'block', fontSize: '11px', color: '#64748b' }}>
+                            Display Google email input and Continue with Google button in the left sidebar
+                          </span>
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={settings.showGoogleEmailInputInSidebar ?? true}
+                          onChange={(e) =>
+                            onChangeSettings({ showGoogleEmailInputInSidebar: e.target.checked })
+                          }
+                        />
+                      </label>
                     </div>
                   </div>
 

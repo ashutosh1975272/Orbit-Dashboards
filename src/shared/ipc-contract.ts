@@ -236,6 +236,7 @@ export interface AppSettings {
     profilesHub: boolean
   }
   showScrapeProgressLine?: boolean
+  showGoogleEmailInputInSidebar?: boolean
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -253,6 +254,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   showLookSwitcher: true,
   showRecentSection: true,
   showScrapeProgressLine: true,
+  showGoogleEmailInputInSidebar: true,
   sidebarButtons: {
     addWebsite: true,
     newProject: true,

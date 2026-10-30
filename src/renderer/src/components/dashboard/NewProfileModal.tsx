@@ -7,15 +7,23 @@ interface NewProfileModalProps {
   open: boolean
   onClose: () => void
   onCreate: (name: string, email: string, mode: ProfileCreationMode) => Promise<void>
+  initialEmail?: string
 }
 
-export function NewProfileModal({ open, onClose, onCreate }: NewProfileModalProps): React.JSX.Element | null {
+export function NewProfileModal({ open, onClose, onCreate, initialEmail }: NewProfileModalProps): React.JSX.Element | null {
   const profiles = useProfileStore((s) => s.profiles)
   const [mode, setMode] = useState<ProfileCreationMode>('both')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Sync initialEmail if provided when opening
+  React.useEffect(() => {
+    if (open && initialEmail) {
+      setEmail(initialEmail)
+    }
+  }, [open, initialEmail])
 
   // Check if email already matches an existing profile
   const existingProfile = useMemo(() => {

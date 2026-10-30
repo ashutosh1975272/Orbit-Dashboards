@@ -72,6 +72,7 @@ interface ProfileSidebarProps {
   sidebarLook?: 'ancient' | 'new-cosmic'
   showLookSwitcher?: boolean
   showRecentSection?: boolean
+  showGoogleEmailInputInSidebar?: boolean
   sidebarButtons?: {
     addWebsite?: boolean
     newProject?: boolean
@@ -345,6 +346,7 @@ export const ProfileSidebar = memo(function ProfileSidebar({
   sidebarLook: propSidebarLook,
   showLookSwitcher = true,
   showRecentSection = true,
+  showGoogleEmailInputInSidebar = true,
   sidebarButtons = {
     addWebsite: true,
     newProject: true,
@@ -564,34 +566,38 @@ export const ProfileSidebar = memo(function ProfileSidebar({
         </div>
       ) : null}
 
-      <label className="field-label" htmlFor="google-email">
-        Google email
-      </label>
-      <input
-        id="google-email"
-        className="field-input"
-        type="email"
-        placeholder="name@gmail.com"
-        value={email}
-        disabled={googleBusy}
-        onChange={(e) => onEmailChange(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') onAddGoogle()
-        }}
-      />
-      <button
-        type="button"
-        className="btn primary block btn-apply"
-        disabled={googleBusy}
-        onClick={onAddGoogle}
-        aria-label="Continue with Google"
-      >
-        {googleBusy ? 'Signing in…' : 'Continue with Google'}
-      </button>
-      {googleBusy ? (
-        <button type="button" className="btn secondary block" onClick={onCancelGoogle}>
-          Cancel sign-in
-        </button>
+      {showGoogleEmailInputInSidebar ? (
+        <>
+          <label className="field-label" htmlFor="google-email">
+            Google email
+          </label>
+          <input
+            id="google-email"
+            className="field-input"
+            type="email"
+            placeholder="name@gmail.com"
+            value={email}
+            disabled={googleBusy}
+            onChange={(e) => onEmailChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') onAddGoogle()
+            }}
+          />
+          <button
+            type="button"
+            className="btn primary block btn-apply"
+            disabled={googleBusy}
+            onClick={onAddGoogle}
+            aria-label="Continue with Google"
+          >
+            {googleBusy ? 'Signing in…' : 'Continue with Google'}
+          </button>
+          {googleBusy ? (
+            <button type="button" className="btn secondary block" onClick={onCancelGoogle}>
+              Cancel sign-in
+            </button>
+          ) : null}
+        </>
       ) : null}
 
       <ul className="nav-tree">

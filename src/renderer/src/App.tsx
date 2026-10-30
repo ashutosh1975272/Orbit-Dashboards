@@ -89,6 +89,7 @@ function App(): React.JSX.Element {
   } | null>(null)
   const [addPlatformOpen, setAddPlatformOpen] = useState(false)
   const [newProfileModalOpen, setNewProfileModalOpen] = useState(false)
+  const [initialNewProfileEmail, setInitialNewProfileEmail] = useState<string | null>(null)
   const [newProjectModalOpen, setNewProjectModalOpen] = useState(false)
   const [accountsModalOpen, setAccountsModalOpen] = useState(false)
   const [activeCustomLinkId, setActiveCustomLinkId] = useState<string | null>(null)
@@ -537,61 +538,10 @@ function App(): React.JSX.Element {
 
   const handleAddGoogle = useCallback(async () => {
     const hint = email.trim()
-    if (!hint) {
-      setStatusLine('Enter a Google email first.')
-      return
-    }
-    setLocalAuthPhase('google')
-    setStatusLine('Opening Chrome…')
-    try {
-      const profile = await createProfile(hint)
-      const latest = useProfileStore.getState().profiles.find((p) => p.id === profile.id) ?? profile
-      const googleOk = latest.googleAuthStatus === 'signed-in'
-      const slackOk = latest.apps.slack.sessionStatus === 'signed-in'
-
-      // Same email already on the dashboard — open that profile; do not re-auth
-      // (re-importing Chrome cookies was logging Slack out).
-      if (googleOk) {
-        await activateProfile(profile.id, viewportBounds())
-        setEmail('')
-        setStatusLine(
-          slackOk
-            ? 'This email is already signed in — opened that profile.'
-            : 'Google already signed in for this email. Open Slack under this profile.'
-        )
-        return
-      }
-
-      // Clear any reused-profile ✓ before Chrome opens.
-      useProfileStore.setState((s) => ({
-        profiles: s.profiles.map((p) =>
-          p.id === profile.id ? { ...p, googleAuthStatus: 'signing-in' } : p
-        )
-      }))
-      await activateProfile(profile.id, viewportBounds())
-      await nextPaint()
-      await new Promise((r) => setTimeout(r, 50))
-      setStatusLine('Waiting for Google / 2SV…')
-      await startGoogleAuth(profile.id, viewportBounds())
-      await loadProfiles()
-      const updated = useProfileStore.getState().profiles.find((p) => p.id === profile.id)
-      if (updated?.googleAuthStatus === 'signed-in') {
-        setEmail('')
-        // Sidebar Google logins always belong to Global Accounts
-        await window.api.profiles.setAccountScope(profile.id, 'global')
-        await loadProfiles()
-        setStatusLine('Google done. Open Slack under this profile to continue.')
-      } else if (!updated) {
-        setStatusLine('Cancelled — unsigned profile removed.')
-      } else {
-        setStatusLine('Google sign-in did not finish. Try again.')
-      }
-    } catch (err) {
-      setStatusLine(String(err))
-    } finally {
-      setLocalAuthPhase(null)
-    }
-  }, [email, createProfile, activateProfile, startGoogleAuth, loadProfiles])
+    setInitialNewProfileEmail(hint || null)
+    setEmail('')
+    setNewProfileModalOpen(true)
+  }, [email])
 
   const handleCreateAndAuthProfile = useCallback(
     async (displayName: string, targetEmail: string, mode?: 'under_global' | 'individual' | 'both') => {
@@ -907,6 +857,7 @@ function App(): React.JSX.Element {
               sidebarLook={settings.sidebarLook ?? 'ancient'}
               showLookSwitcher={settings.showLookSwitcher ?? true}
               showRecentSection={settings.showRecentSection ?? true}
+              showGoogleEmailInputInSidebar={settings.showGoogleEmailInputInSidebar ?? true}
               sidebarButtons={settings.sidebarButtons}
               onLookChange={(look) => {
                 void window.api.app.setSettings({ sidebarLook: look }).then((next) => {
@@ -1152,8 +1103,12 @@ function App(): React.JSX.Element {
 
       <NewProfileModal
         open={newProfileModalOpen}
-        onClose={() => setNewProfileModalOpen(false)}
+        onClose={() => {
+          setNewProfileModalOpen(false)
+          setInitialNewProfileEmail(null)
+        }}
         onCreate={handleCreateAndAuthProfile}
+        initialEmail={initialNewProfileEmail || undefined}
       />
 
       {platformSettings ? (
