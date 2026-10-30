@@ -107,6 +107,7 @@ export const IpcChannels = {
   ProfileReorderCustomLinks: 'profile:reorder-custom-links',
   ProfileListCustomLinks: 'profile:list-custom-links',
   ProfileSetHiddenInSidebar: 'profile:set-hidden-in-sidebar',
+  ProfileSetAccountScope: 'profile:set-account-scope',
   ProfileSetLinkHiddenInSidebar: 'profile:set-link-hidden-in-sidebar',
   ProfileActivateCustomLink: 'profile:activate-custom-link',
   ProfileSessionStatusChanged: 'profile:session-status-changed',
@@ -275,6 +276,7 @@ export interface IpcApi {
     reorderCustomLinks: (profileId: string, orderedIds: string[]) => Promise<Profile>
     listCustomLinks: (profileId: string) => Promise<import('./types').CustomLink[]>
     setHiddenInSidebar: (profileId: string, hidden: boolean) => Promise<Profile>
+    setAccountScope: (profileId: string, scope: import('./types').ProfileScope) => Promise<Profile>
     setLinkHiddenInSidebar: (profileId: string, linkId: string, hidden: boolean) => Promise<Profile>
     activateCustomLink: (
       profileId: string,

@@ -567,7 +567,14 @@ export default function DashboardView(): React.ReactElement | null {
                 }}
               >
                 {(() => {
-                  const individualProfiles = profiles.filter((p) => p.hiddenInSidebar || (!p.isGlobalProfile && p.id !== GLOBAL_PROFILE_ID))
+                  const individualProfiles = profiles.filter((p) => {
+                    // Strictly exclude any profile belonging to Global Accounts
+                    if (p.isGlobalProfile || p.id === GLOBAL_PROFILE_ID || p.accountScope === 'global') {
+                      return false
+                    }
+                    // Only include profiles scoped as individual or hidden from main sidebar
+                    return p.accountScope === 'individual' || p.hiddenInSidebar === true
+                  })
                   return (
                     <>
                       <option value="all">All Profiles ({individualProfiles.length})</option>
@@ -772,18 +779,15 @@ export default function DashboardView(): React.ReactElement | null {
           open={newProfileModalOpen}
           onClose={() => setNewProfileModalOpen(false)}
           onCreate={async (name, email, mode) => {
-            let targetProfileId: string
-            if (mode === 'under_global') {
-              const globalP = useProfileStore.getState().profiles.find((p) => p.id === GLOBAL_PROFILE_ID || p.isGlobalProfile)
-              targetProfileId = globalP ? globalP.id : (await useProfileStore.getState().createProfile(email)).id
-            } else {
-              const profile = await useProfileStore.getState().createProfile(email)
-              targetProfileId = profile.id
-              if (name.trim() && name.trim() !== email) {
-                await window.api.profiles.setCustomName(profile.id, name.trim())
-              }
-            }
+            const profile = await useProfileStore.getState().createProfile(email.trim())
+            const targetProfileId = profile.id
+            const finalDisplayName = name.trim() || email.trim()
+            await window.api.profiles.setCustomName(targetProfileId, finalDisplayName)
+
+            const scope = mode === 'under_global' ? 'global' : 'individual'
+            await window.api.profiles.setAccountScope(targetProfileId, scope)
             await useProfileStore.getState().loadProfiles()
+
             // Initiate Google Authentication in Chrome
             try {
               useProfileStore.setState((s) => ({

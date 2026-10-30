@@ -77,6 +77,8 @@ const api: IpcApi = {
       ipcRenderer.invoke(IpcChannels.ProfileListCustomLinks, { profileId }),
     setHiddenInSidebar: (profileId, hidden) =>
       ipcRenderer.invoke(IpcChannels.ProfileSetHiddenInSidebar, { profileId, hidden }),
+    setAccountScope: (profileId, scope) =>
+      ipcRenderer.invoke(IpcChannels.ProfileSetAccountScope, { profileId, scope }),
     setLinkHiddenInSidebar: (profileId, linkId, hidden) =>
       ipcRenderer.invoke(IpcChannels.ProfileSetLinkHiddenInSidebar, { profileId, linkId, hidden }),
     activateCustomLink: (profileId, linkId, url, bounds) =>

@@ -73,11 +73,15 @@ export interface CustomLink {
 
 export const GLOBAL_PROFILE_ID = 'global-account-profile'
 
+export type ProfileScope = 'global' | 'individual'
+
 export interface Profile {
   id: string
   displayName: string
   /** Optional friendly label; UI prefers this over displayName (email). */
   customName?: string
+  /** Scope of profile: global (main sidebar & shared pool) vs individual (filtered in dashboard projects) */
+  accountScope?: ProfileScope
   createdAt: string
   avatarColor: string
   /** Optional photo URL (e.g. captured after Google/Slack sign-in). */
@@ -88,7 +92,7 @@ export interface Profile {
   muted?: boolean
   /** When true, hide profile row from left sidebar */
   hiddenInSidebar?: boolean
-  /** When true, indicates this is the special Global Account aggregator profile */
+  /** When true, indicates this is a Global Account aggregator profile */
   isGlobalProfile?: boolean
   /**
    * Google account cookies ready (Chrome password + 2SV).

@@ -393,6 +393,8 @@ type RawProfile = {
   sortOrder?: unknown
   muted?: unknown
   hiddenInSidebar?: unknown
+  accountScope?: unknown
+  isGlobalProfile?: unknown
   googleAuthStatus?: unknown
   apps?: unknown
   customLinks?: unknown
@@ -461,6 +463,10 @@ function normalizeProfile(raw: RawProfile): Profile {
         : 'not-signed-in',
     muted: raw.muted === true,
     hiddenInSidebar: raw.hiddenInSidebar === true,
+    ...(raw.accountScope === 'global' || raw.accountScope === 'individual'
+      ? { accountScope: raw.accountScope }
+      : {}),
+    ...(raw.isGlobalProfile === true ? { isGlobalProfile: true } : {}),
     ...(typeof sortOrder === 'number' ? { sortOrder } : {}),
     ...(customName ? { customName } : {}),
     ...(avatarUrl ? { avatarUrl } : {}),
@@ -1332,6 +1338,25 @@ export class ProfileStore {
     const updatedProfile: Profile = {
       ...data.profiles[index]!,
       hiddenInSidebar: hidden
+    }
+    data.profiles[index] = updatedProfile
+    await this.write(data)
+    return updatedProfile
+  }
+
+  async setAccountScope(profileId: string, scope: import('../../shared/types').ProfileScope): Promise<Profile> {
+    const data = await this.read()
+    const index = data.profiles.findIndex((p) => p.id === profileId)
+    if (index === -1) {
+      throw new Error(`Profile not found: ${profileId}`)
+    }
+    const updatedProfile: Profile = {
+      ...data.profiles[index]!,
+      accountScope: scope,
+      // Global accounts are shown in sidebar & flagged as global profile
+      // Individual profiles are hidden from sidebar and routed to dashboard dropdown
+      hiddenInSidebar: scope === 'individual',
+      isGlobalProfile: scope === 'global'
     }
     data.profiles[index] = updatedProfile
     await this.write(data)

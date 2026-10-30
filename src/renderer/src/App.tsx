@@ -660,13 +660,9 @@ function App(): React.JSX.Element {
         const finalDisplayName = displayName.trim() || hint
         await window.api.profiles.setCustomName(profile.id, finalDisplayName)
 
-        // If created under global scope: keep visible in main sidebar
-        // If created as individual profile: hide from main sidebar (appears in dashboard project dropdown)
-        if (mode === 'under_global') {
-          await window.api.profiles.setHiddenInSidebar(targetProfileId, false)
-        } else {
-          await window.api.profiles.setHiddenInSidebar(targetProfileId, true)
-        }
+        // Set account scope: 'global' for global pool, 'individual' for individual client profiles
+        const scope = mode === 'under_global' ? 'global' : 'individual'
+        await window.api.profiles.setAccountScope(targetProfileId, scope)
         await loadProfiles()
 
         const latest = useProfileStore.getState().profiles.find((p) => p.id === targetProfileId)

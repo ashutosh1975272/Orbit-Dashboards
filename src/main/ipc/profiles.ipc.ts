@@ -878,6 +878,15 @@ export function registerProfileIpc(deps: ProfileIpcDeps): void {
   )
 
   handleInvoke(
+    IpcChannels.ProfileSetAccountScope,
+    async (payload: { profileId: string; scope: import('../../shared/types').ProfileScope }) => {
+      const updated = await deps.profileStore.setAccountScope(payload.profileId, payload.scope)
+      notifyProfileUpdated(deps.getMainWindow, updated)
+      return updated
+    }
+  )
+
+  handleInvoke(
     IpcChannels.ProfileSetLinkHiddenInSidebar,
     async (payload: { profileId: string; linkId: string; hidden: boolean }) => {
       const updated = await deps.profileStore.setLinkSidebarVisibility(
