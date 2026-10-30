@@ -26,6 +26,14 @@ export function NewProfileModal({ open, onClose, onCreate }: NewProfileModalProp
 
   if (!open) return null
 
+  const handleClose = () => {
+    setName('')
+    setEmail('')
+    setMode('both')
+    setError(null)
+    onClose()
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim()) {
@@ -40,9 +48,7 @@ export function NewProfileModal({ open, onClose, onCreate }: NewProfileModalProp
     setSubmitting(true)
     try {
       await onCreate(name.trim(), email.trim(), mode)
-      setName('')
-      setEmail('')
-      onClose()
+      handleClose()
     } catch (err: any) {
       setError(err instanceof Error ? err.message : 'Failed to create profile')
     } finally {
@@ -55,7 +61,7 @@ export function NewProfileModal({ open, onClose, onCreate }: NewProfileModalProp
       className="platform-settings-backdrop"
       role="presentation"
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose()
+        if (e.target === e.currentTarget) handleClose()
       }}
       style={{ zIndex: 1300 }}
     >
@@ -95,7 +101,7 @@ export function NewProfileModal({ open, onClose, onCreate }: NewProfileModalProp
           <button
             type="button"
             className="btn ghost"
-            onClick={onClose}
+            onClick={handleClose}
             style={{ color: '#94a3b8', fontSize: '13px' }}
           >
             ✕
@@ -243,7 +249,7 @@ export function NewProfileModal({ open, onClose, onCreate }: NewProfileModalProp
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
-            <button type="button" className="btn ghost" onClick={onClose} disabled={submitting}>
+            <button type="button" className="btn ghost" onClick={handleClose} disabled={submitting}>
               Cancel
             </button>
             <button type="submit" className="btn primary" disabled={submitting}>

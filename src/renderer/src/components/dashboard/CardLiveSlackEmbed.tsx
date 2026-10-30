@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from 'react'
 interface CardLiveSlackEmbedProps {
   profileId: string
   teamId: string
-  projectId?: string
 }
 
 interface ScrapeEventState {
@@ -21,8 +20,7 @@ interface ScrapeEventState {
  */
 export default function CardLiveSlackEmbed({
   profileId,
-  teamId,
-  projectId: _projectId
+  teamId
 }: CardLiveSlackEmbedProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const embedRef = useRef<HTMLDivElement>(null)
@@ -51,7 +49,7 @@ export default function CardLiveSlackEmbed({
   useEffect(() => {
     if (!window.api?.dashboard?.onScrapeEvent) return undefined
     const unsubscribe = window.api.dashboard.onScrapeEvent((event: any) => {
-      if (event?.type === 'reading-channel') {
+      if (event?.type === 'navigate' || event?.type === 'status' || event?.type === 'read') {
         setScrapeEvent({
           status: 'reading',
           channelName: event.channelName,
@@ -59,7 +57,7 @@ export default function CardLiveSlackEmbed({
           maxScroll: event.maxScroll,
           messageCount: event.messageCount
         })
-      } else if (event?.type === 'finished' || event?.type === 'stopped') {
+      } else if (event?.type === 'run_finished') {
         setScrapeEvent({ status: 'finished' })
         setTimeout(() => setScrapeEvent({ status: 'idle' }), 3000)
       }

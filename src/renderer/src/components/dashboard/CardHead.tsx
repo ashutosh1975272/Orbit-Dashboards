@@ -7,8 +7,6 @@ export interface CardHeadFlag {
   tone: 'success' | 'warn' | 'danger' | 'muted'
 }
 
-export type CardViewMode = 'insights' | 'live'
-
 /** Header for the expanded project workspace. Identity on the left, one
  *  secondary action plus a menu on the right. Only states that are true are
  *  shown — never a strip of dimmed pills standing in for filters. */
@@ -19,8 +17,6 @@ interface CardHeadProps {
   profileName?: string | null
   aiBadge?: string
   flags?: CardHeadFlag[]
-  viewMode?: CardViewMode
-  onViewModeChange?: (mode: CardViewMode) => void
   syncing: boolean
   onSync: () => void
   onScrape?: () => void
@@ -51,8 +47,6 @@ export default function CardHead({
   profileName,
   aiBadge,
   flags,
-  viewMode: _viewMode = 'insights',
-  onViewModeChange: _onViewModeChange,
   syncing,
   onSync,
   onScrape,

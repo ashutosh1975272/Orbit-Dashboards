@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 export interface RunLogItem {
   runId: string
@@ -36,11 +36,14 @@ export function RunLogsModal({ open, projectId, projectName, onClose }: RunLogsM
   const [selectedWorkspace, setSelectedWorkspace] = useState<string>('all')
   const [selectedChannel, setSelectedChannel] = useState<string | null>(null)
 
+  const selectedRunIdRef = useRef(selectedRunId)
+  selectedRunIdRef.current = selectedRunId
+
   const fetchLogs = async () => {
     try {
       const data = await window.api.dashboard.getRunLogs({ projectId })
       setLogs(data)
-      if (data.length > 0 && !selectedRunId) {
+      if (data.length > 0 && !selectedRunIdRef.current) {
         setSelectedRunId(data[0].runId)
       }
     } finally {

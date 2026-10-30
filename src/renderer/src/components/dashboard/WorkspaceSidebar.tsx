@@ -1,5 +1,6 @@
 import type React from 'react'
 import { Fragment, useRef, useMemo, useState } from 'react'
+import type { DashboardProject } from '../../../../shared/dashboard-contract'
 import type { CardView } from './card-view'
 import NavIcon from './nav-icons'
 import { detailMeta } from './guide-model'
@@ -33,8 +34,7 @@ import {
 
 interface WorkspaceSidebarProps {
   projectId?: string
-  projectProfileId?: string
-  sources?: any[]
+  sources?: DashboardProject['sources']
   view: CardView
   nav: WorkspaceNavState
   channels: ConnectorChannelLists
@@ -156,7 +156,6 @@ function Row({
 
 export default function WorkspaceSidebar({
   projectId = '',
-  projectProfileId: _projectProfileId,
   sources = [],
   view,
   nav,

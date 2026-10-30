@@ -39,7 +39,7 @@ export function CardAddModal({
   const [error, setError] = useState<string | null>(null)
 
   // Form states for My Accounts & Client Accounts
-  const [itemPlatform, setItemPlatform] = useState('slack')
+  const [itemPlatform, setItemPlatform] = useState<string>('slack')
   const [itemName, setItemName] = useState('')
   const [itemUrl, setItemUrl] = useState('')
 
@@ -135,7 +135,7 @@ export function CardAddModal({
       const newSource: ProjectSource = {
         id: `src-custom-${Date.now().toString(36)}`,
         kind: 'browser',
-        platform: (itemPlatform as any) || 'slack',
+        platform: itemPlatform || 'slack',
         profileId: targetProfileId,
         workspaceId: `custom-${Date.now().toString(36)}`,
         workspaceName: itemName.trim(),

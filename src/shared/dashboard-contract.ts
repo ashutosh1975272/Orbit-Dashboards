@@ -81,7 +81,7 @@ export type ProjectSourceStatus =
 export interface ProjectSource {
   id: string
   kind: 'token' | 'browser'
-  platform: 'slack'
+  platform: 'slack' | 'teams' | 'whatsapp' | 'upwork' | 'discord' | 'googlechat' | 'custom' | string
   profileId?: string
   workspaceId: string
   workspaceName: string

@@ -170,7 +170,6 @@ export default function WorkspaceContent({
           key={`global-embed:${pId}:${tId}`}
           profileId={pId}
           teamId={tId}
-          projectId={project.id}
         />
       )
     } else if (slackSourceOf(nav) === 'team' && !channels.teamConnected) {
