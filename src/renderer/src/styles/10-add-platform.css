@@ -767,7 +767,83 @@
   color: var(--muted);
 }
 
-/* Nav action stack buttons in ProfileSidebar (Vertical Stack) */
+/* Compact 2-Tier Sidebar Action Buttons */
+.nav-action-compact-container {
+  margin: 10px 0 0 0;
+  padding: 8px 0 2px 0;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.nav-action-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  width: 100%;
+}
+
+.nav-action-compact-btn {
+  display: flex;
+  align-items: center;
+  justifyContent: center;
+  gap: 5px;
+  padding: 7px 4px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--bg-page);
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 550;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.nav-action-compact-btn:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: #fff;
+}
+
+.nav-action-compact-btn.nav-btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.nav-action-compact-btn.nav-btn-primary:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+}
+
+.nav-action-compact-btn.nav-settings-btn {
+  color: var(--text-faint);
+}
+
+.nav-btn-icon {
+  font-size: 13px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.nav-btn-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  letter-spacing: -0.01em;
+}
+
+/* Nav action stack buttons in ProfileSidebar (Legacy support) */
 .nav-add-section {
   margin: 12px 0 0 0;
   padding-top: 8px;

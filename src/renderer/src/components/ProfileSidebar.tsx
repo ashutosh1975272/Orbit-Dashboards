@@ -60,6 +60,8 @@ interface ProfileSidebarProps {
   onObserver?: () => void
   /** Open the Accounts & Workspaces management hub / Global settings. */
   onOpenAccountsSettings?: () => void
+  /** Open the Profiles & Accounts management hub */
+  onOpenProfilesHub?: () => void
   /** Active custom link ID if one is currently opened in embed */
   activeCustomLinkId?: string | null
   /** Select and view a custom link */
@@ -324,6 +326,7 @@ export const ProfileSidebar = memo(function ProfileSidebar({
   onNewProfile,
   onObserver,
   onOpenAccountsSettings,
+  onOpenProfilesHub,
   activeCustomLinkId,
   onSelectCustomLink,
   dashboardSlot
@@ -773,56 +776,82 @@ export const ProfileSidebar = memo(function ProfileSidebar({
         )}
       </ul>
 
-      <div className="nav-add-section">
-        <button
-          type="button"
-          className="nav-action-btn"
-          onClick={onAddPlatform}
-          title="Add platform or custom link"
-          aria-label="Add platform or custom link"
-        >
-          + Add
-        </button>
-        {onNewProject ? (
+      <div className="nav-action-compact-container">
+        {/* Row 1: Creation Actions */}
+        <div className="nav-action-row nav-action-row-creation">
           <button
             type="button"
-            className="nav-action-btn nav-action-primary"
-            onClick={onNewProject}
-            title="Create New Project / Workspace"
-            aria-label="New Project"
+            className="nav-action-compact-btn"
+            onClick={onAddPlatform}
+            title="Add Platform or Web Link"
+            aria-label="Add Platform"
           >
-            + New Project
+            <span className="nav-btn-icon">➕</span>
+            <span className="nav-btn-text">Add</span>
           </button>
-        ) : null}
-        {onNewProfile ? (
+
+          {onNewProject ? (
+            <button
+              type="button"
+              className="nav-action-compact-btn nav-btn-primary"
+              onClick={onNewProject}
+              title="Create New Project / Workspace"
+              aria-label="New Project"
+            >
+              <span className="nav-btn-icon">📁</span>
+              <span className="nav-btn-text">Project</span>
+            </button>
+          ) : null}
+
+          {onNewProfile ? (
+            <button
+              type="button"
+              className="nav-action-compact-btn"
+              onClick={onNewProfile}
+              title="Create New Profile / Account"
+              aria-label="New Profile"
+            >
+              <span className="nav-btn-icon">👤</span>
+              <span className="nav-btn-text">Profile</span>
+            </button>
+          ) : null}
+        </div>
+
+        {/* Row 2: Management & Utility Actions */}
+        <div className="nav-action-row nav-action-row-utility">
           <button
             type="button"
-            className="nav-action-btn"
-            onClick={onNewProfile}
-            title="Create New Profile"
-            aria-label="New Profile"
+            className="nav-action-compact-btn nav-settings-btn"
+            onClick={onOpenAccountsSettings}
+            title="Global Settings Hub"
+            aria-label="Settings"
           >
-            + New Profile
+            <span className="nav-btn-icon">⚙️</span>
+            <span className="nav-btn-text">Settings</span>
           </button>
-        ) : null}
-        <button
-          type="button"
-          className="nav-action-btn"
-          onClick={onObserver}
-          title="Observer Mode &amp; Channels"
-          aria-label="Observer"
-        >
-          + Observer
-        </button>
-        <button
-          type="button"
-          className="nav-action-btn nav-settings-btn"
-          onClick={onOpenAccountsSettings}
-          title="Global Settings Hub"
-          aria-label="Global Settings Hub"
-        >
-          ⚙ Settings
-        </button>
+
+          <button
+            type="button"
+            className="nav-action-compact-btn"
+            onClick={onObserver}
+            title="Observer Mode &amp; Channels"
+            aria-label="Observer"
+          >
+            <span className="nav-btn-icon">🔭</span>
+            <span className="nav-btn-text">Observer</span>
+          </button>
+
+          <button
+            type="button"
+            className="nav-action-compact-btn"
+            onClick={onOpenProfilesHub || onOpenAccountsSettings}
+            title="Profiles &amp; Accounts Management"
+            aria-label="Profiles"
+          >
+            <span className="nav-btn-icon">👥</span>
+            <span className="nav-btn-text">Profiles</span>
+          </button>
+        </div>
       </div>
 
       <p className="sidebar-status" onClick={onDismissError} role="status">

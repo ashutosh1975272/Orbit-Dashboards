@@ -944,6 +944,9 @@ function App(): React.JSX.Element {
                 setUnifiedSettingsTab('general')
                 setUnifiedSettingsOpen(true)
               }}
+              onOpenProfilesHub={() => {
+                setAccountsModalOpen(true)
+              }}
               activeCustomLinkId={activeCustomLinkId}
               onSelectCustomLink={handleSelectCustomLink}
             />
