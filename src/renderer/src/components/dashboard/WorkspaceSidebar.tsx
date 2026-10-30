@@ -5,7 +5,6 @@ import NavIcon from './nav-icons'
 import { detailMeta } from './guide-model'
 import { useSidebarLayout } from './use-sidebar-layout'
 import { useProfileStore } from '../../hooks/useProfiles'
-import { useDashboardStore } from '../../hooks/useDashboard'
 import {
   INFO_GROUPS,
   NAV_CONNECTORS,
@@ -405,38 +404,36 @@ export default function WorkspaceSidebar({
                                 >
                                   <span>👤 {group.profileName}</span>
                                 </div>
-                                {group.slackWorkspaces.map((gw) => (
-                                  <button
-                                    key={`${group.profileId}:${gw.teamId}`}
-                                    type="button"
-                                    className="ws-nav-subitem"
-                                    title={`Open ${gw.teamName} (${group.profileName}) in live workspace view`}
-                                    onClick={() => {
-                                      useDashboardStore.getState().closeDashboard()
-                                      void useProfileStore.getState().openWorkspace(group.profileId, 'slack', gw.teamId, {
-                                        x: 320,
-                                        y: 40,
-                                        width: window.innerWidth - 320,
-                                        height: window.innerHeight - 40
-                                      })
-                                    }}
-                                    style={{
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'space-between',
-                                      padding: '4px 12px 4px 28px',
-                                      width: '100%',
-                                      textAlign: 'left'
-                                    }}
-                                  >
-                                    <span className="ws-nav-label" style={{ fontSize: 12 }}>
-                                      🏢 {gw.teamName}
-                                    </span>
-                                    <span className="ws-nav-tag" style={{ fontSize: 10, opacity: 0.7 }}>
-                                      Slack
-                                    </span>
-                                  </button>
-                                ))}
+                                {group.slackWorkspaces.map((gw) => {
+                                  const selId = `w:${group.profileId}:${gw.teamId}` as SelectionId
+                                  const isSelected = nav.selection === selId
+                                  return (
+                                    <button
+                                      key={`${group.profileId}:${gw.teamId}`}
+                                      type="button"
+                                      className={`ws-nav-subitem${isSelected ? ' is-active' : ''}`}
+                                      title={`View ${gw.teamName} (${group.profileName}) inside this card`}
+                                      onClick={() => {
+                                        onSelect(selId)
+                                      }}
+                                      style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        padding: '4px 12px 4px 28px',
+                                        width: '100%',
+                                        textAlign: 'left'
+                                      }}
+                                    >
+                                      <span className="ws-nav-label" style={{ fontSize: 12 }}>
+                                        🏢 {gw.teamName}
+                                      </span>
+                                      <span className="ws-nav-tag" style={{ fontSize: 10, opacity: 0.7 }}>
+                                        Slack
+                                      </span>
+                                    </button>
+                                  )
+                                })}
                                 {group.customLinks.map((link) => (
                                   <button
                                     key={link.id}

@@ -100,7 +100,14 @@ export function CardAddModal({
       return
     }
 
-    const targetProfileId = project.profileId || profiles[0]?.id
+    // Resolve a real profile ID (never pass virtual manual: tokens to profile store APIs)
+    const validProfile =
+      profiles.find((p) => p.id === project.profileId && !p.id.startsWith('manual:')) ||
+      profiles.find((p) => !p.id.startsWith('manual:') && (p.isGlobalProfile || p.id === 'global-account-profile')) ||
+      profiles.find((p) => !p.id.startsWith('manual:')) ||
+      profiles[0]
+
+    const targetProfileId = validProfile?.id
     if (!targetProfileId) {
       setError('No profile available to attach to')
       return

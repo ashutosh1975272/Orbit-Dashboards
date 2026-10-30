@@ -35,6 +35,9 @@ export type InfoGroupKey = 'attention' | 'project' | 'signals'
 /** A single channel inside a connector's dropdown. */
 export type ChannelSelectionId = `c:${ConnectorKey}:${string}`
 
+/** A live workspace embedded session selected from Global Accounts */
+export type GlobalWorkspaceSelectionId = `w:${string}:${string}`
+
 export type SelectionId =
   | `v:${VisualKey}`
   | `d:${DetailKey}`
@@ -42,6 +45,7 @@ export type SelectionId =
   | `m:${XomniModeKey}`
   | `s:${SlackSourceKey}`
   | ChannelSelectionId
+  | GlobalWorkspaceSelectionId
 
 export interface NavRow {
   id: SelectionId
@@ -453,7 +457,7 @@ function isValidSelection(raw: unknown): raw is SelectionId {
   if (ALL_ROWS.some((row) => row.id === raw)) return true
   // Channel ids carry data the model never holds (a Slack channel id), so only
   // their shape and connector can be checked here.
-  return isChannelId(raw)
+  return isChannelId(raw) || isGlobalWorkspaceId(raw)
 }
 
 /** A selection pointing at one channel inside a connector's dropdown. */
@@ -461,6 +465,10 @@ export function isChannelId(id: string | null): id is ChannelSelectionId {
   if (!id || !id.startsWith('c:')) return false
   const parts = id.split(':')
   return parts.length === 3 && ALL_CONNECTORS.includes(parts[1] as ConnectorKey) && !!parts[2]
+}
+
+export function isGlobalWorkspaceId(id: string | null): id is GlobalWorkspaceSelectionId {
+  return typeof id === 'string' && id.startsWith('w:')
 }
 
 /** The connector a selection belongs to, whether it is the whole-workspace row
@@ -483,7 +491,7 @@ export function channelSelectionId(key: ConnectorKey, channelId: string): Channe
 
 /** The section that owns a selection. */
 export function sectionOfSelection(id: SelectionId): SectionKey {
-  if (isChannelId(id) || id.startsWith('s:')) return 'slack'
+  if (isChannelId(id) || id.startsWith('s:') || isGlobalWorkspaceId(id)) return 'slack'
   return NAV_SECTIONS.find((s) => s.rows.some((r) => r.id === id))?.key ?? 'info'
 }
 

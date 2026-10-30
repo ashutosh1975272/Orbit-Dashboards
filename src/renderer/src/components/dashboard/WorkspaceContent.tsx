@@ -22,6 +22,7 @@ import {
   guideSectionOf,
   isChannelId,
   isDetailId,
+  isGlobalWorkspaceId,
   isGuideId,
   isVisualId,
   navRowOf,
@@ -160,7 +161,18 @@ export default function WorkspaceContent({
       bare = true
     }
   } else if (nav.openGroup === 'slack') {
-    if (slackSourceOf(nav) === 'team' && !channels.teamConnected) {
+    if (sel && isGlobalWorkspaceId(sel)) {
+      // Global workspace selected: show embedded live Slack inside this card
+      const [, pId, tId] = sel.split(':')
+      body = (
+        <SlackChatTab
+          key={`global:${pId}:${tId}`}
+          projectId={summary.projectId}
+          source="client"
+          lockedChannel={null}
+        />
+      )
+    } else if (slackSourceOf(nav) === 'team' && !channels.teamConnected) {
       body = (
         <div className="ws-agent">
           <div className="ws-agent-empty">
