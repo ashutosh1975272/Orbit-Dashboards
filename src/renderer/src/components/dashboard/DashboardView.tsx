@@ -8,6 +8,7 @@ import { useDashboardStore } from '../../hooks/useDashboard'
 import ProjectCard from './ProjectCard'
 import { buildCardSummary } from './card-view'
 import DashboardWizard from './DashboardWizard'
+import { NewProjectModal } from './NewProjectModal'
 import GlobalSettingsPanel from './GlobalSettingsPanel'
 import ErrorBoundary from './ErrorBoundary'
 import RecentStrip from './RecentStrip'
@@ -70,7 +71,6 @@ export default function DashboardView(): React.ReactElement | null {
   const recent = useDashboardStore((s) => s.recent)
   const loadRecent = useDashboardStore((s) => s.loadRecent)
   const wizardOpenFor = useDashboardStore((s) => s.wizardOpenFor)
-  const openWizard = useDashboardStore((s) => s.openWizard)
   const [renderError, setRenderError] = useState<Error | null>(null)
   const [viewMode, setViewMode] = useState<'compact' | 'expanded' | 'mixed'>(() => {
     try {
@@ -90,6 +90,7 @@ export default function DashboardView(): React.ReactElement | null {
     nonce: number
   } | null>(null)
   const [globalSettingsOpen, setGlobalSettingsOpen] = useState(false)
+  const [newProjectModalOpen, setNewProjectModalOpen] = useState(false)
   const [globalConfig, setGlobalConfig] = useState<DashboardGlobalConfig | null>(null)
   const [filter, setFilter] = useState<ProjectFilter>(() => {
     try {
@@ -603,7 +604,7 @@ export default function DashboardView(): React.ReactElement | null {
             <button
               type="button"
               className="btn btn-primary"
-              onClick={() => openWizard()}
+              onClick={() => setNewProjectModalOpen(true)}
               style={{ fontSize: '13px', padding: '6px 12px' }}
             >
               + New Workspace
@@ -764,7 +765,7 @@ export default function DashboardView(): React.ReactElement | null {
                   Click <strong>New project</strong>. A guided setup walks you through it: create
                   the Slack app, get the token, pick channels, then sync.
                 </p>
-                <button type="button" className="btn btn-primary" onClick={() => openWizard()}>
+                <button type="button" className="btn btn-primary" onClick={() => setNewProjectModalOpen(true)}>
                   New project
                 </button>
               </div>
@@ -775,6 +776,10 @@ export default function DashboardView(): React.ReactElement | null {
         </section>
 
         {wizardOpenFor ? <DashboardWizard /> : null}
+        <NewProjectModal
+          open={newProjectModalOpen}
+          onClose={() => setNewProjectModalOpen(false)}
+        />
         <NewProfileModal
           open={newProfileModalOpen}
           onClose={() => setNewProfileModalOpen(false)}

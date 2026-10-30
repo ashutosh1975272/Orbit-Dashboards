@@ -22,6 +22,7 @@ import { AddPlatformPage } from './components/dashboard/AddPlatformPage'
 import { AccountsManagementModal } from './components/dashboard/AccountsManagementModal'
 import { UnifiedSettingsModal, type SettingsTabKey } from './components/dashboard/UnifiedSettingsModal'
 import { NewProfileModal } from './components/dashboard/NewProfileModal'
+import { NewProjectModal } from './components/dashboard/NewProjectModal'
 import { ScrapeNavbar, type NavbarState, type ScrapeSnippet } from './components/dashboard/overlay/ScrapeNavbar'
 import { sidebarToastFor } from './lib/sidebar-toast'
 import { modKey, modShift } from './lib/shortcut-label'
@@ -89,6 +90,7 @@ function App(): React.JSX.Element {
   } | null>(null)
   const [addPlatformOpen, setAddPlatformOpen] = useState(false)
   const [newProfileModalOpen, setNewProfileModalOpen] = useState(false)
+  const [newProjectModalOpen, setNewProjectModalOpen] = useState(false)
   const [accountsModalOpen, setAccountsModalOpen] = useState(false)
   const [activeCustomLinkId, setActiveCustomLinkId] = useState<string | null>(null)
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS)
@@ -932,7 +934,7 @@ function App(): React.JSX.Element {
               onAddPlatform={() => setAddPlatformOpen(true)}
               onNewProject={() => {
                 useDashboardStore.getState().openDashboard()
-                useDashboardStore.getState().openWizard()
+                setNewProjectModalOpen(true)
               }}
               onNewProfile={() => setNewProfileModalOpen(true)}
               onObserver={() => {
@@ -1212,6 +1214,13 @@ function App(): React.JSX.Element {
           profileId={platformSettings.profileId}
           appId={platformSettings.appId}
           onClose={() => setPlatformSettings(null)}
+        />
+      ) : null}
+
+      {newProjectModalOpen ? (
+        <NewProjectModal
+          open={true}
+          onClose={() => setNewProjectModalOpen(false)}
         />
       ) : null}
 
