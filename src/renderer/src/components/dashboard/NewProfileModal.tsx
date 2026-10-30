@@ -101,11 +101,16 @@ export function NewProfileModal({ open, onClose, onCreate }: NewProfileModalProp
             </div>
           )}
 
-          {/* Mode Selector: Global Accounts vs Separate Profile */}
+          {/* Mode Selector: 2 Creation Scopes (Global vs Individual) */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: '13px', fontWeight: 500, color: '#cbd5e1' }}>
-              Where do you want to add this account?
-            </label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label style={{ fontSize: '13px', fontWeight: 500, color: '#cbd5e1' }}>
+                Account Creation Scope:
+              </label>
+              <span style={{ fontSize: '11px', color: '#64748b' }}>
+                (Observer is managed from sidebar)
+              </span>
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <button
                 type="button"
@@ -122,10 +127,10 @@ export function NewProfileModal({ open, onClose, onCreate }: NewProfileModalProp
                 }}
               >
                 <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '4px', color: mode === 'under_global' ? '#fff' : '#cbd5e1' }}>
-                  🌐 Under Global Accounts
+                  🌐 1. Global Accounts
                 </div>
                 <div style={{ fontSize: '11px', color: '#64748b', lineHeight: 1.3 }}>
-                  Shared default profile. Workspaces available across all cards.
+                  Shared global pool. All workspaces added here can be used in all project cards.
                 </div>
               </button>
 
@@ -144,10 +149,10 @@ export function NewProfileModal({ open, onClose, onCreate }: NewProfileModalProp
                 }}
               >
                 <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '4px', color: mode === 'individual' ? '#fff' : '#cbd5e1' }}>
-                  👤 Separate Profile
+                  👤 2. Individual Profile
                 </div>
                 <div style={{ fontSize: '11px', color: '#64748b', lineHeight: 1.3 }}>
-                  Dedicated individual profile (e.g. Ayush, Client). Can own project workspaces.
+                  Dedicated individual profile (e.g. Ayush, Client). Can own project cards.
                 </div>
               </button>
             </div>

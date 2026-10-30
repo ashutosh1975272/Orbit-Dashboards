@@ -56,6 +56,8 @@ interface ProfileSidebarProps {
   onNewProject?: () => void
   /** Open the modal to create a new profile */
   onNewProfile?: () => void
+  /** Trigger the Observer action/mode */
+  onObserver?: () => void
   /** Open the Accounts & Workspaces management hub / Global settings. */
   onOpenAccountsSettings?: () => void
   /** Active custom link ID if one is currently opened in embed */
@@ -320,6 +322,7 @@ export const ProfileSidebar = memo(function ProfileSidebar({
   onAddPlatform,
   onNewProject,
   onNewProfile,
+  onObserver,
   onOpenAccountsSettings,
   activeCustomLinkId,
   onSelectCustomLink,
@@ -595,6 +598,23 @@ export const ProfileSidebar = memo(function ProfileSidebar({
                         {profileOpen ? '▼' : '▶'}
                       </span>
                       <span className="nav-profile-name">{label}</span>
+                      {(profile.isGlobalProfile || profile.id === 'global-account-profile') && (
+                        <span
+                          style={{
+                            fontSize: '9.5px',
+                            fontWeight: 700,
+                            padding: '1px 5px',
+                            borderRadius: '4px',
+                            background: 'rgba(99, 102, 241, 0.2)',
+                            color: '#a5b4fc',
+                            border: '1px solid rgba(99, 102, 241, 0.35)',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.04em'
+                          }}
+                        >
+                          Global
+                        </span>
+                      )}
                       <ProfileAuthMark googleAuthStatus={profile.googleAuthStatus} />
                       {profile.muted ? (
                         <span
@@ -785,6 +805,15 @@ export const ProfileSidebar = memo(function ProfileSidebar({
             + New Profile
           </button>
         ) : null}
+        <button
+          type="button"
+          className="nav-action-btn"
+          onClick={onObserver}
+          title="Observer Mode &amp; Channels"
+          aria-label="Observer"
+        >
+          + Observer
+        </button>
         <button
           type="button"
           className="nav-action-btn nav-settings-btn"

@@ -938,6 +938,9 @@ function App(): React.JSX.Element {
                 useDashboardStore.getState().openWizard()
               }}
               onNewProfile={() => setNewProfileModalOpen(true)}
+              onObserver={() => {
+                setToast('Observer Mode enabled. Observer channel streams active.')
+              }}
               onOpenAccountsSettings={() => {
                 setUnifiedSettingsTab('general')
                 setUnifiedSettingsOpen(true)
