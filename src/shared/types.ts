@@ -73,14 +73,14 @@ export interface CustomLink {
 
 export const GLOBAL_PROFILE_ID = 'global-account-profile'
 
-export type ProfileScope = 'global' | 'individual' | 'observer'
+export type ProfileScope = 'global' | 'individual' | 'both' | 'observer'
 
 export interface Profile {
   id: string
   displayName: string
   /** Optional friendly label; UI prefers this over displayName (email). */
   customName?: string
-  /** Scope of profile: global (main sidebar & shared pool) vs individual (filtered in dashboard projects) */
+  /** Scope of profile: global (main sidebar & shared pool) vs individual (filtered in dashboard projects) vs both */
   accountScope?: ProfileScope
   createdAt: string
   avatarColor: string
@@ -111,17 +111,20 @@ export function profileDisplayLabel(profile: Profile): string {
 /** Strictly check if a profile is a Global Company Account */
 export function isGlobalAccountProfile(profile: Profile): boolean {
   if (profile.id === GLOBAL_PROFILE_ID || profile.isGlobalProfile === true) return true
-  if (profile.accountScope === 'global') return true
+  const scope = profile.accountScope
+  if (scope === 'global' || scope === 'both') return true
   // Any profile visible in the main sidebar (hiddenInSidebar !== true) and not explicitly marked individual is Global
-  if (profile.hiddenInSidebar !== true && profile.accountScope !== 'individual') return true
+  if (profile.hiddenInSidebar !== true && scope !== 'individual') return true
   return false
 }
 
 /** Strictly check if a profile is an Individual Profile */
 export function isIndividualProfile(profile: Profile): boolean {
+  const scope = profile.accountScope
+  if (scope === 'both') return true
   if (isGlobalAccountProfile(profile)) return false
-  if (profile.accountScope === 'observer') return false
-  return profile.accountScope === 'individual' || profile.hiddenInSidebar === true
+  if (scope === 'observer') return false
+  return scope === 'individual' || profile.hiddenInSidebar === true
 }
 
 export interface ProfileSessionStatusPayload {

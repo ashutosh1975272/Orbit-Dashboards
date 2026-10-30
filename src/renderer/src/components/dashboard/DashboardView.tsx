@@ -782,7 +782,7 @@ export default function DashboardView(): React.ReactElement | null {
             const finalDisplayName = name.trim() || email.trim()
             await window.api.profiles.setCustomName(targetProfileId, finalDisplayName)
 
-            const scope = mode === 'under_global' ? 'global' : 'individual'
+            const scope = mode === 'under_global' ? 'global' : mode === 'both' ? 'both' : 'individual'
             await window.api.profiles.setAccountScope(targetProfileId, scope)
             await useProfileStore.getState().loadProfiles()
 

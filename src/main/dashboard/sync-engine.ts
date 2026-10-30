@@ -432,6 +432,7 @@ export class DashboardSyncEngine {
           const startTime = Date.now()
           let channelsRead = 0
           let newMessagesCount = 0
+          const snippets: { channelId: string; channelName?: string; sender: string; ts: string; snippet: string }[] = []
           try {
             const reader = new SlackReaderView({
               profileId: bSrc.profileId,
@@ -451,6 +452,15 @@ export class DashboardSyncEngine {
                   source: 'client'
                 })
                 newMessagesCount += appendRes.added
+                for (const m of messages.slice(-5)) {
+                  snippets.push({
+                    channelId: ch.id,
+                    channelName: ch.name,
+                    sender: m.user || 'Anonymous',
+                    ts: m.ts,
+                    snippet: (m.text || '').slice(0, 100)
+                  })
+                }
                 clientDeltas.push({
                   channelId: ch.id,
                   channelName: ch.name,
@@ -462,9 +472,9 @@ export class DashboardSyncEngine {
               }
             }
             reader.destroy()
-        if (this.activeWatchReader === reader) {
-          this.activeWatchReader = null
-        }
+            if (this.activeWatchReader === reader) {
+              this.activeWatchReader = null
+            }
 
             // Update source stats
             const nowIso = new Date().toISOString()
@@ -496,6 +506,7 @@ export class DashboardSyncEngine {
               workspaceId: bSrc.workspaceId,
               channelsRead,
               newMessages: newMessagesCount,
+              snippets: snippets.slice(0, 20),
               durationMs: Date.now() - startTime,
               llmCalls: 0,
               status: 'connected'

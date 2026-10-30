@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
+import { useProfileStore } from '../../hooks/useProfiles'
 
-export type ProfileCreationMode = 'under_global' | 'individual'
+export type ProfileCreationMode = 'under_global' | 'individual' | 'both'
 
 interface NewProfileModalProps {
   open: boolean
@@ -9,18 +10,26 @@ interface NewProfileModalProps {
 }
 
 export function NewProfileModal({ open, onClose, onCreate }: NewProfileModalProps): React.JSX.Element | null {
-  const [mode, setMode] = useState<ProfileCreationMode>('under_global')
+  const profiles = useProfileStore((s) => s.profiles)
+  const [mode, setMode] = useState<ProfileCreationMode>('both')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Check if email already matches an existing profile
+  const existingProfile = useMemo(() => {
+    const trimmed = email.trim().toLowerCase()
+    if (!trimmed || !trimmed.includes('@')) return null
+    return profiles.find((p) => p.displayName.trim().toLowerCase() === trimmed) || null
+  }, [email, profiles])
 
   if (!open) return null
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim()) {
-      setError(mode === 'under_global' ? 'Please enter an account name (e.g. Ashutosh, Agency)' : 'Please enter an individual profile name')
+      setError('Please enter a name for this profile or account')
       return
     }
     if (!email.trim() || !email.includes('@')) {
@@ -56,8 +65,8 @@ export function NewProfileModal({ open, onClose, onCreate }: NewProfileModalProp
         aria-modal="true"
         aria-label="Add Profile or Account"
         style={{
-          width: '490px',
-          maxWidth: '92vw',
+          width: '560px',
+          maxWidth: '94vw',
           backgroundColor: '#090d16',
           borderRadius: '12px',
           border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -100,7 +109,7 @@ export function NewProfileModal({ open, onClose, onCreate }: NewProfileModalProp
             </div>
           )}
 
-          {/* Mode Selector: 2 Creation Scopes (Global vs Individual) */}
+          {/* Mode Selector: 3 Creation Scopes (Both, Global, Individual) */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <label style={{ fontSize: '13px', fontWeight: 500, color: '#cbd5e1' }}>
@@ -110,12 +119,34 @@ export function NewProfileModal({ open, onClose, onCreate }: NewProfileModalProp
                 (Observer is managed from sidebar)
               </span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => setMode('both')}
+                style={{
+                  padding: '10px',
+                  borderRadius: '8px',
+                  border: mode === 'both' ? '1.5px solid var(--accent)' : '1px solid rgba(255, 255, 255, 0.12)',
+                  background: mode === 'both' ? 'color-mix(in srgb, var(--accent) 15%, transparent)' : 'rgba(255, 255, 255, 0.03)',
+                  color: mode === 'both' ? '#fff' : '#94a3b8',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <div style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px', color: mode === 'both' ? '#fff' : '#cbd5e1' }}>
+                  🌟 Both (Recommended)
+                </div>
+                <div style={{ fontSize: '10px', color: '#64748b', lineHeight: 1.3 }}>
+                  Usable in both Global pool & Individual project list.
+                </div>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setMode('under_global')}
                 style={{
-                  padding: '12px',
+                  padding: '10px',
                   borderRadius: '8px',
                   border: mode === 'under_global' ? '1.5px solid var(--accent)' : '1px solid rgba(255, 255, 255, 0.12)',
                   background: mode === 'under_global' ? 'color-mix(in srgb, var(--accent) 15%, transparent)' : 'rgba(255, 255, 255, 0.03)',
@@ -125,11 +156,11 @@ export function NewProfileModal({ open, onClose, onCreate }: NewProfileModalProp
                   transition: 'all 0.15s ease'
                 }}
               >
-                <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '4px', color: mode === 'under_global' ? '#fff' : '#cbd5e1' }}>
-                  🌐 1. Global Accounts
+                <div style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px', color: mode === 'under_global' ? '#fff' : '#cbd5e1' }}>
+                  🌐 Global Accounts
                 </div>
-                <div style={{ fontSize: '11px', color: '#64748b', lineHeight: 1.3 }}>
-                  Shared global pool. All workspaces added here can be used in all project cards.
+                <div style={{ fontSize: '10px', color: '#64748b', lineHeight: 1.3 }}>
+                  Shared company pool for all project cards.
                 </div>
               </button>
 
@@ -137,7 +168,7 @@ export function NewProfileModal({ open, onClose, onCreate }: NewProfileModalProp
                 type="button"
                 onClick={() => setMode('individual')}
                 style={{
-                  padding: '12px',
+                  padding: '10px',
                   borderRadius: '8px',
                   border: mode === 'individual' ? '1.5px solid var(--accent)' : '1px solid rgba(255, 255, 255, 0.12)',
                   background: mode === 'individual' ? 'color-mix(in srgb, var(--accent) 15%, transparent)' : 'rgba(255, 255, 255, 0.03)',
@@ -147,11 +178,11 @@ export function NewProfileModal({ open, onClose, onCreate }: NewProfileModalProp
                   transition: 'all 0.15s ease'
                 }}
               >
-                <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '4px', color: mode === 'individual' ? '#fff' : '#cbd5e1' }}>
-                  👤 2. Individual Profile
+                <div style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px', color: mode === 'individual' ? '#fff' : '#cbd5e1' }}>
+                  👤 Individual Only
                 </div>
-                <div style={{ fontSize: '11px', color: '#64748b', lineHeight: 1.3 }}>
-                  Dedicated individual profile (e.g. Ayush, Client). Can own project cards.
+                <div style={{ fontSize: '10px', color: '#64748b', lineHeight: 1.3 }}>
+                  Dedicated client profile that owns cards.
                 </div>
               </button>
             </div>
@@ -159,11 +190,11 @@ export function NewProfileModal({ open, onClose, onCreate }: NewProfileModalProp
 
           <div>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#cbd5e1', marginBottom: '6px' }}>
-              {mode === 'under_global' ? 'Global Account / Profile Name' : 'Individual Profile Name'}
+              Account / Profile Name
             </label>
             <input
               type="text"
-              placeholder={mode === 'under_global' ? 'e.g. Ashutosh, Agency Global, Support' : 'e.g. Ayush, Client Project Profile'}
+              placeholder="e.g. Ashutosh, Agency Global, Client Team"
               value={name}
               onChange={(e) => setName(e.target.value)}
               autoFocus
@@ -194,15 +225,21 @@ export function NewProfileModal({ open, onClose, onCreate }: NewProfileModalProp
                 padding: '9px 12px',
                 borderRadius: '6px',
                 background: '#020617',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
+                border: existingProfile ? '1px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.12)',
                 color: '#fff',
                 fontSize: '13px',
                 boxSizing: 'border-box'
               }}
             />
-            <span style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', display: 'block' }}>
-              Chrome will open to verify Google session and 2SV before activating.
-            </span>
+            {existingProfile ? (
+              <span style={{ fontSize: '12px', color: '#38bdf8', marginTop: '4px', display: 'block' }}>
+                ℹ️ This email is already connected as &ldquo;{existingProfile.customName || existingProfile.displayName}&rdquo;. Submitting will update its scope and profile name.
+              </span>
+            ) : (
+              <span style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                Chrome will open to verify Google session and 2SV before activating.
+              </span>
+            )}
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
@@ -210,7 +247,7 @@ export function NewProfileModal({ open, onClose, onCreate }: NewProfileModalProp
               Cancel
             </button>
             <button type="submit" className="btn primary" disabled={submitting}>
-              {submitting ? 'Connecting…' : mode === 'under_global' ? 'Add Account & Verify' : 'Create Profile & Verify'}
+              {submitting ? 'Connecting…' : existingProfile ? 'Update & Link Account' : 'Add Account & Verify'}
             </button>
           </div>
         </form>

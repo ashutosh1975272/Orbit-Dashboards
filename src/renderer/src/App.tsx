@@ -594,7 +594,7 @@ function App(): React.JSX.Element {
   }, [email, createProfile, activateProfile, startGoogleAuth, loadProfiles])
 
   const handleCreateAndAuthProfile = useCallback(
-    async (displayName: string, targetEmail: string, mode?: 'under_global' | 'individual') => {
+    async (displayName: string, targetEmail: string, mode?: 'under_global' | 'individual' | 'both') => {
       const hint = targetEmail.trim()
       if (!hint) return
       setLocalAuthPhase('google')
@@ -605,8 +605,8 @@ function App(): React.JSX.Element {
         const finalDisplayName = displayName.trim() || hint
         await window.api.profiles.setCustomName(profile.id, finalDisplayName)
 
-        // Set account scope: 'global' for global pool, 'individual' for individual client profiles
-        const scope = mode === 'under_global' ? 'global' : 'individual'
+        // Set account scope: 'global' for global pool, 'individual' for individual client profiles, or 'both'
+        const scope = mode === 'under_global' ? 'global' : mode === 'both' ? 'both' : 'individual'
         await window.api.profiles.setAccountScope(targetProfileId, scope)
         await loadProfiles()
 
@@ -615,7 +615,13 @@ function App(): React.JSX.Element {
 
         if (googleOk) {
           await activateProfile(targetProfileId, viewportBounds())
-          setToast(`Profile ${displayName || hint} already signed in.`)
+          setToast(
+            mode === 'both'
+              ? `Profile ${finalDisplayName} linked to Global & Individual accounts!`
+              : mode === 'under_global'
+                ? `Account ${finalDisplayName} linked to Global accounts!`
+                : `Profile ${finalDisplayName} ready.`
+          )
           return
         }
 
@@ -632,7 +638,13 @@ function App(): React.JSX.Element {
         await loadProfiles()
         const updated = useProfileStore.getState().profiles.find((p) => p.id === targetProfileId)
         if (updated?.googleAuthStatus === 'signed-in') {
-          setToast(mode === 'under_global' ? `Google verified and added to Global Accounts!` : `Google verified! Profile ${displayName || hint} created.`)
+          setToast(
+            mode === 'both'
+              ? `Google verified! Account available in Global and Individual profiles.`
+              : mode === 'under_global'
+                ? `Google verified and added to Global Accounts!`
+                : `Google verified! Profile ${displayName || hint} created.`
+          )
           setStatusLine('Google done. Open Slack under this profile to continue.')
         } else if (!updated) {
           setStatusLine('Cancelled — unsigned profile removed.')
@@ -1126,8 +1138,7 @@ function App(): React.JSX.Element {
         }}
         onAddGoogleAccount={() => {
           setUnifiedSettingsOpen(false)
-          const emailInput = document.querySelector('.nav-input') as HTMLInputElement | null
-          emailInput?.focus()
+          setNewProfileModalOpen(true)
         }}
         onSelectProfile={(id) => {
           setUnifiedSettingsOpen(false)
@@ -1170,8 +1181,7 @@ function App(): React.JSX.Element {
           open={true}
           onClose={() => setAccountsModalOpen(false)}
           onAddGoogleAccount={() => {
-            const emailInput = document.querySelector('.nav-input') as HTMLInputElement | null
-            emailInput?.focus()
+            setNewProfileModalOpen(true)
           }}
           onSelectProfile={(id) => void handleSelectProfile(id)}
           onOpenCustomLink={(pId, link) => void handleSelectCustomLink(pId, link)}

@@ -463,7 +463,7 @@ function normalizeProfile(raw: RawProfile): Profile {
         : 'not-signed-in',
     muted: raw.muted === true,
     hiddenInSidebar: raw.hiddenInSidebar === true,
-    ...(raw.accountScope === 'global' || raw.accountScope === 'individual' || raw.accountScope === 'observer'
+    ...(raw.accountScope === 'global' || raw.accountScope === 'individual' || raw.accountScope === 'both' || raw.accountScope === 'observer'
       ? { accountScope: raw.accountScope }
       : raw.hiddenInSidebar !== true
         ? { accountScope: 'global' as const }
