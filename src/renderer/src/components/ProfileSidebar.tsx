@@ -303,7 +303,7 @@ export const ProfileSidebar = memo(function ProfileSidebar({
   email,
   onEmailChange,
   googleBusy,
-  statusLine,
+  statusLine: _statusLine,
   unreadCounts,
   recentWorkspaces,
   onAddGoogle,
@@ -319,7 +319,7 @@ export const ProfileSidebar = memo(function ProfileSidebar({
   onOpenWorkspace,
   onPinFromAvailable,
   onUnpin,
-  onDismissError,
+  onDismissError: _onDismissError,
   onPlatformSettings: _onPlatformSettings,
   onAddPlatform,
   onNewProject,
@@ -338,10 +338,37 @@ export const ProfileSidebar = memo(function ProfileSidebar({
   const [dragId, setDragId] = useState<string | null>(null)
   const [activeLook, setActiveLook] = useState<'ancient' | 'new-cosmic'>('ancient')
   const profileIdSet = useMemo(() => new Set(profiles.map((p) => p.id)), [profiles])
-  const visibleRecents = useMemo(
-    () => recentWorkspaces.filter((r) => profileIdSet.has(r.profileId)).slice(0, 5),
-    [recentWorkspaces, profileIdSet]
-  )
+  const visibleRecents = useMemo(() => {
+    const fromHistory = recentWorkspaces.filter((r) => profileIdSet.has(r.profileId))
+    if (fromHistory.length > 0) {
+      return fromHistory.slice(0, 5)
+    }
+
+    // Fallback: If no explicit history is recorded yet, surface available / pinned workspaces
+    const fallbackList: RecentWorkspace[] = []
+    for (const p of profiles) {
+      for (const appId of APP_IDS) {
+        const session = p.apps[appId]
+        if (!session) continue
+        const allWs = [
+          ...session.pinnedWorkspaces.map((w) => ({ ...w, lastSeenAt: undefined })),
+          ...session.availableWorkspaces
+        ]
+        for (const ws of allWs) {
+          if (!fallbackList.some((existing) => existing.profileId === p.id && existing.teamId === ws.teamId)) {
+            fallbackList.push({
+              profileId: p.id,
+              appId,
+              teamId: ws.teamId,
+              label: displayWorkspaceName(ws),
+              at: ws.lastSeenAt || p.createdAt
+            })
+          }
+        }
+      }
+    }
+    return fallbackList.slice(0, 5)
+  }, [recentWorkspaces, profileIdSet, profiles])
 
   const isProfileOpen = (profileId: string): boolean => {
     if (profileId in profileExpanded) {
@@ -783,23 +810,23 @@ export const ProfileSidebar = memo(function ProfileSidebar({
             type="button"
             className="nav-action-compact-btn"
             onClick={onAddPlatform}
-            title="Add Platform or Web Link"
-            aria-label="Add Platform"
+            title="Add Website or Web Platform"
+            aria-label="Add Website"
           >
-            <span className="nav-btn-icon">➕</span>
-            <span className="nav-btn-text">Add</span>
+            <span className="nav-btn-icon">🌐</span>
+            <span className="nav-btn-text">+ Website</span>
           </button>
 
           {onNewProject ? (
             <button
               type="button"
-              className="nav-action-compact-btn nav-btn-primary"
+              className="nav-action-compact-btn"
               onClick={onNewProject}
               title="Create New Project / Workspace"
               aria-label="New Project"
             >
               <span className="nav-btn-icon">📁</span>
-              <span className="nav-btn-text">Project</span>
+              <span className="nav-btn-text">+ Project</span>
             </button>
           ) : null}
 
@@ -812,7 +839,7 @@ export const ProfileSidebar = memo(function ProfileSidebar({
               aria-label="New Profile"
             >
               <span className="nav-btn-icon">👤</span>
-              <span className="nav-btn-text">Profile</span>
+              <span className="nav-btn-text">+ Profile</span>
             </button>
           ) : null}
         </div>
@@ -853,10 +880,6 @@ export const ProfileSidebar = memo(function ProfileSidebar({
           </button>
         </div>
       </div>
-
-      <p className="sidebar-status" onClick={onDismissError} role="status">
-        {statusLine}
-      </p>
     </aside>
   )
 })
