@@ -9,10 +9,11 @@ interface NewProjectModalProps {
   open: boolean
   onClose: () => void
   onSuccess?: (projectId: string) => void
+  embedded?: boolean
 }
 
 /**
- * Modern 1-page modal dialog for project creation:
+ * Modern 1-page modal dialog / in-place view for project creation:
  * 1. Select Individual Profile (strictly excludes Global Accounts)
  * 2. Enter Project Name
  * 3. Optional '+ Add' button to pick linked accounts (without upfront OAuth)
@@ -21,21 +22,28 @@ interface NewProjectModalProps {
 export function NewProjectModal({
   open,
   onClose,
-  onSuccess
+  onSuccess,
+  embedded = false
 }: NewProjectModalProps): React.JSX.Element | null {
   const profiles = useProfileStore((s) => s.profiles)
   const upsertProject = useDashboardStore((s) => s.upsertProject)
   const syncNow = useDashboardStore((s) => s.syncNow)
 
-  // Filter strictly for Individual Profiles
+  // Filter strictly for Individual Profiles:
+  // Must have (accountScope === 'individual' || hiddenInSidebar === true),
+  // and cannot be isGlobalProfile, GLOBAL_PROFILE_ID, accountScope === 'global', or 'observer'
   const individualProfiles = useMemo(() => {
-    return profiles.filter(
-      (p) =>
-        p.id !== GLOBAL_PROFILE_ID &&
-        !p.isGlobalProfile &&
-        p.accountScope !== 'global' &&
-        p.accountScope !== 'observer'
-    )
+    return profiles.filter((p) => {
+      if (
+        p.isGlobalProfile ||
+        p.id === GLOBAL_PROFILE_ID ||
+        p.accountScope === 'global' ||
+        p.accountScope === 'observer'
+      ) {
+        return false
+      }
+      return p.accountScope === 'individual' || p.hiddenInSidebar === true
+    })
   }, [profiles])
 
   const [selectedProfileId, setSelectedProfileId] = useState<string>(() => {
@@ -117,70 +125,64 @@ export function NewProjectModal({
     }
   }
 
-  return (
+  const modalContent = (
     <div
-      className="platform-settings-backdrop"
-      role="presentation"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget && !addAccountsOpen) onClose()
+      className={embedded ? 'embedded-panel-card' : 'platform-settings-panel'}
+      role="dialog"
+      aria-modal={!embedded}
+      aria-label="Create New Project"
+      style={{
+        width: embedded ? '100%' : '520px',
+        maxWidth: embedded ? '680px' : '92vw',
+        backgroundColor: '#0f172a',
+        borderRadius: '14px',
+        border: '1px solid rgba(255, 255, 255, 0.12)',
+        boxShadow: embedded ? '0 10px 30px rgba(0, 0, 0, 0.4)' : '0 25px 50px -12px rgba(0, 0, 0, 0.75)',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        margin: embedded ? '0 auto' : undefined
       }}
-      style={{ zIndex: 1200 }}
     >
+      {/* Header */}
       <div
-        className="platform-settings-panel"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Create New Project"
         style={{
-          width: '520px',
-          maxWidth: '92vw',
-          backgroundColor: '#0f172a',
-          borderRadius: '14px',
-          border: '1px solid rgba(255, 255, 255, 0.12)',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.75)',
-          overflow: 'hidden',
+          padding: '18px 22px',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
           display: 'flex',
-          flexDirection: 'column'
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: 'rgba(255, 255, 255, 0.02)'
         }}
       >
-        {/* Header */}
-        <div
-          style={{
-            padding: '18px 22px',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            background: 'rgba(255, 255, 255, 0.02)'
-          }}
-        >
-          <div>
-            <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 650, color: '#f8fafc' }}>
-              Create New Project
-            </h3>
-            <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#94a3b8' }}>
-              Create a project card inside an individual profile without upfront OAuth blockers.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#94a3b8',
-              cursor: 'pointer',
-              fontSize: '18px',
-              padding: '4px 8px',
-              borderRadius: '6px'
-            }}
-          >
-            ✕
-          </button>
+        <div>
+          <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 650, color: '#f8fafc' }}>
+            Create New Project
+          </h3>
+          <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#94a3b8' }}>
+            Create a project card inside an individual profile without upfront OAuth blockers.
+          </p>
         </div>
+        <button
+          type="button"
+          onClick={onClose}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: '#94a3b8',
+            cursor: 'pointer',
+            fontSize: '18px',
+            padding: '4px 8px',
+            borderRadius: '6px'
+          }}
+          title="Close"
+        >
+          ✕
+        </button>
+      </div>
 
-        {/* Content */}
-        <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+      {/* Content */}
+      <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
           {error && (
             <div
               style={{
@@ -404,15 +406,44 @@ export function NewProjectModal({
           </button>
         </div>
       </div>
+  )
 
-      {/* Embedded selector reuse */}
+  if (embedded) {
+    return (
+      <>
+        {modalContent}
+        {addAccountsOpen && (
+          <CardAddModal
+            open={addAccountsOpen}
+            project={dummyProject}
+            onClose={() => setAddAccountsOpen(false)}
+            onSuccess={() => {
+              if (dummyProject.sources) {
+                setSources([...dummyProject.sources])
+              }
+            }}
+          />
+        )}
+      </>
+    )
+  }
+
+  return (
+    <div
+      className="platform-settings-backdrop"
+      role="presentation"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget && !addAccountsOpen) onClose()
+      }}
+      style={{ zIndex: 1200 }}
+    >
+      {modalContent}
       {addAccountsOpen && (
         <CardAddModal
           open={addAccountsOpen}
           project={dummyProject}
           onClose={() => setAddAccountsOpen(false)}
           onSuccess={() => {
-            // Pick up newly added sources from the dummy project
             if (dummyProject.sources) {
               setSources([...dummyProject.sources])
             }
