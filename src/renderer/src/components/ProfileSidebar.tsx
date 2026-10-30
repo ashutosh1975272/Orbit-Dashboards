@@ -1,12 +1,14 @@
 import { memo, useMemo, useState } from 'react'
 import { APP_DISPLAY_NAME } from '../../../shared/brand'
-import type { AppId, AppSession, AppSessionStatus, Profile } from '../../../shared/types'
+import type { AppId, AppSession, AppSessionStatus, CustomLink, Profile } from '../../../shared/types'
 import {
   APP_IDS,
-  appLabel,
   appSupportsWorkspaces,
-  profileDisplayLabel
+  profileDisplayLabel,
+  sanitizeWorkspaceName,
+  sidebarAppLabel
 } from '../../../shared/types'
+import { modKey } from '../lib/shortcut-label'
 import { formatUnreadBadge, unreadKey } from '../lib/unread-badge'
 import { AppIcon } from './AppIcon'
 import { SidebarPanelIcon } from './SidebarPanelIcon'
@@ -46,8 +48,31 @@ interface ProfileSidebarProps {
   onPinFromAvailable: (profileId: string, appId: AppId, teamId: string) => void
   onUnpin: (profileId: string, appId: AppId, teamId: string) => void
   onDismissError: () => void
+  /** Open the platform settings panel for a given profile + app. */
+  onPlatformSettings: (profileId: string, appId: AppId) => void
+  /** Open the "+ Add" page for adding platforms / custom links. */
+  onAddPlatform: () => void
+  /** Open the Accounts & Workspaces management hub. */
+  onOpenAccountsSettings?: () => void
+  /** Active custom link ID if one is currently opened in embed */
+  activeCustomLinkId?: string | null
+  /** Select and view a custom link */
+  onSelectCustomLink?: (profileId: string, link: CustomLink) => void
   /** Optional slot rendered after the Recents strip (dashboard entry point). */
   dashboardSlot?: React.ReactNode
+}
+
+function platformStatusDot(sessionStatus: AppSessionStatus): {
+  label: string
+  kind: 'connected' | 'needs-login' | 'signing-in'
+} {
+  if (sessionStatus === 'signed-in') {
+    return { label: 'Connected', kind: 'connected' }
+  }
+  if (sessionStatus === 'not-signed-in') {
+    return { label: 'Needs login', kind: 'needs-login' }
+  }
+  return { label: 'Signing in…', kind: 'signing-in' }
 }
 
 function isBusy(status: AppSessionStatus): boolean {
@@ -96,21 +121,24 @@ function displayWorkspaceName(ws: {
   teamId: string
   lastChannelName?: string
 }): string {
-  const name = ws.teamName?.trim()
+  const sanitized = sanitizeWorkspaceName(ws.teamName)
+  const name = sanitized || ws.teamName?.trim()
   const generic =
     !name ||
-    /^(microsoft teams|teams|teams org|organization|teams-home)$/i.test(name) ||
+    /^(microsoft teams|teams|teams org|organization|teams-home|unknown)$/i.test(name) ||
+    /^\d+\s+new\s+items?/i.test(name) ||
+    /^new\s+item/i.test(name) ||
     /^tenant-/i.test(name) ||
     /^T[A-Z0-9]+$/i.test(name)
 
   if (!generic) {
     return name
   }
-  if (ws.lastChannelName?.trim()) {
-    return ws.lastChannelName.trim()
-  }
   if (ws.teamDomain?.trim()) {
     return ws.teamDomain.trim()
+  }
+  if (ws.lastChannelName?.trim()) {
+    return sanitizeWorkspaceName(ws.lastChannelName.trim()) || ws.lastChannelName.trim()
   }
   if (ws.teamId === 'teams-home') {
     return 'Personal'
@@ -284,6 +312,11 @@ export const ProfileSidebar = memo(function ProfileSidebar({
   onPinFromAvailable,
   onUnpin,
   onDismissError,
+  onPlatformSettings,
+  onAddPlatform,
+  onOpenAccountsSettings,
+  activeCustomLinkId,
+  onSelectCustomLink,
   dashboardSlot
 }: ProfileSidebarProps): React.JSX.Element {
   const [profileExpanded, setProfileExpanded] = useState<Record<string, boolean>>({})
@@ -331,7 +364,7 @@ export const ProfileSidebar = memo(function ProfileSidebar({
               type="button"
               className="btn ghost icon-btn"
               onClick={onToggleSidebar}
-              title="Hide sidebar (⌘B)"
+              title={`Hide sidebar (${modKey()}B)`}
               aria-label="Hide sidebar"
             >
               <SidebarPanelIcon />
@@ -370,7 +403,8 @@ export const ProfileSidebar = memo(function ProfileSidebar({
                     type="button"
                     className="recent-item"
                     onClick={() => {
-                      onSelect(r.profileId)
+                      // Opening the workspace already activates its profile/app;
+                      // a second onSelect here races it and can clear activeAppId.
                       if (app) {
                         onOpenWorkspace(r.profileId, app, r.teamId)
                       }
@@ -389,7 +423,7 @@ export const ProfileSidebar = memo(function ProfileSidebar({
                       <span className="ws-title">{title}</span>
                       <span className="ws-sub">
                         {profileName}
-                        {app ? ` · ${appLabel(app)}` : ''}
+                        {app ? ` · ${sidebarAppLabel(app)}` : ''}
                       </span>
                     </span>
                   </button>
@@ -436,7 +470,9 @@ export const ProfileSidebar = memo(function ProfileSidebar({
         {profiles.length === 0 ? (
           <li className="empty-hint">No profiles yet.</li>
         ) : (
-          profiles.map((profile) => {
+          profiles
+            .filter((p) => !p.hiddenInSidebar)
+            .map((profile) => {
             const profileOpen = isProfileOpen(profile.id)
             const profileActive = profile.id === activeProfileId
             const label = profileDisplayLabel(profile)
@@ -552,29 +588,53 @@ export const ProfileSidebar = memo(function ProfileSidebar({
                             onOpenInSplit(profile.id, appId)
                           }}
                         >
-                          <button
-                            type="button"
-                            className="nav-app-select"
-                            onClick={() => {
-                              onSelectApp(profile.id, appId)
-                              if (signedIn && supportsWorkspaces) {
-                                setAppExpanded((prev) => ({
-                                  ...prev,
-                                  [`${profile.id}:${appId}`]: true
-                                }))
-                              }
-                            }}
-                            title="Right-click: open in split"
-                          >
-                            <AppIcon appId={appId} className="nav-app-icon" size={12} />
-                            <span className="nav-app-label">{appLabel(appId)}</span>
-                            <AppStatusMark status={session.sessionStatus} />
-                            {formatUnreadBadge(unreadCounts[unreadKey(profile.id, appId)] ?? 0) ? (
-                              <span className="unread-badge" aria-label="Unread">
-                                {formatUnreadBadge(unreadCounts[unreadKey(profile.id, appId)] ?? 0)}
-                              </span>
-                            ) : null}
-                          </button>
+                          <div className="nav-app-row">
+                            <button
+                              type="button"
+                              className="nav-app-select"
+                              onClick={() => {
+                                onSelectApp(profile.id, appId)
+                                if (signedIn && supportsWorkspaces) {
+                                  setAppExpanded((prev) => ({
+                                    ...prev,
+                                    [`${profile.id}:${appId}`]: true
+                                  }))
+                                }
+                              }}
+                              title="Right-click: open in split"
+                            >
+                              <AppIcon appId={appId} className="nav-app-icon" size={12} />
+                              <span className="nav-app-label">{sidebarAppLabel(appId)}</span>
+                              <AppStatusMark status={session.sessionStatus} />
+                              {(() => {
+                                const st = platformStatusDot(session.sessionStatus)
+                                return (
+                                  <span
+                                    className={`platform-status-dot platform-status-${st.kind}`}
+                                    title={st.label}
+                                    aria-label={st.label}
+                                  />
+                                )
+                              })()}
+                              {formatUnreadBadge(unreadCounts[unreadKey(profile.id, appId)] ?? 0) ? (
+                                <span className="unread-badge" aria-label="Unread">
+                                  {formatUnreadBadge(unreadCounts[unreadKey(profile.id, appId)] ?? 0)}
+                                </span>
+                              ) : null}
+                            </button>
+                            <button
+                              type="button"
+                              className="nav-app-settings"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                onPlatformSettings(profile.id, appId)
+                              }}
+                              title="Settings"
+                              aria-label="Settings"
+                            >
+                              ⚙
+                            </button>
+                          </div>
 
                           {appOpen && signedIn && supportsWorkspaces ? (
                             <WorkspaceBranch
@@ -590,6 +650,47 @@ export const ProfileSidebar = memo(function ProfileSidebar({
                         </li>
                       )
                     })}
+
+                    {/* Custom Links Rows */}
+                    {(profile.customLinks ?? [])
+                      .filter((link) => !link.hiddenInSidebar)
+                      .map((link) => {
+                        const isLinkActive =
+                          profileActive && activeCustomLinkId === link.id
+
+                        return (
+                          <li
+                            key={link.id}
+                            className={`nav-app${isLinkActive ? ' is-active' : ''}`}
+                          >
+                            <div className="nav-app-row">
+                              <button
+                                type="button"
+                                className="nav-app-select"
+                                onClick={() => {
+                                  onSelect(profile.id)
+                                  onSelectCustomLink?.(profile.id, link)
+                                }}
+                                title={`Open ${link.name} (${link.url})`}
+                              >
+                                <span
+                                  style={{
+                                    fontSize: '0.82rem',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    width: '16px',
+                                    marginRight: '2px'
+                                  }}
+                                >
+                                  🌐
+                                </span>
+                                <span className="nav-app-label">{link.name}</span>
+                              </button>
+                            </div>
+                          </li>
+                        )
+                      })}
                   </ul>
                 ) : null}
               </li>
@@ -597,6 +698,27 @@ export const ProfileSidebar = memo(function ProfileSidebar({
           })
         )}
       </ul>
+
+      <div className="nav-add-section">
+        <button
+          type="button"
+          className="nav-add-btn"
+          onClick={onAddPlatform}
+          title="Add platform or custom link"
+          aria-label="Add platform or custom link"
+        >
+          + Add
+        </button>
+        <button
+          type="button"
+          className="nav-accounts-btn"
+          onClick={onOpenAccountsSettings}
+          title="Global Settings & Accounts Hub"
+          aria-label="Global Settings & Accounts Hub"
+        >
+          ⚙ Settings
+        </button>
+      </div>
 
       <p className="sidebar-status" onClick={onDismissError} role="status">
         {statusLine}

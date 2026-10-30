@@ -1,3 +1,4 @@
+const fakeVault = { encrypt: (p: string) => Buffer.from(p).toString('base64'), decrypt: (b: string) => Buffer.from(b, 'base64').toString('utf8') }
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -219,7 +220,7 @@ describe('NimProvider.chatJson', () => {
 describe('MonitorStore — one workspace per card', () => {
   async function store(): Promise<MonitorStore> {
     const dir = await tmpDir()
-    return new MonitorStore({ rootDir: dir, encryptionAvailable: false })
+    return new MonitorStore({ rootDir: dir, encryptionAvailable: true, vault: fakeVault })
   }
 
   it('stamps the workspace from the vault metadata', async () => {
@@ -306,7 +307,7 @@ describe('MonitorStore — one workspace per card', () => {
 describe('workspace migration', () => {
   it('splits a mixed card into one card per workspace', async () => {
     const dir = await tmpDir()
-    const store = new MonitorStore({ rootDir: dir, encryptionAvailable: false })
+    const store = new MonitorStore({ rootDir: dir, encryptionAvailable: true, vault: fakeVault })
     // legacy card: written by an old version, before workspaces were stamped
     await writeLegacyProject(dir, {
       id: 'legacy-1',
@@ -352,7 +353,7 @@ describe('workspace migration', () => {
 
   it('stamps a legacy card that only watches one workspace', async () => {
     const dir = await tmpDir()
-    const store = new MonitorStore({ rootDir: dir, encryptionAvailable: false })
+    const store = new MonitorStore({ rootDir: dir, encryptionAvailable: true, vault: fakeVault })
     await writeLegacyProject(dir, {
       id: 'legacy-2',
       name: 'Legacy',
@@ -383,7 +384,7 @@ describe('workspace migration', () => {
 
   it('does nothing when every card already knows its workspace', async () => {
     const dir = await tmpDir()
-    const store = new MonitorStore({ rootDir: dir, encryptionAvailable: false })
+    const store = new MonitorStore({ rootDir: dir, encryptionAvailable: true, vault: fakeVault })
     await store.upsertProject({
       project: {
         name: 'Clean',
@@ -416,7 +417,7 @@ describe('workspace migration', () => {
 describe('one card = one workspace (hard rule)', () => {
   it('refuses to store a card without a real workspace', async () => {
     const dir = await tmpDir()
-    const store = new MonitorStore({ rootDir: dir, encryptionAvailable: false })
+    const store = new MonitorStore({ rootDir: dir, encryptionAvailable: true, vault: fakeVault })
     await expect(
       store.upsertProject({
         project: {
@@ -436,7 +437,7 @@ describe('one card = one workspace (hard rule)', () => {
 
   it('stamps the workspace from the vault metadata when it is missing', async () => {
     const dir = await tmpDir()
-    const store = new MonitorStore({ rootDir: dir, encryptionAvailable: false })
+    const store = new MonitorStore({ rootDir: dir, encryptionAvailable: true, vault: fakeVault })
     await store.saveManualToken('K1', 'xoxp-1', { teamId: 'T1', teamName: 'Workspace A' })
     const created = await store.upsertProject({
       project: {

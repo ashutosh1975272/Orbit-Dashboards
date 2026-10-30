@@ -6,6 +6,7 @@ import type {
   AppSession,
   AppSessionStatus,
   AvailableWorkspace,
+  CustomLink,
   PinnedWorkspace,
   Profile,
   ProfileApps,
@@ -149,7 +150,10 @@ function workspaceFromRaw(
     (appId === 'slack'
       ? resolvePinnedOpenUrl({ teamId: id, openUrl, teamDomain: domain })
       : defaultOpenUrlForApp(appId))
-  const name = appId === 'teams' && id === 'teams-home' ? 'Personal' : teamName.trim() || id
+  let name = appId === 'teams' && id === 'teams-home' ? 'Personal' : teamName.trim() || id
+  if (appId === 'slack' && isSlackPlaceholderName(name) && domain) {
+    name = domain
+  }
   return {
     teamId: id,
     teamName: name,
@@ -387,8 +391,10 @@ type RawProfile = {
   avatarUrl?: unknown
   sortOrder?: unknown
   muted?: unknown
+  hiddenInSidebar?: unknown
   googleAuthStatus?: unknown
   apps?: unknown
+  customLinks?: unknown
   /** Legacy Slack-only fields */
   sessionStatus?: unknown
   availableWorkspaces?: unknown
@@ -453,11 +459,94 @@ function normalizeProfile(raw: RawProfile): Profile {
         ? raw.googleAuthStatus
         : 'not-signed-in',
     muted: raw.muted === true,
+    hiddenInSidebar: raw.hiddenInSidebar === true,
     ...(typeof sortOrder === 'number' ? { sortOrder } : {}),
     ...(customName ? { customName } : {}),
     ...(avatarUrl ? { avatarUrl } : {}),
-    apps
+    apps,
+    customLinks: normalizeCustomLinks(raw.customLinks)
   }
+}
+
+function normalizeCustomLinks(raw: unknown): CustomLink[] {
+  if (!Array.isArray(raw)) return []
+  const out: CustomLink[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const rec = item as Record<string, unknown>
+    if (typeof rec.id !== 'string' || !rec.id.trim()) continue
+    if (typeof rec.name !== 'string' || !rec.name.trim()) continue
+    if (typeof rec.url !== 'string' || !rec.url.trim()) continue
+    out.push({
+      id: rec.id.trim(),
+      name: rec.name.trim(),
+      url: rec.url.trim(),
+      order: typeof rec.order === 'number' && Number.isFinite(rec.order) ? rec.order : out.length,
+      createdAt: typeof rec.createdAt === 'string' ? rec.createdAt : new Date().toISOString(),
+      partition:
+        typeof rec.partition === 'string' && rec.partition.trim()
+          ? rec.partition.trim()
+          : `persist:profile-link-${rec.id.trim()}`,
+      hiddenInSidebar: rec.hiddenInSidebar === true
+    })
+  }
+  return out.sort((a, b) => a.order - b.order)
+}
+
+export function validateCustomLinkInput(
+  name: string,
+  url: string,
+  existingLinks: CustomLink[] = []
+): { valid: true; name: string; url: string } | { valid: false; message: string } {
+  const trimmedName = (name ?? '').trim()
+  if (!trimmedName || trimmedName.length < 1 || trimmedName.length > 40) {
+    return { valid: false, message: 'Name must be between 1 and 40 characters.' }
+  }
+
+  const trimmedUrl = (url ?? '').trim()
+  if (!trimmedUrl) {
+    return { valid: false, message: 'URL is required.' }
+  }
+
+  if (
+    trimmedUrl.toLowerCase().startsWith('javascript:') ||
+    trimmedUrl.toLowerCase().startsWith('file:') ||
+    trimmedUrl.toLowerCase().startsWith('data:')
+  ) {
+    return { valid: false, message: 'Insecure URL scheme rejected.' }
+  }
+
+  let parsed: URL
+  try {
+    parsed = new URL(trimmedUrl)
+  } catch {
+    return { valid: false, message: 'Invalid URL format.' }
+  }
+
+  if (parsed.protocol !== 'https:') {
+    return { valid: false, message: 'https only URL is required.' }
+  }
+
+  if (!parsed.hostname || !parsed.hostname.trim()) {
+    return { valid: false, message: 'URL host cannot be empty.' }
+  }
+
+  if (existingLinks.length >= 30) {
+    return {
+      valid: false,
+      message: 'Maximum limit of 30 custom links per profile reached.'
+    }
+  }
+
+  const normalizedTarget = parsed.href.toLowerCase().replace(/\/$/, '')
+  const duplicate = existingLinks.some(
+    (l) => l.url.trim().toLowerCase().replace(/\/$/, '') === normalizedTarget
+  )
+  if (duplicate) {
+    return { valid: false, message: 'This URL has already been added to this profile.' }
+  }
+
+  return { valid: true, name: trimmedName, url: parsed.href }
 }
 
 function updateApp(profile: Profile, appId: AppId, session: AppSession): Profile {
@@ -538,7 +627,9 @@ export class ProfileStore {
       googleAuthStatus: 'not-signed-in',
       sortOrder: data.profiles.length,
       muted: false,
-      apps: emptyProfileApps()
+      hiddenInSidebar: false,
+      apps: emptyProfileApps(),
+      customLinks: []
     }
 
     data.profiles.push(profile)
@@ -776,12 +867,11 @@ export class ProfileStore {
     if (existingIdx >= 0) {
       const prev = app.availableWorkspaces[existingIdx]
       const nextName =
-        isSlackPlaceholderName(entry.teamName) && !isSlackPlaceholderName(prev.teamName)
-          ? prev.teamName
-          : entry.teamName &&
-              !/^(microsoft teams|teams|teams org|organization)$/i.test(entry.teamName)
-            ? entry.teamName
-            : prev.teamName || entry.teamName
+        !isSlackPlaceholderName(entry.teamName)
+          ? entry.teamName
+          : !isSlackPlaceholderName(prev.teamName)
+            ? prev.teamName
+            : entry.teamDomain || prev.teamDomain || entry.teamName
       availableWorkspaces = app.availableWorkspaces.map((w, i) =>
         i === existingIdx
           ? {
@@ -1063,6 +1153,187 @@ export class ProfileStore {
   async get(profileId: string): Promise<Profile | undefined> {
     const data = await this.read()
     return data.profiles.find((p) => p.id === profileId)
+  }
+
+  async listCustomLinks(profileId: string): Promise<CustomLink[]> {
+    const profile = await this.get(profileId)
+    if (!profile) {
+      throw new Error(`Profile not found: ${profileId}`)
+    }
+    return profile.customLinks ?? []
+  }
+
+  async addCustomLink(
+    profileId: string,
+    link: { name: string; url: string }
+  ): Promise<Profile> {
+    const data = await this.read()
+    const index = data.profiles.findIndex((p) => p.id === profileId)
+    if (index === -1) {
+      throw new Error(`Profile not found: ${profileId}`)
+    }
+    const profile = data.profiles[index]!
+    const existing = profile.customLinks ?? []
+
+    const validated = validateCustomLinkInput(link.name, link.url, existing)
+    if (!validated.valid) {
+      throw new Error(validated.message)
+    }
+
+    const linkId = randomUUID()
+    const newLink: CustomLink = {
+      id: linkId,
+      name: validated.name,
+      url: validated.url,
+      order: existing.length,
+      createdAt: new Date().toISOString(),
+      partition: `persist:profile-${profileId}-link-${linkId}`,
+      hiddenInSidebar: false
+    }
+
+    const updatedProfile: Profile = {
+      ...profile,
+      customLinks: [...existing, newLink]
+    }
+    data.profiles[index] = updatedProfile
+    await this.write(data)
+    return updatedProfile
+  }
+
+  async updateCustomLink(
+    profileId: string,
+    linkId: string,
+    patch: { name?: string; url?: string }
+  ): Promise<Profile> {
+    const data = await this.read()
+    const index = data.profiles.findIndex((p) => p.id === profileId)
+    if (index === -1) {
+      throw new Error(`Profile not found: ${profileId}`)
+    }
+    const profile = data.profiles[index]!
+    const existing = profile.customLinks ?? []
+    const linkIdx = existing.findIndex((l) => l.id === linkId)
+    if (linkIdx === -1) {
+      throw new Error(`Custom link not found: ${linkId}`)
+    }
+
+    const current = existing[linkIdx]!
+    const nextName = patch.name !== undefined ? patch.name : current.name
+    const nextUrl = patch.url !== undefined ? patch.url : current.url
+
+    // Exclude current link from duplicate check
+    const otherLinks = existing.filter((l) => l.id !== linkId)
+    const validated = validateCustomLinkInput(nextName, nextUrl, otherLinks)
+    if (!validated.valid) {
+      throw new Error(validated.message)
+    }
+
+    const updatedLink: CustomLink = {
+      ...current,
+      name: validated.name,
+      url: validated.url
+    }
+
+    const nextLinks = [...existing]
+    nextLinks[linkIdx] = updatedLink
+    const updatedProfile: Profile = {
+      ...profile,
+      customLinks: nextLinks
+    }
+    data.profiles[index] = updatedProfile
+    await this.write(data)
+    return updatedProfile
+  }
+
+  async removeCustomLink(profileId: string, linkId: string): Promise<Profile> {
+    const data = await this.read()
+    const index = data.profiles.findIndex((p) => p.id === profileId)
+    if (index === -1) {
+      throw new Error(`Profile not found: ${profileId}`)
+    }
+    const profile = data.profiles[index]!
+    const existing = profile.customLinks ?? []
+    const nextLinks = existing
+      .filter((l) => l.id !== linkId)
+      .map((link, idx) => ({ ...link, order: idx }))
+
+    const updatedProfile: Profile = {
+      ...profile,
+      customLinks: nextLinks
+    }
+    data.profiles[index] = updatedProfile
+    await this.write(data)
+    return updatedProfile
+  }
+
+  async reorderCustomLinks(profileId: string, orderedIds: string[]): Promise<Profile> {
+    const data = await this.read()
+    const index = data.profiles.findIndex((p) => p.id === profileId)
+    if (index === -1) {
+      throw new Error(`Profile not found: ${profileId}`)
+    }
+    const profile = data.profiles[index]!
+    const existing = profile.customLinks ?? []
+    const byId = new Map(existing.map((l) => [l.id, l]))
+
+    const reordered: CustomLink[] = []
+    for (let i = 0; i < orderedIds.length; i++) {
+      const item = byId.get(orderedIds[i]!)
+      if (item) {
+        reordered.push({ ...item, order: i })
+        byId.delete(orderedIds[i]!)
+      }
+    }
+    // Append any omitted links
+    for (const remaining of byId.values()) {
+      reordered.push({ ...remaining, order: reordered.length })
+    }
+
+    const updatedProfile: Profile = {
+      ...profile,
+      customLinks: reordered
+    }
+    data.profiles[index] = updatedProfile
+    await this.write(data)
+    return updatedProfile
+  }
+
+  async setSidebarVisibility(profileId: string, hidden: boolean): Promise<Profile> {
+    const data = await this.read()
+    const index = data.profiles.findIndex((p) => p.id === profileId)
+    if (index === -1) {
+      throw new Error(`Profile not found: ${profileId}`)
+    }
+    const updatedProfile: Profile = {
+      ...data.profiles[index]!,
+      hiddenInSidebar: hidden
+    }
+    data.profiles[index] = updatedProfile
+    await this.write(data)
+    return updatedProfile
+  }
+
+  async setLinkSidebarVisibility(
+    profileId: string,
+    linkId: string,
+    hidden: boolean
+  ): Promise<Profile> {
+    const data = await this.read()
+    const index = data.profiles.findIndex((p) => p.id === profileId)
+    if (index === -1) {
+      throw new Error(`Profile not found: ${profileId}`)
+    }
+    const profile = data.profiles[index]!
+    const links = (profile.customLinks ?? []).map((l) =>
+      l.id === linkId ? { ...l, hiddenInSidebar: hidden } : l
+    )
+    const updatedProfile: Profile = {
+      ...profile,
+      customLinks: links
+    }
+    data.profiles[index] = updatedProfile
+    await this.write(data)
+    return updatedProfile
   }
 
   private async read(): Promise<{ profiles: Profile[] }> {

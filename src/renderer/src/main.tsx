@@ -10,8 +10,13 @@ import { applyDocumentTheme, applySidebarWidth } from './lib/workspace-theme'
 applyDocumentTheme('dark')
 applySidebarWidth(DEFAULT_APP_SETTINGS.sidebarWidth)
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>
-)
+const demo = __ORBIT_DEMO__
+if (demo === 'sparse' || demo === 'rich') {
+  void import('./demo/mount-demo').then(({ mountDemo }) => mountDemo(demo))
+} else {
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>
+  )
+}

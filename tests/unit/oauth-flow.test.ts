@@ -12,6 +12,7 @@ describe('oauth-flow helpers', () => {
     expect(parsed.origin + parsed.pathname).toBe('https://slack.com/oauth/v2/authorize')
     expect(parsed.searchParams.get('client_id')).toBe('client-123')
     expect(parsed.searchParams.get('user_scope')).toBe(__test__.USER_SCOPES)
+    expect(parsed.searchParams.get('user_scope')).toContain('chat:write')
     expect(parsed.searchParams.get('state')).toBe('state-abc')
   })
 

@@ -19,6 +19,8 @@ import { compareTs } from './delta-store'
 
 export interface InsightEngineDeps {
   provider: NimProvider | null
+  /** v2.7 — per-project provider (project settings → global → env). */
+  resolveProvider?: (projectId: string) => Promise<NimProvider | null>
   historyStore: HistoryStore
   deltaStore: DashboardDeltaStore
   /** users.list per token — name mapping for prompts (best effort). */
@@ -33,6 +35,7 @@ const HEARTBEAT_MINUTES = 30
 
 export class InsightEngine {
   private readonly provider: NimProvider | null
+  private readonly resolveProvider: ((projectId: string) => Promise<NimProvider | null>) | null
   private readonly historyStore: HistoryStore
   private readonly deltaStore: DashboardDeltaStore
   private readonly fetchUsers: (token: string) => Promise<Map<string, string>>
@@ -40,6 +43,7 @@ export class InsightEngine {
 
   constructor(deps: InsightEngineDeps) {
     this.provider = deps.provider
+    this.resolveProvider = deps.resolveProvider ?? null
     this.historyStore = deps.historyStore
     this.deltaStore = deps.deltaStore
     this.fetchUsers = deps.fetchUsers ?? (async () => new Map())
@@ -103,7 +107,8 @@ export class InsightEngine {
   async refresh(
     project: DashboardProject,
     token: string,
-    baseSnapshot: DashboardProjectSnapshot
+    baseSnapshot: DashboardProjectSnapshot,
+    options?: { force?: boolean }
   ): Promise<DashboardProjectSnapshot> {
     const entries = await this.historyStore.read(project.id)
     const lastEntry = entries[0]
@@ -117,42 +122,61 @@ export class InsightEngine {
     let modelUsed: string | null = null
     let merged: ProjectInsight | null = null
 
-    if (this.provider) {
-      if (newCount > 0) {
-        const minutesSince = lastEntry
-          ? (Date.now() - new Date(lastEntry.atIso).getTime()) / 60_000
-          : Infinity
-        const due = newCount >= MIN_NEW_FOR_IMMEDIATE || minutesSince >= HEARTBEAT_MINUTES
-        if (due) {
-          try {
-            const userNames = await this.fetchUsers(token)
-            const chatInput = this.toChatInput(raw, userNames, project)
-            const messages = buildInsightMessages({
-              projectName: project.name,
-              workspaceName: project.teamName ?? project.teamId,
-              clientName: project.clientName,
-              previous,
-              newMessages: chatInput,
-              newCount
-            })
-            const res = await this.provider.chatJson(messages, { temperature: 0.2 })
-            // only quotes that really exist in the chat may reach the card
-            const quotes = chatInput.map((m) => m.text)
-            merged = mergeInsight(res.data, previous, quotes)
-            modelUsed = res.modelUsed
-            source = 'ai'
-            this.log(
-              `[dashboard] insight refreshed (${project.name}) model=${modelUsed} new=${newCount}`
-            )
-          } catch (err) {
-            this.log(
-              `[dashboard] insight failed (${project.name}): ${
-                err instanceof Error ? err.message : String(err)
-              } — using heuristics`
-            )
-            merged = buildHeuristicInsight(baseSnapshot)
-            source = 'heuristic'
-          }
+    let provider = this.provider
+    if (this.resolveProvider) {
+      try {
+        provider = await this.resolveProvider(project.id)
+      } catch (err) {
+        this.log(
+          `[dashboard] settings resolve failed (${project.name}): ${
+            err instanceof Error ? err.message : String(err)
+          }`
+        )
+        provider = null
+      }
+    }
+
+    if (provider) {
+      const minutesSince = lastEntry
+        ? (Date.now() - new Date(lastEntry.atIso).getTime()) / 60_000
+        : Infinity
+      // A forced daily re-check re-grounds even on a quiet day; otherwise the
+      // cost is only paid when messages arrived and either enough of them or
+      // enough time has passed.
+      const due =
+        newCount > 0 &&
+        (options?.force === true ||
+          newCount >= MIN_NEW_FOR_IMMEDIATE ||
+          minutesSince >= HEARTBEAT_MINUTES)
+      if (due) {
+        try {
+          const userNames = await this.fetchUsers(token)
+          const chatInput = this.toChatInput(raw, userNames, project)
+          const messages = buildInsightMessages({
+            projectName: project.name,
+            workspaceName: project.teamName ?? project.teamId,
+            clientName: project.clientName,
+            previous,
+            newMessages: chatInput,
+            newCount
+          })
+          const res = await provider.chatJson(messages, { temperature: 0.2 })
+          // only quotes that really exist in the chat may reach the card
+          const quotes = chatInput.map((m) => m.text)
+          merged = mergeInsight(res.data, previous, quotes)
+          modelUsed = res.modelUsed
+          source = 'ai'
+          this.log(
+            `[dashboard] insight refreshed (${project.name}) model=${modelUsed} new=${newCount}`
+          )
+        } catch (err) {
+          this.log(
+            `[dashboard] insight failed (${project.name}): ${
+              err instanceof Error ? err.message : String(err)
+            } — using heuristics`
+          )
+          merged = buildHeuristicInsight(baseSnapshot)
+          source = 'heuristic'
         }
       }
     } else if (newCount > 0 || !previous) {

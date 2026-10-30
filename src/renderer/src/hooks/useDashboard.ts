@@ -38,7 +38,14 @@ interface DashboardState {
       | (Omit<DashboardProject, 'createdAt'> & { id: string })
   ) => Promise<void>
   deleteProject: (projectId: string) => Promise<void>
+  setPinnedOrder: (order: string[]) => Promise<void>
   syncNow: (projectId?: string) => Promise<void>
+  syncSource: (payload: { projectId: string; sourceId?: string }) => Promise<{
+    channelsRead: number
+    newMessages: number
+    status: string
+    error?: string
+  }>
   addManualToken: (
     key: string,
     token: string
@@ -66,6 +73,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   setDashRailExpanded: (expanded) => set({ dashRailExpanded: expanded }),
 
   loadSnapshot: async () => {
+    const state = get()
+    if (state.loading) return
     set({ loading: true, error: null })
     try {
       const snapshot = await window.api.dashboard.getSnapshot()
@@ -97,6 +106,11 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     set({ snapshot })
   },
 
+  setPinnedOrder: async (order) => {
+    const snapshot = await window.api.dashboard.setPinnedOrder({ order })
+    set({ snapshot })
+  },
+
   syncNow: async (projectId) => {
     set({ error: null })
     try {
@@ -106,6 +120,23 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       void get().loadRecent()
     } catch (err) {
       set({ error: err instanceof Error ? err.message : 'sync failed' })
+    }
+  },
+
+  syncSource: async (payload) => {
+    try {
+      const res = await window.api.dashboard.syncSource(payload)
+      const snapshot = await window.api.dashboard.getSnapshot()
+      set({ snapshot })
+      void get().loadRecent()
+      return res
+    } catch (err) {
+      return {
+        channelsRead: 0,
+        newMessages: 0,
+        status: 'error',
+        error: err instanceof Error ? err.message : 'Failed to scrape source'
+      }
     }
   },
 

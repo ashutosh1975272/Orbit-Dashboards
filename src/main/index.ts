@@ -6,7 +6,11 @@ import dockIcon from '../../resources/dockIcon.png?asset'
 import trayIcon from '../../resources/trayIcon.png?asset'
 import { APP_BUNDLE_ID, APP_DISPLAY_NAME } from '../shared/brand'
 import { IpcChannels } from '../shared/ipc-contract'
-import type { DashboardDigest, RecentActivity } from '../shared/dashboard-contract'
+import type {
+  DashboardDigest,
+  DashboardTeamWorkspaceCandidate,
+  RecentActivity
+} from '../shared/dashboard-contract'
 import { AdminAuthController, defaultAdminSessionPath } from './admin-auth'
 import { AppLockController, notifyUnreadIncrease } from './app-lock'
 import { AppSettingsStore, defaultAppSettingsPath } from './app-settings'
@@ -17,14 +21,25 @@ import { registerSlackDataIpc } from './ipc/slack-data.ipc'
 import { registerDashboardIpc } from './ipc/dashboard.ipc'
 import { DashboardDeltaStore } from './dashboard/delta-store'
 import { MonitorStore } from './dashboard/monitor-store'
+import { WorkspaceMappingStore } from './dashboard/workspace-mapping-store'
 import { DashboardInsightSyncEngine } from './dashboard/sync-engine'
 import { DashboardScheduler } from './dashboard/scheduler'
 import { DashboardSidebarStateStore } from './dashboard/sidebar-state'
+import { TeamWorkspaceStore } from './dashboard/team-workspace-store'
 import { migrateWorkspaceCards } from './dashboard/workspace-migration'
 import { buildRecentFeed } from './dashboard/recent-feed'
 import { DashboardDigestStore, refreshDigest } from './dashboard/digest'
+import { DashboardChatService } from './dashboard/chat-service'
+import { ProjectChatService } from './dashboard/project-chat-service'
+import { DashboardChatRetriever } from './dashboard/chat-retrieval'
 import { HistoryStore } from './dashboard/history-store'
-import { NimProvider } from './dashboard/ai-provider'
+import { DashboardViewedStore } from './dashboard/viewed-store'
+import { DashboardScheduleStore } from './dashboard/schedule-store'
+import { RunLogStore } from './dashboard/run-log-store'
+import { AiSettingsStore } from './dashboard/ai-settings-store'
+import { AiSettingsService, DEFAULT_EMBEDDING_MODEL } from './dashboard/ai-settings'
+import { ConfigService } from './dashboard/config-service'
+import { migrateConfigV1 } from './dashboard/config-migration'
 import { InsightEngine } from './dashboard/insight-engine'
 import { SlackPoller } from './dashboard/slack-poller'
 import { loadAppEnv } from './load-app-env'
@@ -231,41 +246,135 @@ if (!gotSingleInstanceLock) {
       rootDir: dashboardRoot,
       encryptionAvailable: (await import('electron')).safeStorage.isEncryptionAvailable()
     })
+    const workspaceMappingStore = new WorkspaceMappingStore({ rootDir: dashboardRoot })
     const dashboardDeltaStore = new DashboardDeltaStore({ rootDir: dashboardRoot })
     const dashboardSidebarStateStore = new DashboardSidebarStateStore(userData)
+    // v3 — one team workspace shared by every card (ticket 04). The secret stays
+    // encrypted here; cards only ever see the pinned channel list.
+    const teamWorkspaceStore = new TeamWorkspaceStore({
+      rootDir: dashboardRoot,
+      encryptionAvailable: (await import('electron')).safeStorage.isEncryptionAvailable()
+    })
+    const teamWorkspaceReader = {
+      getConnection: async (): Promise<{
+        profileId: string
+        teamId: string
+        token: string | null
+        channels: Array<{ channelId: string; channelName: string }>
+        status: 'connected' | 'needs-reconnect'
+      } | null> => {
+        const connection = await teamWorkspaceStore.getConnection()
+        if (!connection) return null
+        const token =
+          connection.token ?? (await tokenStore.tryGet(connection.profileId, connection.teamId))
+        return {
+          profileId: connection.profileId,
+          teamId: connection.teamId,
+          token,
+          channels: connection.channels,
+          status: connection.status
+        }
+      },
+      setStatus: (status: 'connected' | 'needs-reconnect', atIso?: string) =>
+        teamWorkspaceStore.setStatus(status, atIso)
+    }
+    const listTeamWorkspaceCandidates = async (): Promise<DashboardTeamWorkspaceCandidate[]> => {
+      const profiles = await profileStore.list()
+      const byTeam = new Map<string, DashboardTeamWorkspaceCandidate>()
+      for (const profile of profiles) {
+        for (const workspace of await tokenStore.listWorkspaces(profile.id)) {
+          if (!workspace.teamId || byTeam.has(workspace.teamId)) continue
+          byTeam.set(workspace.teamId, {
+            profileId: profile.id,
+            profileName: profileDisplayLabel(profile),
+            teamId: workspace.teamId,
+            teamName: workspace.teamName,
+            teamDomain: workspace.teamDomain,
+            scopes: workspace.scopes
+          })
+        }
+      }
+      return [...byTeam.values()]
+    }
     // v2.2 — NVIDIA NIM rolling insights (universal key/model from .env)
-    const nimKey = process.env.NVIDIA_NIM_API_KEY ?? ''
     const nimPrimary =
       process.env.NVIDIA_NIM_MODEL_PRIMARY ?? 'nvidia/nemotron-3.5-super-vl-120b-a12b'
     const nimFallback =
       process.env.NVIDIA_NIM_MODEL_FALLBACK ?? 'nvidia/nemotron-3.5-lightning-30b-a3b'
+    const nimEmbeddingModel = process.env.NVIDIA_NIM_EMBEDDING_MODEL ?? DEFAULT_EMBEDDING_MODEL
     const nimTimeoutMs = Number(process.env.NVIDIA_NIM_TIMEOUT_MS ?? 90_000)
     const nimMaxTokens = Number(process.env.NVIDIA_NIM_MAX_TOKENS ?? 2000)
     // reasoning models burn the whole token budget on reasoning and answer
     // nothing, so thinking is off by default (re-enable from .env)
     const nimEnableThinking = process.env.NVIDIA_NIM_ENABLE_THINKING === 'true'
-    const nimProvider = nimKey
-      ? new NimProvider({
-          apiKey: nimKey,
-          modelPrimary: nimPrimary,
-          modelFallback: nimFallback,
-          timeoutMs: Number.isFinite(nimTimeoutMs) ? nimTimeoutMs : 90_000,
-          maxTokens: Number.isFinite(nimMaxTokens) ? nimMaxTokens : 2000,
-          enableThinking: nimEnableThinking
-        })
-      : null
+    // v2.7 — project settings → global settings → built-in default models. The
+    // key never leaves this process; the renderer only sees masks.
+    const aiSettingsStore = new AiSettingsStore({
+      rootDir: dashboardRoot,
+      encryptionAvailable: (await import('electron')).safeStorage.isEncryptionAvailable()
+    })
+    // One-time seed from .env keeps existing installs working; afterwards the
+    // resolver is the only reader of AI config.
+    await migrateConfigV1({
+      rootDir: dashboardRoot,
+      aiSettingsStore,
+      env: {
+        nvidiaApiKey: process.env.NVIDIA_NIM_API_KEY,
+        nvidiaChatModel: nimPrimary,
+        nvidiaEmbeddingModel: nimEmbeddingModel
+      }
+    }).catch((err) => {
+      log.warn(`[dashboard] config migration skipped: ${err instanceof Error ? err.message : err}`)
+    })
+    const aiSettings = new AiSettingsService({
+      store: aiSettingsStore,
+      defaults: {
+        chatModel: nimPrimary,
+        embeddingModel: nimEmbeddingModel,
+        fallbackModel: nimFallback
+      },
+      timeoutMs: Number.isFinite(nimTimeoutMs) ? nimTimeoutMs : 90_000,
+      maxTokens: Number.isFinite(nimMaxTokens) ? nimMaxTokens : 2000,
+      enableThinking: nimEnableThinking
+    })
+    const configService = new ConfigService({
+      aiSettings,
+      teamWorkspace: teamWorkspaceStore,
+      monitorStore: dashboardMonitorStore,
+      workspaceMapping: workspaceMappingStore,
+      oauthTokenProvider: { tryGet: (profileId, teamId) => tokenStore.tryGet(profileId, teamId) }
+    })
+    // D7 — an older build could write a secret as plaintext before the save path
+    // blocked it. Seal anything it left behind, once, before any sync runs.
+    await Promise.all([
+      dashboardMonitorStore.migrateLegacyPlaintext(),
+      teamWorkspaceStore.migrateLegacyPlaintext(),
+      aiSettingsStore.migrateLegacyPlaintext()
+    ])
+      .then((counts) => {
+        const moved = counts.reduce((total, n) => total + n, 0)
+        if (moved > 0) log.info(`[dashboard] re-encrypted ${moved} legacy plaintext secret(s)`)
+      })
+      .catch((err) => {
+        log.warn(
+          `[dashboard] plaintext re-encryption skipped: ${err instanceof Error ? err.message : err}`
+        )
+      })
     const dashboardHistoryStore = new HistoryStore({ rootDir: dashboardRoot })
+    const dashboardViewedStore = new DashboardViewedStore({ rootDir: dashboardRoot })
+    const dashboardScheduleStore = new DashboardScheduleStore({ rootDir: dashboardRoot })
     // The engine always exists: with a key it enriches with NVIDIA NIM,
     // without one it still keeps every card meaningful via local heuristics.
     const insightEngine = new InsightEngine({
-      provider: nimProvider,
+      provider: null,
+      resolveProvider: (projectId: string) => aiSettings.getProvider(projectId),
       historyStore: dashboardHistoryStore,
       deltaStore: dashboardDeltaStore,
       fetchUsers: (token: string) => new SlackPoller().usersList(token),
       log: (msg) => log.info(msg)
     })
-    if (!nimProvider) {
-      log.info('[dashboard] NVIDIA_NIM_API_KEY missing — insights fall back to heuristics')
+    if (!(await aiSettings.resolveSettings()).apiKey) {
+      log.info('[dashboard] no AI key configured — insights fall back to heuristics')
     }
     const digestStore = new DashboardDigestStore({ rootDir: dashboardRoot })
     const refreshDigestNow = async (): Promise<DashboardDigest | null> => {
@@ -280,7 +389,7 @@ if (!gotSingleInstanceLock) {
       return refreshDigest({
         workspaces,
         store: digestStore,
-        provider: nimProvider,
+        provider: await aiSettings.getProvider(),
         log: (msg) => log.info(msg)
       })
     }
@@ -288,16 +397,22 @@ if (!gotSingleInstanceLock) {
     const dashboardEngine = new DashboardInsightSyncEngine({
       monitorStore: dashboardMonitorStore,
       deltaStore: dashboardDeltaStore,
+      workspaceMapping: workspaceMappingStore,
       oauthTokenProvider: { tryGet: (profileId, teamId) => tokenStore.tryGet(profileId, teamId) },
       manualTokenProvider: {
         getManualToken: (key: string) => dashboardMonitorStore.getManualToken(key)
       },
+      teamWorkspace: teamWorkspaceReader,
       insightEngine,
       insightReader: {
         getLastInsight: (projectId: string) => insightEngine.existingInsight(projectId),
         getLastEntry: async (projectId: string) =>
           (await dashboardHistoryStore.read(projectId))[0] ?? null
       },
+      historyReader: (projectId: string) => dashboardHistoryStore.read(projectId),
+      viewedStore: dashboardViewedStore,
+      getExistingBrowserView: (profileId, appId) =>
+        browserViewManager.getExistingView(profileId, appId),
       onSynced: () => {
         void refreshDigestNow().catch((err) =>
           log.warn('[dashboard] digest refresh failed', { err: String(err) })
@@ -312,9 +427,35 @@ if (!gotSingleInstanceLock) {
         monitorStore: dashboardMonitorStore,
         deltaStore: dashboardDeltaStore,
         getLastInsight: (projectId: string) => insightEngine.existingInsight(projectId),
-        getNewMessageCount: (projectId: string) => dashboardEngine.newMessageCountFor(projectId)
+        getNewMessageCount: (projectId: string) => dashboardEngine.newMessageCountFor(projectId),
+        getLastViewedAt: (projectId: string) => dashboardViewedStore.get(projectId)
       })
     const getDigest = async (): Promise<DashboardDigest | null> => refreshDigestNow()
+
+    // v2.6 — Slack Chat tab: local history + replies via chat.postMessage
+    const dashboardChatService = new DashboardChatService({
+      monitorStore: dashboardMonitorStore,
+      deltaStore: dashboardDeltaStore,
+      oauthTokenProvider: { tryGet: (profileId, teamId) => tokenStore.tryGet(profileId, teamId) },
+      teamWorkspace: teamWorkspaceReader,
+      oauthScopesProvider: async (profileId, teamId) => {
+        const links = await tokenStore.listWorkspaces(profileId)
+        return links.find((link) => link.teamId === teamId)?.scopes ?? null
+      },
+      log: (msg) => log.info(msg)
+    })
+    const projectChatService = new ProjectChatService({
+      rootDir: dashboardRoot,
+      monitorStore: dashboardMonitorStore,
+      configService,
+      insightEngine,
+      retriever: new DashboardChatRetriever({
+        monitorStore: dashboardMonitorStore,
+        configService,
+        deltaStore: dashboardDeltaStore,
+        teamWorkspace: teamWorkspaceStore
+      })
+    })
 
     // v2.2 — one-time workspace migration: stamp + split legacy mixed cards.
     // Runs in the background: it talks to Slack and must never block startup.
@@ -357,9 +498,48 @@ if (!gotSingleInstanceLock) {
         log.warn('[dashboard] workspace migration skipped', { err: String(err) })
       }
     }
-    const dashboardScheduler = new DashboardScheduler(dashboardEngine, () =>
-      dashboardMonitorStore.syncIntervalSeconds()
-    )
+    const dashboardScheduler = new DashboardScheduler(dashboardEngine, dashboardScheduleStore, {
+      runDailyRecheck: async () => {
+        const projects = await dashboardMonitorStore.listProjects()
+        let checked = 0
+        let skipped = 0
+        let failed = 0
+        for (const project of projects) {
+          const token =
+            project.tokenSource === 'manual'
+              ? project.manualTokenKey
+                ? await dashboardMonitorStore.getManualToken(project.manualTokenKey)
+                : null
+              : await tokenStore.tryGet(project.profileId, project.teamId)
+          const settings = await aiSettings.resolveSettings(project.id)
+          if (!token || !settings.apiKey) {
+            skipped += 1
+            continue
+          }
+          const snapshot = (await dashboardEngine.buildSnapshot(project.id))[0]
+          if (!snapshot) {
+            skipped += 1
+            continue
+          }
+          try {
+            await insightEngine.refresh(project, token, snapshot, { force: true })
+            checked += 1
+          } catch {
+            failed += 1
+          }
+        }
+        const parts = [`Re-grounded ${checked} project${checked === 1 ? '' : 's'}`]
+        if (skipped) parts.push(`${skipped} skipped (no token or key)`)
+        if (failed) parts.push(`${failed} failed`)
+        return { checked, skipped, detail: `${parts.join(' · ')}.` }
+      },
+      onChanged: (state) => {
+        const win = mainWindow
+        if (win && !win.isDestroyed()) {
+          win.webContents.send(IpcChannels.DashboardSchedulesChanged, state)
+        }
+      }
+    })
 
     const adminAuth = new AdminAuthController({
       sessionPath: defaultAdminSessionPath(userData)
@@ -399,15 +579,63 @@ if (!gotSingleInstanceLock) {
     registerDashboardIpc({
       monitorStore: dashboardMonitorStore,
       engine: dashboardEngine,
+      deltaStore: dashboardDeltaStore,
+      runLogStore: new RunLogStore({ rootDir: dashboardDeltaStore.rootDir }),
       scheduler: dashboardScheduler,
       getMainWindow: () => mainWindow,
       oauthTokenProvider: { tryGet: (profileId, teamId) => tokenStore.tryGet(profileId, teamId) },
       historyStore: dashboardHistoryStore,
       buildRecent,
       getDigest,
-      sidebarStateStore: dashboardSidebarStateStore
+      sidebarStateStore: dashboardSidebarStateStore,
+      chatService: dashboardChatService,
+      projectChatService,
+      aiSettings,
+      configService,
+      teamWorkspace: teamWorkspaceStore,
+      listTeamWorkspaceCandidates,
+      workspaceMapping: workspaceMappingStore,
+      viewedStore: dashboardViewedStore
     })
+
     void runWorkspaceMigration()
+
+    // Self-healing migration for corrupted workspace names (e.g. "1 new item" or "unknown")
+    void (async () => {
+      try {
+        const profiles = await profileStore.list()
+        for (const p of profiles) {
+          const slack = p.apps.slack
+          if (slack && slack.availableWorkspaces) {
+            for (const ws of slack.availableWorkspaces) {
+              if (
+                ws.teamName &&
+                (/\d+\s+new\s+items?/i.test(ws.teamName) ||
+                  ws.teamName === 'unknown' ||
+                  ws.teamName === '1 new item')
+              ) {
+                const targetName =
+                  ws.teamId === 'T0C6YS80MPZ'
+                    ? 'AgentWork'
+                    : ws.teamDomain || 'AgentWork'
+                await profileStore.upsertAvailable(p.id, 'slack', {
+                  ...ws,
+                  teamName: targetName,
+                  teamDomain: ws.teamDomain || 'agentworkworld'
+                })
+                log.info('[profiles] cleaned placeholder workspace name', {
+                  profileId: p.id,
+                  teamId: ws.teamId,
+                  targetName
+                })
+              }
+            }
+          }
+        }
+      } catch (err) {
+        log.warn('[profiles] self-healing workspace name check failed', { err: String(err) })
+      }
+    })()
     dashboardScheduler.start()
     registerAppIpc({
       settingsStore,
@@ -577,6 +805,7 @@ if (!gotSingleInstanceLock) {
     })
 
     app.on('before-quit', () => {
+      dashboardScheduler.stop()
       lock.stopIdleWatch()
       if (sleepTimer) clearInterval(sleepTimer)
       tray.destroy()

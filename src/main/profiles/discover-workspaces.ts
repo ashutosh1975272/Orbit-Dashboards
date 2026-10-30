@@ -9,7 +9,14 @@ import {
  * Prefer human workspace names — never leave bare T… ids as the display name when DOM has better.
  */
 export const READ_SLACK_WORKSPACE_NAME_SCRIPT = `(() => {
-  const bad = (t) => !t || /^T[A-Z0-9]+$/i.test(t) || /^slack$/i.test(t);
+  const bad = (t) =>
+    !t ||
+    /^T[A-Z0-9]+$/i.test(t) ||
+    /^slack$/i.test(t) ||
+    /^unknown$/i.test(t) ||
+    /\\d+\\s+new\\s+items?/i.test(t) ||
+    /^new\\s+item/i.test(t) ||
+    /^\\(\\d+\\)/.test(t);
   const clean = (t) => (t || '').replace(/\\s+/g, ' ').trim();
 
   const selectors = [
@@ -31,18 +38,25 @@ export const READ_SLACK_WORKSPACE_NAME_SCRIPT = `(() => {
   }
 
   const title = clean(document.title || '').replace(/\\s*[|—–-]\\s*Slack\\s*$/i, '');
-  const parts = title.split(/\\s*[|—–]\\s*/).map((p) => p.trim()).filter(Boolean);
+  const parts = title.split(/\\s*[|—–-]\\s*/).map((p) => p.trim()).filter(Boolean);
   if (parts.length >= 2) {
     const last = parts[parts.length - 1];
-    if (!bad(last)) return last;
+    if (!bad(last) && !/\\(channel\\)|\\(direct message\\)/i.test(last)) return last;
   }
-  if (!bad(title)) return title;
+  if (!bad(title) && !/\\(channel\\)|\\(direct message\\)/i.test(title)) return title;
   return null;
 })()`
 
 /** Workspace name + current channel/DM title from the Slack client DOM / tab title. */
 export const READ_SLACK_CONTEXT_SCRIPT = `(() => {
-  const badWs = (t) => !t || /^T[A-Z0-9]+$/i.test(t) || /^slack$/i.test(t);
+  const badWs = (t) =>
+    !t ||
+    /^T[A-Z0-9]+$/i.test(t) ||
+    /^slack$/i.test(t) ||
+    /^unknown$/i.test(t) ||
+    /\\d+\\s+new\\s+items?/i.test(t) ||
+    /^new\\s+item/i.test(t) ||
+    /^\\(\\d+\\)/.test(t);
   const badCh = (t) =>
     !t ||
     /^[CDGT][A-Z0-9]{8,}$/i.test(t) ||
@@ -160,7 +174,14 @@ export const READ_TEAMS_ORG_NAME_SCRIPT = `(() => {
 export const DISCOVER_WORKSPACES_SCRIPT = `(() => {
   const out = [];
   const seen = new Set();
-  const badName = (t) => !t || /^T[A-Z0-9]+$/i.test(t) || /^slack$/i.test(t);
+  const badName = (t) =>
+    !t ||
+    /^T[A-Z0-9]+$/i.test(t) ||
+    /^slack$/i.test(t) ||
+    /^unknown$/i.test(t) ||
+    /\\d+\\s+new\\s+items?/i.test(t) ||
+    /^new\\s+item/i.test(t) ||
+    /^\\(\\d+\\)/.test(t);
   const clean = (t) => (t || '').replace(/\\s+/g, ' ').trim();
 
   const readCurrentName = () => {
@@ -181,9 +202,11 @@ export const DISCOVER_WORKSPACES_SCRIPT = `(() => {
       if (!badName(t)) return t;
     }
     const title = clean(document.title || '').replace(/\\s*[|—–-]\\s*Slack\\s*$/i, '');
-    const parts = title.split(/\\s*[|—–]\\s*/).map((p) => p.trim()).filter(Boolean);
-    if (parts.length >= 2 && !badName(parts[parts.length - 1])) return parts[parts.length - 1];
-    if (!badName(title)) return title;
+    const parts = title.split(/\\s*[|—–-]\\s*/).map((p) => p.trim()).filter(Boolean);
+    if (parts.length >= 2 && !badName(parts[parts.length - 1]) && !/\\(channel\\)|\\(direct message\\)/i.test(parts[parts.length - 1])) {
+      return parts[parts.length - 1];
+    }
+    if (!badName(title) && !/\\(channel\\)|\\(direct message\\)/i.test(title)) return title;
     return null;
   };
 

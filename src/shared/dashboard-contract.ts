@@ -9,10 +9,90 @@ export type DashboardTokenSource = 'oauth' | 'manual'
 export type DashboardMood = 'good' | 'neutral' | 'tense'
 export type DashboardSyncState = 'idle' | 'syncing' | 'error'
 
+/** Where a stored message came from: the card's client workspace, or our own. */
+export type DashboardSource = 'client' | 'ours' | `browser:${string}`
+
+export type DashboardTeamWorkspaceSource = 'oauth' | 'manual' | 'none'
+
+/** One workspace the app can already reach, offered when connecting ours. */
+export interface DashboardTeamWorkspaceCandidate {
+  profileId: string
+  profileName: string
+  teamId: string
+  teamName: string
+  teamDomain: string
+  scopes: string[]
+}
+
+/** Public view of the one team workspace shared by every card. Never a token. */
+export interface DashboardTeamWorkspace {
+  connected: boolean
+  profileId: string | null
+  teamId: string | null
+  teamName: string | null
+  teamDomain: string | null
+  source: DashboardTeamWorkspaceSource
+  /** Mask such as "••••abcd"; null when nothing is connected. */
+  maskedToken: string | null
+  /** Last known health of the connected token. */
+  status: 'connected' | 'needs-reconnect'
+  lastVerifiedAt: string | null
+  /**
+   * Legacy global pins. Kept for existing cards until per-project Our Slack
+   * channel mapping lands; new cards map channels on the project.
+   */
+  channels: DashboardMonitor[]
+  updatedAt: string | null
+}
+
+export interface DashboardTeamWorkspaceConnectPayload {
+  source: 'oauth' | 'manual'
+  profileId?: string
+  teamId?: string
+  /** Raw token, only for source = 'manual'. Never returned by main. */
+  token?: string
+}
+
+export interface DashboardTeamWorkspaceChannelsPayload {
+  channels: DashboardMonitor[]
+}
+
 export interface DashboardMonitor {
   /** Monitored Slack channel (public channel, private group, or mpim). */
   channelId: string
   channelName: string
+}
+
+export interface ProjectSourceChannel {
+  id: string
+  name: string
+  isPrivate?: boolean
+}
+
+export type ProjectSourceStatus =
+  | 'connected'
+  | 'needs-login'
+  | 'challenge'
+  | 'adapter-broken'
+  | 'paused'
+  | 'running'
+
+export interface ProjectSource {
+  id: string
+  kind: 'token' | 'browser'
+  platform: 'slack'
+  profileId?: string
+  workspaceId: string
+  workspaceName: string
+  channels: ProjectSourceChannel[]
+  role: 'client' | 'ours'
+  enabled: boolean
+  backfillDays: 1 | 7 | 30
+  status?: ProjectSourceStatus
+  lastReadAt?: string
+  lastReadNewCount?: number
+  createdAt: string
+  updatedAt: string
 }
 
 export interface DashboardProject {
@@ -33,6 +113,29 @@ export interface DashboardProject {
   /** Slack user id of the token owner (= the freelancer, not the client). */
   selfUserId?: string
   monitors: DashboardMonitor[]
+  /** Additive multi-source model (SLK-1) */
+  sources?: ProjectSource[]
+  sourcePreference?: 'token_first' | 'browser_only'
+  /** Automation mode: per_approval = confirm dialog before scrape, autonomous = direct, scheduled = cron */
+  scrapeMode?: 'per_approval' | 'autonomous' | 'scheduled'
+  /** Cron or human string when scrapeMode === 'scheduled' */
+  scrapeSchedule?: string
+  /** Per-card visual automation overlay settings override */
+  automationOverride?: {
+    showLiveBorder?: boolean
+    borderStyle?: 'thin' | 'glow'
+    showCursorOverlay?: boolean
+    showMessageHighlight?: boolean
+  }
+  /**
+   * Our Slack channels this project reads. Empty means none; per-project
+   * mapping replaces the legacy global pin set.
+   */
+  ourSlackChannels?: DashboardMonitor[]
+  /** Vault key for a project-specific Our Slack token (advanced override). */
+  ourSlackTokenKey?: string
+  ourSlackTeamId?: string
+  ourSlackTeamName?: string
   /** User-set dates (ISO yyyy-mm-dd) — win over extractedDates. */
   startDate?: string
   endDate?: string
@@ -41,9 +144,145 @@ export interface DashboardProject {
   createdAt: string
 }
 
+/** One day of message activity, split by workspace. Deterministic, main-process. */
+export interface DashboardActivityDay {
+  /** yyyy-mm-dd (UTC) */
+  date: string
+  client: number
+  ours: number
+  isToday: boolean
+}
+
+/** Median first-reply time over the last `windowDays`, or null under 3 pairs. */
+export interface DashboardResponseStats {
+  medianSeconds: number | null
+  pairs: number
+  windowDays: number
+}
+
+export type DashboardAttentionKind =
+  | 'question'
+  | 'needs-reply'
+  | 'blocker'
+  | 'risk'
+  | 'requirement'
+  | 'decision'
+  | 'commitment'
+  | 'file'
+  | 'status'
+
+/** One row for "Needs your attention" / "New since your last visit". */
+export interface DashboardAttentionItem {
+  kind: DashboardAttentionKind
+  text: string
+  atIso?: string
+  source?: DashboardSource
+  channelId?: string
+  /** Real Slack message ts only — never an ISO date (an ISO can't match `[data-ts]`). */
+  ts?: string
+  /** True when source + channelId + ts can address a real Slack message row. */
+  canJump?: boolean
+  permalink?: string
+}
+
+export interface DashboardNewSinceCounts {
+  requirements: number
+  decisions: number
+  commitments: number
+  files: number
+  statusChanges: number
+  questions: number
+}
+
+/** Everything the Dashboard page shows that is computed from stored messages. */
+export interface DashboardMetrics {
+  daily: DashboardActivityDay[]
+  messages24h: { client: number; ours: number }
+  lastClientContactAt: string | null
+  ourResponse: DashboardResponseStats
+  waiting: {
+    /** needs-reply + open questions, deduped. */
+    count: number
+    /** Oldest real timestamp among the attention items; null when none is timed. */
+    oldestIso: string | null
+    /** Reported separately; never added to `count`. */
+    blockers: number
+    risks: number
+    items: DashboardAttentionItem[]
+  }
+  statusSince: string | null
+  /** Empty until at least 3 runs have been recorded. */
+  moodTrend: Array<{ atIso: string; mood: InsightMood }>
+  newSince: {
+    lastViewedAt: string | null
+    counts: DashboardNewSinceCounts
+    items: DashboardAttentionItem[]
+  }
+}
+
+export interface DashboardMarkViewedPayload {
+  projectId: string
+  atIso?: string
+}
+
+/* ===== v3 — Schedules ===== */
+
+export type DashboardScheduleKind = 'slack-sync' | 'agent-analysis' | 'daily-recheck'
+
+/** The only intervals the selector offers; one minute is the floor. */
+export const DASHBOARD_SCHEDULE_INTERVALS = [1, 5, 15, 30, 60] as const
+export type DashboardScheduleInterval = (typeof DASHBOARD_SCHEDULE_INTERVALS)[number]
+
+export interface DashboardScheduleSettings {
+  slackSync: { enabled: boolean; intervalMinutes: DashboardScheduleInterval }
+  /** Default off; a once-a-day re-ground while Orbit is open. */
+  dailyRecheck: { enabled: boolean; hour: number }
+}
+
+export interface DashboardScheduleRunSource {
+  source: DashboardSource
+  ok: boolean
+  error?: string | null
+}
+
+export interface DashboardScheduleRun {
+  id: string
+  kind: DashboardScheduleKind
+  startedAt: string
+  finishedAt: string
+  status: 'ok' | 'error' | 'skipped'
+  /** One honest line for the history row. */
+  detail: string
+  projects?: number
+  newMessages?: number
+  sources?: DashboardScheduleRunSource[]
+}
+
+export interface DashboardSchedulesState {
+  settings: DashboardScheduleSettings
+  lastRunAt: Record<DashboardScheduleKind, string | null>
+  /** Next Slack sync; null while paused. */
+  nextRunAt: string | null
+  /** Next daily re-check; null while off. */
+  nextDailyRunAt: string | null
+  running: boolean
+  runs: DashboardScheduleRun[]
+}
+
+export interface DashboardUpdateSchedulePayload {
+  slackSync?: { enabled?: boolean; intervalMinutes?: number }
+  dailyRecheck?: { enabled?: boolean; hour?: number }
+}
+
+export interface DashboardRunSchedulePayload {
+  kind: 'slack-sync' | 'daily-recheck'
+}
+
 export interface DashboardChannelDelta {
   channelId: string
   channelName: string
+  /** Which workspace this channel belongs to (absent on rows stored before v3). */
+  source?: DashboardSource
   messageCount: number
   /** New messages added by the latest sync (tiny +N chip on the card). */
   newMessageCount?: number
@@ -72,6 +311,10 @@ export interface DashboardProjectSnapshot {
   /** ISO of the last successful sync covering this project. */
   lastUpdatedAt: string | null
   syncState: DashboardSyncState
+  /** Set when our team workspace failed while the client workspace synced fine. */
+  ourWorkspaceError?: string | null
+  /** Deterministic Dashboard-page metrics (absent until the first snapshot build). */
+  metrics?: DashboardMetrics
   /** v2.2 NVIDIA NIM rolling insight (undefined/null = not generated yet). */
   insight?: ProjectInsight | null
   insightUpdatedAt?: string | null
@@ -98,6 +341,12 @@ export interface DashboardSnapshot {
   syncIntervalSeconds: number
   /** v2.3 — one line across all workspaces (each item names its workspace). */
   digest?: DashboardDigest | null
+  /** Client-projects page: user-owned order for the Pinned section. */
+  pinnedOrder?: string[]
+}
+
+export interface DashboardPinnedOrderPayload {
+  order: string[]
 }
 
 /** v2.3 — cross-workspace digest (the ONLY place workspaces are combined). */
@@ -110,6 +359,8 @@ export interface DashboardDigest {
   atRisk: string[]
   atIso: string
   source: 'ai' | 'local'
+  /** sha256 of the digest inputs; lets refresh skip the provider when unchanged. */
+  inputHash?: string
 }
 
 /** v2.3 — one item per workspace for the "Recent" strip. */
@@ -137,6 +388,8 @@ export interface RecentActivity {
   delta?: string
   /** hours since last message (for inactive filter) */
   hoursSinceLastMessage: number
+  /** meaningful messages that arrived after the owner last viewed this card */
+  newMessages?: number
 }
 
 export type DashboardSyncProgressPayload = {
@@ -150,10 +403,12 @@ export type DashboardSyncProgressPayload = {
 }
 
 export interface DashboardListChannelsPayload {
-  tokenSource: 'oauth' | 'manual'
+  tokenSource?: 'oauth' | 'manual'
   profileId?: string
   teamId?: string
   manualTokenKey?: string
+  /** 'ours' lists the globally connected team workspace instead of a card's. */
+  source?: DashboardSource
 }
 
 export interface SyncNowPayload {
@@ -203,8 +458,12 @@ export type InsightUrgency = 'low' | 'normal' | 'high'
 
 export interface InsightClientMessage {
   who: string
-  whenIso: string
+  whenIso: string | null
   quote: string
+  source?: DashboardSource
+  channelId?: string
+  ts?: string
+  permalink?: string
 }
 
 /** One thing that happened (evidence-linked). */
@@ -316,7 +575,7 @@ export interface InsightPerson {
 
 export interface InsightMilestone {
   label: string
-  dateIso: string
+  dateIso: string | null
   done: boolean
 }
 
@@ -361,4 +620,316 @@ export interface InsightHistoryEntryContract {
 
   /* v2.4 — sidebar state snapshot at this insight */
   sidebarState?: { left: SidebarState; right: SidebarState }
+}
+
+/* ===== v2.6 — Slack Chat tab (local history + replies) ===== */
+
+/** One message in the Slack Chat tab (local delta store, names resolved best-effort). */
+export interface DashboardChatMessage {
+  /** Slack ts — unique within a channel. Optimistic messages use `temp-…`. */
+  ts: string
+  channelId: string
+  channelName: string
+  /** Slack user id (empty when the message has no author, e.g. some bot posts). */
+  userId: string
+  /** Display name when resolvable; falls back to the user id (ADR-0007). */
+  userName: string
+  /** Workspace this message came from. */
+  source: DashboardSource
+  text: string
+  /** ISO timestamp derived from ts. */
+  atIso: string
+  /** true when the token owner wrote the message. */
+  isMine: boolean
+  /** optimistic message, not confirmed by Slack yet. */
+  pending?: boolean
+  /** optimistic message whose send failed. */
+  failed?: boolean
+}
+
+export interface DashboardChatPage {
+  messages: DashboardChatMessage[]
+  /** Pass as `beforeTs` to load the next (older) page; null when exhausted. */
+  nextBeforeTs: string | null
+  hasMore: boolean
+}
+
+export interface DashboardChatQueryPayload {
+  projectId: string
+  /** Which workspace to read; undefined = the card's client workspace. */
+  source?: DashboardSource
+  /** undefined = every watched channel in that workspace. */
+  channelId?: string
+  /** Return messages strictly older than this Slack ts. */
+  beforeTs?: string
+  /** Page size (default 50, max 200). */
+  limit?: number
+}
+
+export interface DashboardSendMessagePayload {
+  projectId: string
+  /** Which workspace to post into; undefined = the card's client workspace. */
+  source?: DashboardSource
+  channelId: string
+  text: string
+}
+
+export type DashboardSendErrorCode =
+  | 'missing_scope'
+  | 'not_connected'
+  | 'channel_not_found'
+  | 'invalid_text'
+  | 'slack_error'
+  | 'browser_error'
+  | 'unknown'
+
+export interface DashboardSendMessageResult {
+  ok: boolean
+  message?: DashboardChatMessage
+  error?: string
+  code?: DashboardSendErrorCode
+  /** Scope Slack requires when code = 'missing_scope'. */
+  missingScope?: string
+}
+
+/** Slack token health for the Settings section — scopes + send capability. */
+export interface DashboardChatTokenStatus {
+  connected: boolean
+  source: 'oauth' | 'manual' | 'none'
+  teamName: string | null
+  /** Masked token ("••••abcd") so the user can identify it; never the raw token. */
+  maskedToken: string | null
+  /** Granted scopes, or null when Slack's auth.test didn't report them. */
+  scopes: string[] | null
+  /** True when chat:write is present; false when known-missing; null when unknown. */
+  canSend: boolean | null
+  missingWriteScope: boolean
+}
+
+/* ===== Chat with project (read-only agent chat) ===== */
+
+/** A message the answer is allowed to cite. Built by the host from the
+ * retrieved context, never trusted from the model. */
+export interface DashboardProjectChatSourceRef {
+  source: DashboardSource
+  channelId: string
+  channelName: string
+  ts: string
+  permalink?: string
+}
+
+export interface DashboardProjectChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+  atIso: string
+  /** Only assistant messages that finished normally carry sources. */
+  sources?: DashboardProjectChatSourceRef[]
+  /** Assistant answer was cut short by Stop. Partial text, no sources. */
+  stopped?: boolean
+}
+
+export interface DashboardProjectChatPayload {
+  projectId: string
+  message: string
+  /** Reserved for multiple threads; the current build stores one thread. */
+  conversationId?: string
+  /** Re-run after an error without appending the user turn twice. */
+  retry?: boolean
+}
+
+export type DashboardProjectChatErrorCode =
+  | 'PROJECT_NOT_FOUND'
+  | 'AI_KEY_MISSING'
+  | 'RUN_ACTIVE'
+  | 'AUTH_INVALID'
+  | 'RATE_LIMITED'
+  | 'NETWORK'
+  | 'CANCELLED'
+  | 'INTERNAL'
+
+export type DashboardProjectChatStartResult =
+  { ok: true; runId: string } | { ok: false; code: DashboardProjectChatErrorCode; error: string }
+
+export interface DashboardProjectChatChunkEvent {
+  projectId: string
+  runId: string
+  chunk: string
+}
+
+export interface DashboardProjectChatDoneEvent {
+  projectId: string
+  runId: string
+  content: string
+  sources: DashboardProjectChatSourceRef[]
+  stopped: boolean
+}
+
+export interface DashboardProjectChatErrorEvent {
+  projectId: string
+  runId: string
+  code: DashboardProjectChatErrorCode
+  error: string
+  retryable: boolean
+}
+
+export interface DashboardProjectChatHistoryResult {
+  messages: DashboardProjectChatMessage[]
+}
+
+/** Renderer-safe chat status: no key and no key mask. */
+export interface DashboardProjectChatStatus {
+  hasKey: boolean
+  model: string
+  modelSource: AiSettingsSource
+  keySource: AiSettingsSource
+}
+
+/* ===== v2.7 — AI provider settings (global + per project) ===== */
+
+export type AiProviderId = 'nvidia-nim'
+
+/** Never contains the raw key — only a mask such as "••••abcd". */
+export interface AiSettingsPublic {
+  provider: AiProviderId
+  /** Configured chat model, null when this scope does not override one. */
+  model: string | null
+  /** Configured embedding model, null when this scope does not override one. */
+  embeddingModel: string | null
+  /** Masked stored key ("••••abcd"); null when none is stored here. */
+  apiKeyMask: string | null
+  hasKey: boolean
+  status: DashboardConfigStatus
+  lastVerifiedAt: string | null
+}
+
+export interface ProjectAiSettingsPublic extends AiSettingsPublic {
+  /** Legacy coarse switch. Field-level overrides are reflected in `sources`. */
+  useGlobal: boolean
+}
+
+export type AiSettingsSource = 'project' | 'global' | 'default' | 'none'
+
+/** What the insight engine / project chat will actually use. */
+export interface EffectiveAiSettings {
+  provider: AiProviderId
+  /** Chat model. `model` is kept as a compatibility alias. */
+  model: string
+  chatModel: string
+  embeddingModel: string
+  modelSource: AiSettingsSource
+  chatModelSource: AiSettingsSource
+  embeddingModelSource: AiSettingsSource
+  keySource: AiSettingsSource
+  /** Masked key for the effective key, never the key itself. */
+  apiKeyMask: string | null
+}
+
+export interface DashboardAiSettingsView {
+  global: AiSettingsPublic
+  /** null when the view was requested without a project. */
+  project: ProjectAiSettingsPublic | null
+  effective: EffectiveAiSettings
+}
+
+export interface DashboardAiSettingsQueryPayload {
+  projectId?: string
+}
+
+export interface DashboardAiSettingsSavePayload {
+  /** Omitted = dashboard-level global settings. */
+  projectId?: string
+  useGlobal?: boolean
+  provider?: AiProviderId
+  /** null clears the override; undefined keeps the stored value. */
+  model?: string | null
+  /** null clears the override; undefined keeps the stored value. */
+  embeddingModel?: string | null
+  /** null clears the key; undefined keeps it; a string replaces it. */
+  apiKey?: string | null
+}
+
+export interface DashboardAiModelsQueryPayload {
+  projectId?: string
+}
+
+export interface DashboardAiModelsResult {
+  models: string[]
+  /** Embedding model ids, when the provider exposes them separately. */
+  embeddingModels: string[]
+  source: AiSettingsSource
+  error?: string
+}
+
+/* ===== Global config (one per app) ===== */
+
+export type DashboardConfigStatus = 'ok' | 'invalid' | 'not-configured'
+
+export interface DashboardGlobalNvidiaConfig {
+  configured: boolean
+  apiKeyMask: string | null
+  chatModel: string | null
+  embeddingModel: string | null
+  status: DashboardConfigStatus
+  lastVerifiedAt: string | null
+}
+
+export interface DashboardConfigUsage {
+  projects: number
+  usingGlobalAi: number
+  usingGlobalOurSlack: number
+}
+
+export interface DashboardGlobalConfig {
+  ourSlack: DashboardTeamWorkspace
+  nvidia: DashboardGlobalNvidiaConfig
+  usage: DashboardConfigUsage
+}
+
+export interface DashboardAiTestResult {
+  ok: boolean
+  error?: string
+  models?: number
+}
+
+/* ===== Project activity (Dashboard centre, last 14 days) ===== */
+
+/** One stored Slack message, ready to render. Names are resolved or the id. */
+export interface DashboardActivityMessage {
+  source: DashboardSource
+  channelId: string
+  channelName: string
+  ts: string
+  atIso: string
+  userId: string
+  userName: string
+  isMine: boolean
+  text: string
+  permalink: string | null
+}
+
+export interface DashboardActivityParticipant {
+  userId: string
+  name: string
+  source: DashboardSource
+  count: number
+}
+
+export interface DashboardActivityChannel {
+  channelId: string
+  channelName: string
+  source: DashboardSource
+  count: number
+}
+
+export interface DashboardProjectActivity {
+  /** Newest displayable messages across both workspaces. */
+  recent: DashboardActivityMessage[]
+  /** Latest client message and our latest reply, client workspace only. */
+  latestClientAt: string | null
+  latestOursAt: string | null
+  /** null when the client has never written. */
+  ballInCourt: 'you' | 'client' | null
+  participants: DashboardActivityParticipant[]
+  channels: DashboardActivityChannel[]
+  counts14d: { client: number; ours: number }
 }

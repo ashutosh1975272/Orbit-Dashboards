@@ -39,7 +39,15 @@ export function slackClientUrlForConversation(teamId: string, conversationId?: s
 
 export function isSlackPlaceholderName(name: string | undefined | null): boolean {
   const t = name?.trim() ?? ''
-  return !t || /^T[A-Z0-9]+$/i.test(t) || /^slack$/i.test(t)
+  return (
+    !t ||
+    /^T[A-Z0-9]+$/i.test(t) ||
+    /^slack$/i.test(t) ||
+    /^unknown$/i.test(t) ||
+    /^\d+\s+new\s+items?/i.test(t) ||
+    /^new\s+item/i.test(t) ||
+    /^\(\d+\)/.test(t)
+  )
 }
 
 /** Canonical open URL for a pin (prefer stored URL, else client URL from team id). */

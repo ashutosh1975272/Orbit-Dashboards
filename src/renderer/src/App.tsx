@@ -17,6 +17,13 @@ import { useDashboardStore } from './hooks/useDashboard'
 import { SettingsPanel } from './components/SettingsPanel'
 import { SidebarPanelIcon } from './components/SidebarPanelIcon'
 import { SlackViewport } from './components/SlackViewport'
+import { PlatformSettingsPanel } from './components/dashboard/PlatformSettingsPanel'
+import { AddPlatformPage } from './components/dashboard/AddPlatformPage'
+import { AccountsManagementModal } from './components/dashboard/AccountsManagementModal'
+import { UnifiedSettingsModal, type SettingsTabKey } from './components/dashboard/UnifiedSettingsModal'
+import { ScrapeNavbar, type NavbarState, type ScrapeSnippet } from './components/dashboard/overlay/ScrapeNavbar'
+import { sidebarToastFor } from './lib/sidebar-toast'
+import { modKey, modShift } from './lib/shortcut-label'
 import { useProfileStore } from './hooks/useProfiles'
 import {
   applyAppBrandTheme,
@@ -73,6 +80,15 @@ function App(): React.JSX.Element {
   )
   const [cmdkOpen, setCmdkOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [unifiedSettingsOpen, setUnifiedSettingsOpen] = useState(false)
+  const [unifiedSettingsTab, setUnifiedSettingsTab] = useState<SettingsTabKey>('general')
+  const [platformSettings, setPlatformSettings] = useState<{
+    profileId: string
+    appId: AppId
+  } | null>(null)
+  const [addPlatformOpen, setAddPlatformOpen] = useState(false)
+  const [accountsModalOpen, setAccountsModalOpen] = useState(false)
+  const [activeCustomLinkId, setActiveCustomLinkId] = useState<string | null>(null)
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS)
   const [locked, setLocked] = useState(false)
   const [unlocking, setUnlocking] = useState(false)
@@ -91,7 +107,16 @@ function App(): React.JSX.Element {
     profileId: string
     appId: AppId
   } | null>(null)
+  const [globalScrapeState, setGlobalScrapeState] = useState<NavbarState>('idle')
+  const [globalScrapeWorkspace, setGlobalScrapeWorkspace] = useState<string | undefined>()
+  const [globalScrapeChannel, setGlobalScrapeChannel] = useState<string | undefined>()
+  const [globalScrapeProgress, setGlobalScrapeProgress] = useState<string | undefined>()
+  const [globalScrapeStatus, setGlobalScrapeStatus] = useState<string | undefined>()
+  const [globalScrapeSnippets, setGlobalScrapeSnippets] = useState<ScrapeSnippet[]>([])
+  const [globalScrapeCollapsed, setGlobalScrapeCollapsed] = useState(false)
   const lastAppByProfile = useRef<Record<string, AppId>>({})
+  const sidebarCollapsedRef = useRef(settings.sidebarCollapsed)
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const {
     profiles,
@@ -223,14 +248,79 @@ function App(): React.JSX.Element {
     })
   }, [])
 
+  // Universal Cosmic Scrape Event Listener for global header visibility
   useEffect(() => {
-    let hideTimer: ReturnType<typeof setTimeout> | null = null
-    return window.api.app.onToast((message) => {
-      if (hideTimer) clearTimeout(hideTimer)
-      setToast(message)
-      hideTimer = setTimeout(() => setToast(null), 4500)
+    if (!window.api?.dashboard?.onScrapeEvent) return undefined
+    const unsubscribe = window.api.dashboard.onScrapeEvent((event: any) => {
+      if (event.type === 'navigate' || event.type === 'status' || event.type === 'read') {
+        setGlobalScrapeState('reading')
+        if (event.workspaceName) setGlobalScrapeWorkspace(event.workspaceName)
+        if (event.channelName) setGlobalScrapeChannel(event.channelName)
+        if (event.scrollIndex && event.maxScroll) {
+          setGlobalScrapeProgress(`${event.scrollIndex}/${event.maxScroll}${event.messageCount ? ` · ${event.messageCount} msgs` : ''}`)
+        } else if (event.text) {
+          setGlobalScrapeStatus(event.text)
+        }
+        if (event.snippet) {
+          setGlobalScrapeSnippets((prev) => [
+            ...prev,
+            {
+              sender: event.sender || 'Anonymous',
+              snippet: event.snippet,
+              channelName: event.channelName,
+              ts: event.timestamp || new Date().toISOString()
+            }
+          ])
+        }
+      } else if (event.type === 'queued') {
+        setGlobalScrapeState('queued')
+        setGlobalScrapeStatus(event.text || `Queued (${event.queueLength || 1} ahead)`)
+      } else if (event.type === 'waiting_for_user') {
+        setGlobalScrapeState('waiting_for_user')
+        setGlobalScrapeStatus('Waiting for you (user active)')
+      } else if (event.type === 'paused') {
+        setGlobalScrapeState('paused')
+        setGlobalScrapeStatus('Paused')
+      } else if (event.type === 'challenge' || event.type === 'adapter_broken' || event.type === 'error') {
+        setGlobalScrapeState('challenge')
+        setGlobalScrapeStatus(event.text || 'Action required')
+      } else if (event.type === 'run_finished') {
+        setGlobalScrapeState('finished')
+        setGlobalScrapeStatus(event.text || 'Scraping finished')
+        setTimeout(() => {
+          setGlobalScrapeState('idle')
+          setGlobalScrapeStatus(undefined)
+          setGlobalScrapeProgress(undefined)
+        }, 5000)
+      }
     })
+    return () => {
+      unsubscribe()
+    }
   }, [])
+
+  useEffect(() => {
+    sidebarCollapsedRef.current = settings.sidebarCollapsed
+  }, [settings.sidebarCollapsed])
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
+    }
+  }, [])
+
+  const showToast = useCallback((message: string, ms = 4500): void => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
+    setToast(message)
+    toastTimerRef.current = setTimeout(() => {
+      toastTimerRef.current = null
+      setToast(null)
+    }, ms)
+  }, [])
+
+  useEffect(() => {
+    return window.api.app.onToast((message) => showToast(message))
+  }, [showToast])
 
   useEffect(() => {
     return window.api.app.onSettingsChanged((next) => {
@@ -292,6 +382,9 @@ function App(): React.JSX.Element {
 
   const browserAuthBusy = authPhase === 'google' || authPhase === 'slack'
   const dashboardOpen = useDashboardStore((s) => s.dashboardOpen)
+  const openDashboard = useDashboardStore((s) => s.openDashboard)
+  const closeDashboard = useDashboardStore((s) => s.closeDashboard)
+  const showDashboard = dashboardOpen && !browserAuthBusy
   const wizardOpen = useDashboardStore((s) => s.wizardOpenFor) != null
   const splitOn =
     settings.splitViewEnabled && Boolean(splitSecondary) && !browserAuthBusy && !locked
@@ -301,13 +394,17 @@ function App(): React.JSX.Element {
   const showEmbed = Boolean(
     adminAuthenticated &&
     activeProfile &&
-    activeAppId &&
+    (activeAppId || activeCustomLinkId) &&
     !dashboardOpen &&
     !wizardOpen &&
     !browserAuthBusy &&
     !locked &&
     !settingsOpen &&
+    !unifiedSettingsOpen &&
     !cmdkOpen &&
+    !platformSettings &&
+    !addPlatformOpen &&
+    !accountsModalOpen &&
     !showOnboarding
   )
 
@@ -377,25 +474,35 @@ function App(): React.JSX.Element {
     [settings.sidebarWidth]
   )
 
-  const setSidebarCollapsed = useCallback((collapsed: boolean) => {
-    void window.api.app.setSettings({ sidebarCollapsed: collapsed }).then((s) => {
-      setSettings(s)
-      if (!s.sidebarCollapsed) {
-        applySidebarWidth(s.sidebarWidth)
-      }
-      if (collapsed) {
-        setToast('Sidebar hidden — press ⌘B or use the left panel button to show it again.')
-      }
-      window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(() => {
-          const bounds = viewportBounds()
-          if (useProfileStore.getState().activeAppId) {
-            void window.api.profiles.updateBounds(bounds)
+  const setSidebarCollapsed = useCallback(
+    (collapsed: boolean) => {
+      void window.api.app.setSettings({ sidebarCollapsed: collapsed }).then((s) => {
+        const previousCollapsed = sidebarCollapsedRef.current
+        sidebarCollapsedRef.current = s.sidebarCollapsed
+        setSettings(s)
+        if (!s.sidebarCollapsed) {
+          applySidebarWidth(s.sidebarWidth)
+          if (toastTimerRef.current) {
+            clearTimeout(toastTimerRef.current)
+            toastTimerRef.current = null
           }
+          setToast(null)
+        } else {
+          const message = sidebarToastFor(previousCollapsed, s.sidebarCollapsed)
+          if (message) showToast(message, 6000)
+        }
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => {
+            const bounds = viewportBounds()
+            if (useProfileStore.getState().activeAppId) {
+              void window.api.profiles.updateBounds(bounds)
+            }
+          })
         })
       })
-    })
-  }, [])
+    },
+    [showToast]
+  )
 
   const handleAuthDockBounds = useCallback((bounds: ViewportBounds) => {
     void window.api.profiles.syncChromeEmbedBounds(bounds)
@@ -412,6 +519,7 @@ function App(): React.JSX.Element {
 
   const handleSelectProfile = useCallback(
     async (profileId: string) => {
+      setActiveCustomLinkId(null)
       if (profileId === activeProfileId) {
         return
       }
@@ -427,9 +535,23 @@ function App(): React.JSX.Element {
     [activeProfileId, activateProfile, selectApp]
   )
 
+  const handleSelectCustomLink = useCallback(
+    async (profileId: string, link: import('../../shared/types').CustomLink) => {
+      closeDashboard()
+      setActiveCustomLinkId(link.id)
+      useProfileStore.setState({ activeProfileId: profileId, activeAppId: null })
+      const bounds = viewportBounds()
+      await window.api.profiles.activateCustomLink(profileId, link.id, link.url, bounds)
+      setStatusLine(`Viewing ${link.name} · ${link.url}`)
+    },
+    [closeDashboard]
+  )
+
   const handleSidebarSelectApp = useCallback(
     (profileId: string, appId: AppId) => {
+      setActiveCustomLinkId(null)
       void (async () => {
+        closeDashboard()
         const refreshed = useProfileStore.getState().profiles.find((p) => p.id === profileId)
         const signedIn = refreshed?.apps[appId].sessionStatus === 'signed-in'
 
@@ -466,7 +588,7 @@ function App(): React.JSX.Element {
         )
       })()
     },
-    [selectApp, startAppLogin]
+    [closeDashboard, selectApp, startAppLogin]
   )
 
   const handleAddGoogle = useCallback(async () => {
@@ -534,6 +656,9 @@ function App(): React.JSX.Element {
 
   const handleOpenWorkspace = useCallback(
     (profileId: string, appId: AppId, teamId: string) => {
+      // Opening a workspace paints the native Slack view; the dashboard must
+      // close first so React and the embed stay in sync (same as app rows).
+      closeDashboard()
       void (async () => {
         await openWorkspace(profileId, appId, teamId, viewportBounds())
         const profile = useProfileStore.getState().profiles.find((p) => p.id === profileId)
@@ -549,7 +674,7 @@ function App(): React.JSX.Element {
         setSettings(next)
       })()
     },
-    [openWorkspace]
+    [closeDashboard, openWorkspace]
   )
 
   const emptyCopy = useMemo(() => {
@@ -739,6 +864,16 @@ function App(): React.JSX.Element {
                 void unpinWorkspace(profileId, appId, teamId)
               }}
               onDismissError={clearError}
+              onPlatformSettings={(profileId, appId) => {
+                setPlatformSettings({ profileId, appId })
+              }}
+              onAddPlatform={() => setAddPlatformOpen(true)}
+              onOpenAccountsSettings={() => {
+                setUnifiedSettingsTab('general')
+                setUnifiedSettingsOpen(true)
+              }}
+              activeCustomLinkId={activeCustomLinkId}
+              onSelectCustomLink={handleSelectCustomLink}
             />
             <div
               className="sidebar-resizer"
@@ -773,7 +908,7 @@ function App(): React.JSX.Element {
               type="button"
               className="sidebar-reopen"
               onClick={() => setSidebarCollapsed(false)}
-              title={`Show sidebar (⌘B) · ${APP_DISPLAY_NAME}`}
+              title={`Show sidebar (${modKey()}B) · ${APP_DISPLAY_NAME}`}
               aria-label="Show sidebar"
               tabIndex={settings.sidebarCollapsed ? 0 : -1}
             >
@@ -782,7 +917,25 @@ function App(): React.JSX.Element {
           </aside>
         </div>
 
-        <main className={`main-column${splitOn ? ' is-split' : ''}`}>
+        <main className={`main-column${splitOn ? ' is-split' : ''}`} style={{ display: 'flex', flexDirection: 'column' }}>
+          {/* Universal Cosmic Scrape Header Bar: always visible whenever scraping or queued */}
+          <ScrapeNavbar
+            state={globalScrapeState}
+            workspaceName={globalScrapeWorkspace}
+            channelName={globalScrapeChannel}
+            progressText={globalScrapeProgress}
+            statusText={globalScrapeStatus}
+            snippets={globalScrapeSnippets}
+            collapsed={globalScrapeCollapsed}
+            onToggleCollapse={() => setGlobalScrapeCollapsed((v) => !v)}
+            onPause={() => setGlobalScrapeState('paused')}
+            onResume={() => setGlobalScrapeState('reading')}
+            onStop={() => {
+              setGlobalScrapeState('idle')
+              setGlobalScrapeStatus(undefined)
+            }}
+            onBackToDashboard={openDashboard}
+          />
           {browserAuthBusy && authPhase ? (
             <AuthChromePane
               phase={authPhase}
@@ -797,7 +950,7 @@ function App(): React.JSX.Element {
             </div>
           ) : null}
 
-          {dashboardOpen ? (
+          {showDashboard ? (
             <DashboardView />
           ) : showEmbed ? (
             <div className={`main-embed${splitOn ? ' is-split' : ''}`}>
@@ -815,7 +968,7 @@ function App(): React.JSX.Element {
               type="button"
               className="settings-float-btn"
               onClick={() => setSettingsOpen(true)}
-              title="Settings (⌘,)"
+              title={`Settings (${modKey()},)`}
               aria-label="Settings"
             >
               ⚙
@@ -828,8 +981,8 @@ function App(): React.JSX.Element {
               <h1>{emptyCopy.title}</h1>
               <p>{emptyCopy.body}</p>
               <p className="empty-main-hint">
-                Shortcuts: ⌘K jump · ⌘B sidebar · ⌘, settings · ⌘1–9 profiles · ⌘⇧S/T/W apps · ⌘L
-                lock
+                Shortcuts: {modKey()}K jump · {modKey()}B sidebar · {modKey()}, settings ·{' '}
+                {modKey()}1–9 profiles · {modShift()}S/T/W apps · {modKey()}L lock
               </p>
             </div>
           ) : null}
@@ -914,6 +1067,106 @@ function App(): React.JSX.Element {
           })
         }}
       />
+
+      {/* Unified Global Settings Hub: single source of truth for all global configs */}
+      <UnifiedSettingsModal
+        open={unifiedSettingsOpen && !locked}
+        initialTab={unifiedSettingsTab}
+        settings={settings}
+        onClose={() => setUnifiedSettingsOpen(false)}
+        onChangeSettings={(patch) => {
+          void window.api.app.setSettings(patch).then((s) => {
+            setSettings(s)
+            applyDocumentTheme(s.theme)
+            applySidebarDensity(s.sidebarDensity)
+            applySidebarWidth(s.sidebarWidth)
+            if (!s.splitViewEnabled) setSplitSecondary(null)
+          })
+        }}
+        onClearAllProfiles={() => {
+          void window.api.profiles.clearAll().then(async () => {
+            useProfileStore.setState({
+              profiles: [],
+              activeProfileId: null,
+              activeAppId: null
+            })
+            const s = await window.api.app.getSettings()
+            setSettings(s)
+          })
+        }}
+        onExportProfiles={() => {
+          void window.api.profiles.exportMetadata().then((list) => {
+            const blob = new Blob([JSON.stringify(list, null, 2)], {
+              type: 'application/json'
+            })
+            const a = document.createElement('a')
+            a.href = URL.createObjectURL(blob)
+            a.download = 'cosmic-profiles.json'
+            a.click()
+          })
+        }}
+        onImportProfiles={() => {
+          const input = document.createElement('input')
+          input.type = 'file'
+          input.accept = 'application/json,.json'
+          input.onchange = () => {
+            const file = input.files?.[0]
+            if (!file) return
+            void file.text().then(async (text) => {
+              const parsed = JSON.parse(text) as Profile[]
+              const list = await window.api.profiles.importMetadata(parsed)
+              useProfileStore.setState({ profiles: list })
+              setToast(`Imported — ${list.length} profiles total (sessions still need sign-in).`)
+            })
+          }
+          input.click()
+        }}
+        onAdminLogout={() => {
+          void window.api.app.adminLogout().then(() => {
+            setAdminAuthenticated(false)
+            void window.api.profiles.setEmbedVisible(false)
+          })
+        }}
+        onAddGoogleAccount={() => {
+          setUnifiedSettingsOpen(false)
+          const emailInput = document.querySelector('.nav-input') as HTMLInputElement | null
+          emailInput?.focus()
+        }}
+        onSelectProfile={(id) => {
+          setUnifiedSettingsOpen(false)
+          void handleSelectProfile(id)
+        }}
+        onOpenCustomLink={(pId, link) => {
+          setUnifiedSettingsOpen(false)
+          void handleSelectCustomLink(pId, link)
+        }}
+      />
+
+      {platformSettings ? (
+        <PlatformSettingsPanel
+          open={true}
+          profileId={platformSettings.profileId}
+          appId={platformSettings.appId}
+          onClose={() => setPlatformSettings(null)}
+        />
+      ) : null}
+
+      {addPlatformOpen ? (
+        <AddPlatformPage open={true} onClose={() => setAddPlatformOpen(false)} />
+      ) : null}
+
+      {accountsModalOpen ? (
+        <AccountsManagementModal
+          open={true}
+          onClose={() => setAccountsModalOpen(false)}
+          onAddGoogleAccount={() => {
+            const emailInput = document.querySelector('.nav-input') as HTMLInputElement | null
+            emailInput?.focus()
+          }}
+          onSelectProfile={(id) => void handleSelectProfile(id)}
+          onOpenCustomLink={(pId, link) => void handleSelectCustomLink(pId, link)}
+        />
+      ) : null}
 
       {showOnboarding && !locked ? (
         <div className="onboarding-backdrop">

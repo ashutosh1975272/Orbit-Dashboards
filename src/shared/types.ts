@@ -61,6 +61,16 @@ export interface ProfileApps {
   whatsapp: AppSession
 }
 
+export interface CustomLink {
+  id: string
+  name: string
+  url: string
+  order: number
+  createdAt: string
+  partition: string
+  hiddenInSidebar?: boolean
+}
+
 export interface Profile {
   id: string
   displayName: string
@@ -74,12 +84,15 @@ export interface Profile {
   sortOrder?: number
   /** When true, skip tray/desktop notifications for this profile. */
   muted?: boolean
+  /** When true, hide profile row from left sidebar */
+  hiddenInSidebar?: boolean
   /**
    * Google account cookies ready (Chrome password + 2SV).
    * App logins (Slack/Teams) happen separately after the user picks an app.
    */
   googleAuthStatus: 'not-signed-in' | 'signing-in' | 'signed-in'
   apps: ProfileApps
+  customLinks?: CustomLink[]
 }
 
 export function profileDisplayLabel(profile: Profile): string {
@@ -258,7 +271,39 @@ export function appLabel(appId: AppId): string {
   return 'WhatsApp'
 }
 
+/** Cleans up raw titles or legacy captured strings like "channel (Channel) - Workspace" into a clean workspace name. */
+export function sanitizeWorkspaceName(raw?: string): string {
+  if (!raw) return ''
+  let cleaned = raw.replace(/\s+/g, ' ').trim()
+  // Reject notification/badge patterns
+  if (/\d+\s+new\s+items?/i.test(cleaned) || /^new\s+item/i.test(cleaned) || /^\(\d+\)/.test(cleaned)) {
+    return ''
+  }
+  // Strip trailing " | Slack" or " - Slack"
+  cleaned = cleaned.replace(/\s*[|—–-]\s*Slack\s*$/i, '').trim()
+  // Strip Slack channel prefix pattern: "channel (Channel) - WorkspaceName" or "#channel - WorkspaceName"
+  if (cleaned.includes(' - ')) {
+    const parts = cleaned.split(' - ')
+    cleaned = parts[parts.length - 1]!.trim()
+  } else if (cleaned.includes(' | ')) {
+    const parts = cleaned.split(' | ')
+    cleaned = parts[parts.length - 1]!.trim()
+  }
+  return cleaned
+}
+
+export function sidebarAppLabel(appId: AppId): string {
+  return appLabel(appId)
+}
+
 /** WhatsApp has a single Web session — no workspace tree. */
 export function appSupportsWorkspaces(appId: AppId): boolean {
   return appId === 'slack' || appId === 'teams'
+}
+
+/** Workspace → cards mapping (persisted in workspace-mappings.json). */
+export interface WorkspaceMapping {
+  workspaceId: string
+  projectIds: string[]
+  updatedAt: string
 }

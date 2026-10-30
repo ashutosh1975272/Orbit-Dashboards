@@ -2,15 +2,51 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <title>Orbit</title>
+    <title>Cosmic</title>
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' https://cdn.fontshare.com data:; img-src 'self' data: https:;"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' https://cdn.fontshare.com data:; img-src 'self' data: https:;"
     />
+    <!-- View mode persistence - runs before render to prevent flash -->
+    <script>
+      try {
+        var saved = localStorage.getItem('orbit.view') || 'expanded';
+        document.documentElement.dataset.view = saved;
+      } catch (e) {}
+    </script>
   </head>
 
   <body>
     <div id="root"></div>
     <script type="module" src="./src/main.tsx"></script>
+    <script>
+      // Sync button state on load and handle toggle clicks
+      function syncViewToggle() {
+        var mode = document.documentElement.dataset.view;
+        // Legacy .view-toggle
+        document.querySelectorAll('.view-toggle button').forEach(function(btn) {
+          var pressed = btn.dataset.mode === mode;
+          btn.setAttribute('aria-pressed', String(pressed));
+          btn.classList.toggle('active', pressed);
+        });
+        // New .segmented
+        document.querySelectorAll('.segmented button').forEach(function(btn) {
+          var pressed = btn.dataset.mode === mode;
+          btn.setAttribute('aria-pressed', String(pressed));
+        });
+      }
+      // Initial sync
+      syncViewToggle();
+      // Delegated click handler for view toggles (.view-toggle and .segmented)
+      document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.view-toggle button, .segmented button');
+        if (!btn) return;
+        var mode = btn.dataset.mode;
+        if (!mode) return;
+        document.documentElement.dataset.view = mode;
+        try { localStorage.setItem('orbit.view', mode); } catch (err) {}
+        syncViewToggle();
+      });
+    </script>
   </body>
 </html>
