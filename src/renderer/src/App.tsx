@@ -658,7 +658,13 @@ function App(): React.JSX.Element {
         let targetProfileId: string
         if (mode === 'under_global') {
           const globalP = useProfileStore.getState().profiles.find((p) => p.id === GLOBAL_PROFILE_ID || p.isGlobalProfile)
-          targetProfileId = globalP ? globalP.id : (await createProfile(hint)).id
+          if (globalP) {
+            targetProfileId = globalP.id
+          } else {
+            const created = await createProfile(hint)
+            targetProfileId = created.id
+            await window.api.profiles.setCustomName(created.id, 'Global Account')
+          }
         } else {
           const profile = await createProfile(hint)
           targetProfileId = profile.id
