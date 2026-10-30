@@ -137,14 +137,14 @@
 .ws-shell {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
-  /* One fixed footprint: a long body scrolls inside, it never resizes the card. */
-  height: clamp(640px, calc(100vh - 190px), 860px);
+  /* Maximize screen space while preserving safe margins for cosmic top bar + project title */
+  height: clamp(620px, calc(100vh - 120px), 940px);
   background: var(--bg-card);
   border: 1px solid var(--border-card-open);
   border-radius: var(--radius-card);
-  padding: 16px 18px 14px;
+  padding: 12px 14px 10px;
   overflow: hidden;
   container-type: inline-size;
 }
@@ -223,12 +223,12 @@
 
 .ws-body {
   display: grid;
-  grid-template-columns: var(--ws-nav-w, 236px) minmax(0, 1fr);
+  grid-template-columns: var(--ws-nav-w, 205px) minmax(0, 1fr);
   gap: 0;
   flex: 1;
   min-height: 0;
   min-width: 0;
-  margin: 0 -18px -14px;
+  margin: 0 -14px -10px;
   border-top: 1px solid var(--border-panel);
 }
 .ws-body.is-collapsed {

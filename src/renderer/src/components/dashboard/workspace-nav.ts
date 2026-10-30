@@ -408,9 +408,9 @@ export interface WorkspaceNavState {
 
 export const NAV_REV = 6
 
-export const NAV_WIDTH_MIN = 180
-export const NAV_WIDTH_MAX = 400
-export const NAV_WIDTH_DEFAULT = 236
+export const NAV_WIDTH_MIN = 170
+export const NAV_WIDTH_MAX = 360
+export const NAV_WIDTH_DEFAULT = 205
 /** Icon-rail width shown when collapsed or auto-collapsed at narrow widths. */
 export const NAV_RAIL_WIDTH = 56
 

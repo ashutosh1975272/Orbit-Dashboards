@@ -5,6 +5,7 @@ import {
   NAV_CONNECTORS,
   NAV_REV,
   NAV_SECTIONS,
+  NAV_WIDTH_DEFAULT,
   NAV_WIDTH_MAX,
   NAV_WIDTH_MIN,
   buildConnectorChannelLists,
@@ -96,7 +97,7 @@ describe('nav model shape (v6)', () => {
     expect(DEFAULT_NAV.openSections).toEqual(['xomni', 'slack', 'info', 'viz'])
     expect(DEFAULT_NAV.openInfoGroups).toEqual([])
     expect(DEFAULT_NAV.sectionSelections).toEqual({})
-    expect(DEFAULT_NAV.width).toBe(236)
+    expect(DEFAULT_NAV.width).toBe(NAV_WIDTH_DEFAULT)
   })
 
   it('maps selections to their owning section and sub-group', () => {
@@ -122,7 +123,7 @@ describe('nav model shape (v6)', () => {
   it('clamps width to the rail bounds', () => {
     expect(clampNavWidth(50)).toBe(NAV_WIDTH_MIN)
     expect(clampNavWidth(9999)).toBe(NAV_WIDTH_MAX)
-    expect(clampNavWidth(Number.NaN)).toBe(236)
+    expect(clampNavWidth(Number.NaN)).toBe(NAV_WIDTH_DEFAULT)
   })
 })
 
