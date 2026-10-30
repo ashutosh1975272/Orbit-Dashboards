@@ -196,7 +196,6 @@ export default function ExpandedWorkspace({
         onToggle={handleToggle}
         pinned={pinned}
         onTogglePin={onTogglePin}
-        projectId={project.id}
       />
 
       <div
