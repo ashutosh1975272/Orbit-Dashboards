@@ -797,7 +797,7 @@ export default function ProjectSettingsTab({
                         checked={!layout.custom.hiddenItems?.['slack']?.includes('our_slack')}
                         onChange={() => handleToggleSubItem('slack', 'our_slack')}
                       />
-                      <span><b>My Accounts</b> (internal team channels &amp; accounts)</span>
+                      <span><b>My Accounts</b> (internal channels &amp; connected platforms like Discord, Upwork, Teams)</span>
                     </label>
 
                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
@@ -807,15 +807,6 @@ export default function ProjectSettingsTab({
                         onChange={() => handleToggleSubItem('slack', 'client_slack')}
                       />
                       <span><b>Client Accounts</b> (client communication channels &amp; accounts)</span>
-                    </label>
-
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
-                      <input
-                        type="checkbox"
-                        checked={!layout.custom.hiddenItems?.['slack']?.includes('other_platforms')}
-                        onChange={() => handleToggleSubItem('slack', 'other_platforms')}
-                      />
-                      <span><b>Other Platforms &amp; Connectors</b> (Upwork, Discord, Teams, WhatsApp, Google Chat)</span>
                     </label>
                   </div>
                 </div>

@@ -35,6 +35,7 @@ import {
 interface WorkspaceSidebarProps {
   projectId?: string
   projectProfileId?: string
+  sources?: any[]
   view: CardView
   nav: WorkspaceNavState
   channels: ConnectorChannelLists
@@ -157,6 +158,7 @@ function Row({
 export default function WorkspaceSidebar({
   projectId = '',
   projectProfileId: _projectProfileId,
+  sources = [],
   view,
   nav,
   channels,
@@ -469,12 +471,13 @@ export default function WorkspaceSidebar({
                     </div>
                     )}
 
-                    {/* SECTION 2 & 3: OUR SLACK & CLIENT CONNECTORS */}
+                    {/* SECTION 2 & 3: MY ACCOUNTS & CLIENT ACCOUNTS (Platforms like Discord, Upwork, Teams appear inside these if added) */}
                     {NAV_CONNECTORS.filter((c) => {
+                      // Only show top-level My Accounts ('team') and Client Accounts ('client')
+                      if (c.key !== 'team' && c.key !== 'client') return false
                       const hiddenSub = layout.custom.hiddenItems?.['slack'] ?? []
                       if (c.key === 'team' && hiddenSub.includes('our_slack')) return false
                       if (c.key === 'client' && hiddenSub.includes('client_slack')) return false
-                      if (['upwork', 'teams', 'whatsapp', 'googlechat', 'discord'].includes(c.key) && hiddenSub.includes('other_platforms')) return false
                       return true
                     }).map((connector) => {
                     const list = channels[connector.key]
@@ -483,6 +486,11 @@ export default function WorkspaceSidebar({
                     const open = nav.openConnectors.includes(connector.key)
                     const holding =
                       !open && connectorOfSelection(nav.selection) === connector.key
+
+                    // Custom attached platform accounts for this role
+                    const roleKey = connector.key === 'client' ? 'client' : 'ours'
+                    const extraSources = sources.filter((s: any) => s.role === roleKey && s.platform && s.platform !== 'slack')
+
                     return (
                       <div key={connector.key} className="ws-nav-group">
                         <button
@@ -498,8 +506,8 @@ export default function WorkspaceSidebar({
                             <NavIcon name={connector.icon} />
                           </span>
                           <span className="ws-nav-label">{connector.label}</span>
-                          {entries.length > 0 && (
-                            <span className="ws-nav-count">{entries.length}</span>
+                          {(entries.length > 0 || extraSources.length > 0) && (
+                            <span className="ws-nav-count">{entries.length + extraSources.length}</span>
                           )}
                           <Chevron open={open} />
                         </button>
@@ -522,7 +530,7 @@ export default function WorkspaceSidebar({
                                   : list.error}
                               </p>
                             )}
-                            {!list?.loading && !list?.error && entries.length === 0 && (
+                            {!list?.loading && !list?.error && entries.length === 0 && extraSources.length === 0 && (
                               <p className="ws-nav-note">{connector.note}</p>
                             )}
                             {entries.map((channel) => (
@@ -539,6 +547,29 @@ export default function WorkspaceSidebar({
                                   onSelect(channelSelectionId(connector.key, channel.id))
                                 }
                               />
+                            ))}
+                            {extraSources.map((src: any) => (
+                              <button
+                                key={src.id}
+                                type="button"
+                                className="ws-nav-subitem"
+                                title={`${src.workspaceName} (${src.platform})`}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  padding: '4px 12px 4px 28px',
+                                  width: '100%',
+                                  textAlign: 'left'
+                                }}
+                              >
+                                <span className="ws-nav-label" style={{ fontSize: 12 }}>
+                                  🔌 {src.workspaceName}
+                                </span>
+                                <span className="ws-nav-tag" style={{ fontSize: 10, opacity: 0.7, textTransform: 'capitalize' }}>
+                                  {src.platform}
+                                </span>
+                              </button>
                             ))}
                           </>
                         )}
