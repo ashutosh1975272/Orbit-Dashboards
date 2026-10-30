@@ -7,7 +7,7 @@ import { modKey } from '../../lib/shortcut-label'
 import AiSettingsForm from './AiSettingsForm'
 import TeamSlackSettings from './TeamSlackSettings'
 
-export type SettingsTabKey = 'general' | 'ai' | 'our_slack' | 'accounts' | 'maintenance'
+export type SettingsTabKey = 'general' | 'sidebar' | 'ai' | 'our_slack' | 'accounts' | 'maintenance'
 
 interface UnifiedSettingsModalProps {
   open: boolean
@@ -142,6 +142,7 @@ export function UnifiedSettingsModal({
 
   const navItems = [
     { key: 'general' as const, label: 'Preferences & Appearance', icon: '🎨' },
+    { key: 'sidebar' as const, label: 'Sidebar & Navigation', icon: '📑' },
     { key: 'ai' as const, label: 'Global AI & NVIDIA NIM', icon: '🤖' },
     { key: 'our_slack' as const, label: 'Team Slack (Our Slack)', icon: '🏢' },
     { key: 'accounts' as const, label: 'Accounts & Workspaces', icon: '👥' },
@@ -373,6 +374,238 @@ export function UnifiedSettingsModal({
                       onChange={(e) => onChangeSettings({ splitViewEnabled: e.target.checked })}
                     />
                   </label>
+                </div>
+              </div>
+            )}
+
+            {/* TAB: SIDEBAR & NAVIGATION */}
+            {activeTab === 'sidebar' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <header>
+                  <h3 style={{ margin: 0, fontSize: '16px', color: '#f8fafc' }}>
+                    Sidebar & Navigation
+                  </h3>
+                  <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#94a3b8' }}>
+                    Customize which sections, looks, and buttons appear in the sidebar navigation rail.
+                  </p>
+                </header>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '20px',
+                    background: 'rgba(15, 23, 42, 0.4)',
+                    padding: '20px',
+                    borderRadius: '10px',
+                    border: '1px solid rgba(255, 255, 255, 0.06)'
+                  }}
+                >
+                  {/* Subsection 1: Appearance Look */}
+                  <div>
+                    <h4 style={{ margin: '0 0 10px', fontSize: '14px', color: '#e2e8f0', fontWeight: 600 }}>
+                      Appearance Look &amp; Header
+                    </h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <label className="settings-row">
+                        <span>Default Appearance Look</span>
+                        <select
+                          value={settings.sidebarLook ?? 'ancient'}
+                          onChange={(e) =>
+                            onChangeSettings({
+                              sidebarLook: e.target.value as 'ancient' | 'new-cosmic'
+                            })
+                          }
+                        >
+                          <option value="ancient">Ancient Look (Default)</option>
+                          <option value="new-cosmic">New Cosmic (Futuristic)</option>
+                        </select>
+                      </label>
+
+                      <label className="settings-row">
+                        <span>Show Look Switcher in Sidebar Header</span>
+                        <input
+                          type="checkbox"
+                          checked={settings.showLookSwitcher ?? true}
+                          onChange={(e) =>
+                            onChangeSettings({ showLookSwitcher: e.target.checked })
+                          }
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  <hr style={{ border: 'none', borderTop: '1px solid rgba(255, 255, 255, 0.08)', margin: 0 }} />
+
+                  {/* Subsection 2: Content Sections */}
+                  <div>
+                    <h4 style={{ margin: '0 0 10px', fontSize: '14px', color: '#e2e8f0', fontWeight: 600 }}>
+                      Navigation Sections
+                    </h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div className="settings-row" style={{ opacity: 0.9 }}>
+                        <span>
+                          Dashboard &amp; Projects
+                          <span style={{ display: 'block', fontSize: '11px', color: '#64748b' }}>
+                            Permanent anchor — always visible
+                          </span>
+                        </span>
+                        <span style={{ fontSize: '11px', color: '#4ade80', fontWeight: 600 }}>Permanent</span>
+                      </div>
+
+                      <label className="settings-row">
+                        <span>
+                          Show Recent Workspaces
+                          <span style={{ display: 'block', fontSize: '11px', color: '#64748b' }}>
+                            Quick access strip showing recently active workspaces below Dashboard
+                          </span>
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={settings.showRecentSection ?? true}
+                          onChange={(e) =>
+                            onChangeSettings({ showRecentSection: e.target.checked })
+                          }
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  <hr style={{ border: 'none', borderTop: '1px solid rgba(255, 255, 255, 0.08)', margin: 0 }} />
+
+                  {/* Subsection 3: Bottom Action Buttons */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                      <h4 style={{ margin: 0, fontSize: '14px', color: '#e2e8f0', fontWeight: 600 }}>
+                        Sidebar Bottom Action Buttons
+                      </h4>
+                      <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                        Grid automatically adjusts layout based on active buttons
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div className="settings-row" style={{ opacity: 0.9 }}>
+                        <span>
+                          ⚙️ Settings Button
+                          <span style={{ display: 'block', fontSize: '11px', color: '#64748b' }}>
+                            Permanent anchor — opens this Global Settings Hub
+                          </span>
+                        </span>
+                        <span style={{ fontSize: '11px', color: '#4ade80', fontWeight: 600 }}>Permanent</span>
+                      </div>
+
+                      <label className="settings-row">
+                        <span>🌐 + Website (Add Platform &amp; Custom Web Links)</span>
+                        <input
+                          type="checkbox"
+                          checked={settings.sidebarButtons?.addWebsite ?? true}
+                          onChange={(e) =>
+                            onChangeSettings({
+                              sidebarButtons: {
+                                ...(settings.sidebarButtons ?? {
+                                  addWebsite: true,
+                                  newProject: true,
+                                  newProfile: true,
+                                  observer: true,
+                                  profilesHub: true
+                                }),
+                                addWebsite: e.target.checked
+                              }
+                            })
+                          }
+                        />
+                      </label>
+
+                      <label className="settings-row">
+                        <span>📁 + Project (Create Project / Workspace)</span>
+                        <input
+                          type="checkbox"
+                          checked={settings.sidebarButtons?.newProject ?? true}
+                          onChange={(e) =>
+                            onChangeSettings({
+                              sidebarButtons: {
+                                ...(settings.sidebarButtons ?? {
+                                  addWebsite: true,
+                                  newProject: true,
+                                  newProfile: true,
+                                  observer: true,
+                                  profilesHub: true
+                                }),
+                                newProject: e.target.checked
+                              }
+                            })
+                          }
+                        />
+                      </label>
+
+                      <label className="settings-row">
+                        <span>👤 + Profile (Create Profile / Account)</span>
+                        <input
+                          type="checkbox"
+                          checked={settings.sidebarButtons?.newProfile ?? true}
+                          onChange={(e) =>
+                            onChangeSettings({
+                              sidebarButtons: {
+                                ...(settings.sidebarButtons ?? {
+                                  addWebsite: true,
+                                  newProject: true,
+                                  newProfile: true,
+                                  observer: true,
+                                  profilesHub: true
+                                }),
+                                newProfile: e.target.checked
+                              }
+                            })
+                          }
+                        />
+                      </label>
+
+                      <label className="settings-row">
+                        <span>🔭 Observer (Live Workspace &amp; Observer View)</span>
+                        <input
+                          type="checkbox"
+                          checked={settings.sidebarButtons?.observer ?? true}
+                          onChange={(e) =>
+                            onChangeSettings({
+                              sidebarButtons: {
+                                ...(settings.sidebarButtons ?? {
+                                  addWebsite: true,
+                                  newProject: true,
+                                  newProfile: true,
+                                  observer: true,
+                                  profilesHub: true
+                                }),
+                                observer: e.target.checked
+                              }
+                            })
+                          }
+                        />
+                      </label>
+
+                      <label className="settings-row">
+                        <span>👥 Profiles (Profiles &amp; Accounts Management Hub)</span>
+                        <input
+                          type="checkbox"
+                          checked={settings.sidebarButtons?.profilesHub ?? true}
+                          onChange={(e) =>
+                            onChangeSettings({
+                              sidebarButtons: {
+                                ...(settings.sidebarButtons ?? {
+                                  addWebsite: true,
+                                  newProject: true,
+                                  newProfile: true,
+                                  observer: true,
+                                  profilesHub: true
+                                }),
+                                profilesHub: e.target.checked
+                              }
+                            })
+                          }
+                        />
+                      </label>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

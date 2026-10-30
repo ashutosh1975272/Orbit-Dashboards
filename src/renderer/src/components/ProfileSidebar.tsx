@@ -68,6 +68,18 @@ interface ProfileSidebarProps {
   onSelectCustomLink?: (profileId: string, link: CustomLink) => void
   /** Optional slot rendered after the Recents strip (dashboard entry point). */
   dashboardSlot?: React.ReactNode
+  /** Customization settings for the sidebar */
+  sidebarLook?: 'ancient' | 'new-cosmic'
+  showLookSwitcher?: boolean
+  showRecentSection?: boolean
+  sidebarButtons?: {
+    addWebsite?: boolean
+    newProject?: boolean
+    newProfile?: boolean
+    observer?: boolean
+    profilesHub?: boolean
+  }
+  onLookChange?: (look: 'ancient' | 'new-cosmic') => void
 }
 
 function platformStatusDot(sessionStatus: AppSessionStatus): {
@@ -329,14 +341,29 @@ export const ProfileSidebar = memo(function ProfileSidebar({
   onOpenProfilesHub,
   activeCustomLinkId,
   onSelectCustomLink,
-  dashboardSlot
+  dashboardSlot,
+  sidebarLook: propSidebarLook,
+  showLookSwitcher = true,
+  showRecentSection = true,
+  sidebarButtons = {
+    addWebsite: true,
+    newProject: true,
+    newProfile: true,
+    observer: true,
+    profilesHub: true
+  },
+  onLookChange
 }: ProfileSidebarProps): React.JSX.Element {
   const [profileExpanded, setProfileExpanded] = useState<Record<string, boolean>>({})
   const [appExpanded, setAppExpanded] = useState<Record<string, boolean>>({})
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [dragId, setDragId] = useState<string | null>(null)
-  const [activeLook, setActiveLook] = useState<'ancient' | 'new-cosmic'>('ancient')
+  const activeLook = propSidebarLook ?? 'ancient'
+
+  const handleSetLook = (look: 'ancient' | 'new-cosmic'): void => {
+    onLookChange?.(look)
+  }
   const profileIdSet = useMemo(() => new Set(profiles.map((p) => p.id)), [profiles])
   const visibleRecents = useMemo(() => {
     const fromHistory = recentWorkspaces.filter((r) => profileIdSet.has(r.profileId))
@@ -413,68 +440,70 @@ export const ProfileSidebar = memo(function ProfileSidebar({
         </div>
 
         {/* View Looks Switcher: Ancient Look (default) vs New Cosmic */}
-        <div
-          className="sidebar-looks-switcher"
-          role="group"
-          aria-label="Sidebar Appearance Look"
-          style={{
-            display: 'flex',
-            gap: '4px',
-            marginTop: '10px',
-            background: 'rgba(0, 0, 0, 0.28)',
-            padding: '3px',
-            borderRadius: '8px',
-            border: '1px solid rgba(255, 255, 255, 0.07)'
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => setActiveLook('ancient')}
-            aria-pressed={activeLook === 'ancient'}
+        {showLookSwitcher ? (
+          <div
+            className="sidebar-looks-switcher"
+            role="group"
+            aria-label="Sidebar Appearance Look"
             style={{
-              flex: 1,
-              padding: '5px 8px',
-              fontSize: '11px',
-              fontWeight: 600,
-              borderRadius: '6px',
-              border: activeLook === 'ancient' ? '1px solid var(--accent)' : '1px solid transparent',
-              background: activeLook === 'ancient' ? 'color-mix(in srgb, var(--accent) 22%, transparent)' : 'transparent',
-              color: activeLook === 'ancient' ? '#fff' : 'var(--text-faint)',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-              textAlign: 'center'
+              display: 'flex',
+              gap: '4px',
+              marginTop: '10px',
+              background: 'rgba(0, 0, 0, 0.28)',
+              padding: '3px',
+              borderRadius: '8px',
+              border: '1px solid rgba(255, 255, 255, 0.07)'
             }}
-            title="Ancient Look (Default established theme)"
           >
-            Ancient Look
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveLook('new-cosmic')}
-            aria-pressed={activeLook === 'new-cosmic'}
-            style={{
-              flex: 1,
-              padding: '5px 8px',
-              fontSize: '11px',
-              fontWeight: 600,
-              borderRadius: '6px',
-              border: activeLook === 'new-cosmic' ? '1px solid var(--accent)' : '1px solid transparent',
-              background: activeLook === 'new-cosmic' ? 'color-mix(in srgb, var(--accent) 22%, transparent)' : 'transparent',
-              color: activeLook === 'new-cosmic' ? '#fff' : 'var(--text-faint)',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-              textAlign: 'center'
-            }}
-            title="New Cosmic Look (Futuristic exploration)"
-          >
-            New Cosmic
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={() => handleSetLook('ancient')}
+              aria-pressed={activeLook === 'ancient'}
+              style={{
+                flex: 1,
+                padding: '5px 8px',
+                fontSize: '11px',
+                fontWeight: 600,
+                borderRadius: '6px',
+                border: activeLook === 'ancient' ? '1px solid var(--accent)' : '1px solid transparent',
+                background: activeLook === 'ancient' ? 'color-mix(in srgb, var(--accent) 22%, transparent)' : 'transparent',
+                color: activeLook === 'ancient' ? '#fff' : 'var(--text-faint)',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                textAlign: 'center'
+              }}
+              title="Ancient Look (Default established theme)"
+            >
+              Ancient Look
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSetLook('new-cosmic')}
+              aria-pressed={activeLook === 'new-cosmic'}
+              style={{
+                flex: 1,
+                padding: '5px 8px',
+                fontSize: '11px',
+                fontWeight: 600,
+                borderRadius: '6px',
+                border: activeLook === 'new-cosmic' ? '1px solid var(--accent)' : '1px solid transparent',
+                background: activeLook === 'new-cosmic' ? 'color-mix(in srgb, var(--accent) 22%, transparent)' : 'transparent',
+                color: activeLook === 'new-cosmic' ? '#fff' : 'var(--text-faint)',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                textAlign: 'center'
+              }}
+              title="New Cosmic Look (Futuristic exploration)"
+            >
+              New Cosmic
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {dashboardSlot}
 
-      {visibleRecents.length > 0 ? (
+      {showRecentSection && visibleRecents.length > 0 ? (
         <div className="recent-strip" aria-label="Recent workspaces">
           <div className="recent-strip-head">
             <p className="recent-label">Recent</p>
@@ -804,8 +833,8 @@ export const ProfileSidebar = memo(function ProfileSidebar({
       </ul>
 
       <div className="nav-action-compact-container">
-        {/* Row 1: Creation Actions */}
-        <div className="nav-action-row nav-action-row-creation">
+        {/* Configurable Action: + Website */}
+        {sidebarButtons.addWebsite !== false ? (
           <button
             type="button"
             className="nav-action-compact-btn"
@@ -816,47 +845,50 @@ export const ProfileSidebar = memo(function ProfileSidebar({
             <span className="nav-btn-icon">🌐</span>
             <span className="nav-btn-text">+ Website</span>
           </button>
+        ) : null}
 
-          {onNewProject ? (
-            <button
-              type="button"
-              className="nav-action-compact-btn"
-              onClick={onNewProject}
-              title="Create New Project / Workspace"
-              aria-label="New Project"
-            >
-              <span className="nav-btn-icon">📁</span>
-              <span className="nav-btn-text">+ Project</span>
-            </button>
-          ) : null}
-
-          {onNewProfile ? (
-            <button
-              type="button"
-              className="nav-action-compact-btn"
-              onClick={onNewProfile}
-              title="Create New Profile / Account"
-              aria-label="New Profile"
-            >
-              <span className="nav-btn-icon">👤</span>
-              <span className="nav-btn-text">+ Profile</span>
-            </button>
-          ) : null}
-        </div>
-
-        {/* Row 2: Management & Utility Actions */}
-        <div className="nav-action-row nav-action-row-utility">
+        {/* Configurable Action: + Project */}
+        {sidebarButtons.newProject !== false && onNewProject ? (
           <button
             type="button"
-            className="nav-action-compact-btn nav-settings-btn"
-            onClick={onOpenAccountsSettings}
-            title="Global Settings Hub"
-            aria-label="Settings"
+            className="nav-action-compact-btn"
+            onClick={onNewProject}
+            title="Create New Project / Workspace"
+            aria-label="New Project"
           >
-            <span className="nav-btn-icon">⚙️</span>
-            <span className="nav-btn-text">Settings</span>
+            <span className="nav-btn-icon">📁</span>
+            <span className="nav-btn-text">+ Project</span>
           </button>
+        ) : null}
 
+        {/* Configurable Action: + Profile */}
+        {sidebarButtons.newProfile !== false && onNewProfile ? (
+          <button
+            type="button"
+            className="nav-action-compact-btn"
+            onClick={onNewProfile}
+            title="Create New Profile / Account"
+            aria-label="New Profile"
+          >
+            <span className="nav-btn-icon">👤</span>
+            <span className="nav-btn-text">+ Profile</span>
+          </button>
+        ) : null}
+
+        {/* Permanent Action: ⚙️ Settings */}
+        <button
+          type="button"
+          className="nav-action-compact-btn nav-settings-btn"
+          onClick={onOpenAccountsSettings}
+          title="Global Settings Hub"
+          aria-label="Settings"
+        >
+          <span className="nav-btn-icon">⚙️</span>
+          <span className="nav-btn-text">Settings</span>
+        </button>
+
+        {/* Configurable Action: 🔭 Observer */}
+        {sidebarButtons.observer !== false && onObserver ? (
           <button
             type="button"
             className="nav-action-compact-btn"
@@ -867,7 +899,10 @@ export const ProfileSidebar = memo(function ProfileSidebar({
             <span className="nav-btn-icon">🔭</span>
             <span className="nav-btn-text">Observer</span>
           </button>
+        ) : null}
 
+        {/* Configurable Action: 👥 Profiles */}
+        {sidebarButtons.profilesHub !== false ? (
           <button
             type="button"
             className="nav-action-compact-btn"
@@ -878,7 +913,7 @@ export const ProfileSidebar = memo(function ProfileSidebar({
             <span className="nav-btn-icon">👥</span>
             <span className="nav-btn-text">Profiles</span>
           </button>
-        </div>
+        ) : null}
       </div>
     </aside>
   )

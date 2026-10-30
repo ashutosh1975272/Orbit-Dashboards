@@ -66,7 +66,44 @@ export function normalizeAppSettings(parsed: Partial<AppSettings>): AppSettings 
       typeof parsed.notificationSound === 'boolean'
         ? parsed.notificationSound
         : DEFAULT_APP_SETTINGS.notificationSound,
-    recentWorkspaces: recent
+    recentWorkspaces: recent,
+    sidebarLook:
+      parsed.sidebarLook === 'ancient' || parsed.sidebarLook === 'new-cosmic'
+        ? parsed.sidebarLook
+        : DEFAULT_APP_SETTINGS.sidebarLook,
+    showLookSwitcher:
+      typeof parsed.showLookSwitcher === 'boolean'
+        ? parsed.showLookSwitcher
+        : DEFAULT_APP_SETTINGS.showLookSwitcher,
+    showRecentSection:
+      typeof parsed.showRecentSection === 'boolean'
+        ? parsed.showRecentSection
+        : DEFAULT_APP_SETTINGS.showRecentSection,
+    sidebarButtons:
+      parsed.sidebarButtons && typeof parsed.sidebarButtons === 'object'
+        ? {
+            addWebsite:
+              typeof parsed.sidebarButtons.addWebsite === 'boolean'
+                ? parsed.sidebarButtons.addWebsite
+                : DEFAULT_APP_SETTINGS.sidebarButtons.addWebsite,
+            newProject:
+              typeof parsed.sidebarButtons.newProject === 'boolean'
+                ? parsed.sidebarButtons.newProject
+                : DEFAULT_APP_SETTINGS.sidebarButtons.newProject,
+            newProfile:
+              typeof parsed.sidebarButtons.newProfile === 'boolean'
+                ? parsed.sidebarButtons.newProfile
+                : DEFAULT_APP_SETTINGS.sidebarButtons.newProfile,
+            observer:
+              typeof parsed.sidebarButtons.observer === 'boolean'
+                ? parsed.sidebarButtons.observer
+                : DEFAULT_APP_SETTINGS.sidebarButtons.observer,
+            profilesHub:
+              typeof parsed.sidebarButtons.profilesHub === 'boolean'
+                ? parsed.sidebarButtons.profilesHub
+                : DEFAULT_APP_SETTINGS.sidebarButtons.profilesHub
+          }
+        : DEFAULT_APP_SETTINGS.sidebarButtons
   }
 }
 

@@ -767,20 +767,13 @@
   color: var(--muted);
 }
 
-/* Compact 2-Tier Sidebar Action Buttons */
+/* Compact Fluid Sidebar Action Buttons */
 .nav-action-compact-container {
   margin: 10px 0 0 0;
   padding: 8px 0 2px 0;
   border-top: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: 100%;
-}
-
-.nav-action-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
   gap: 6px;
   width: 100%;
 }

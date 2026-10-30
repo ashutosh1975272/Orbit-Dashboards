@@ -949,6 +949,15 @@ function App(): React.JSX.Element {
               }}
               activeCustomLinkId={activeCustomLinkId}
               onSelectCustomLink={handleSelectCustomLink}
+              sidebarLook={settings.sidebarLook ?? 'ancient'}
+              showLookSwitcher={settings.showLookSwitcher ?? true}
+              showRecentSection={settings.showRecentSection ?? true}
+              sidebarButtons={settings.sidebarButtons}
+              onLookChange={(look) => {
+                void window.api.app.setSettings({ sidebarLook: look }).then((next) => {
+                  setSettings(next)
+                })
+              }}
             />
             <div
               className="sidebar-resizer"

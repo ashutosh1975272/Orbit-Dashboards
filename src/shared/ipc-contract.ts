@@ -225,6 +225,16 @@ export interface AppSettings {
     label: string
     at: string
   }>
+  sidebarLook: 'ancient' | 'new-cosmic'
+  showLookSwitcher: boolean
+  showRecentSection: boolean
+  sidebarButtons: {
+    addWebsite: boolean
+    newProject: boolean
+    newProfile: boolean
+    observer: boolean
+    profilesHub: boolean
+  }
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -237,7 +247,17 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   idleSleepMinutes: 30,
   splitViewEnabled: false,
   notificationSound: false,
-  recentWorkspaces: []
+  recentWorkspaces: [],
+  sidebarLook: 'ancient',
+  showLookSwitcher: true,
+  showRecentSection: true,
+  sidebarButtons: {
+    addWebsite: true,
+    newProject: true,
+    newProfile: true,
+    observer: true,
+    profilesHub: true
+  }
 }
 
 export type AdminStatus = {
