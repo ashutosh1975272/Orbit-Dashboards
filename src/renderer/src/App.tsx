@@ -4,7 +4,7 @@ import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { AppSettings } from '../../shared/ipc-contract'
 import { DEFAULT_APP_SETTINGS } from '../../shared/ipc-contract'
 import type { AppId, Profile, ViewportBounds } from '../../shared/types'
-import { APP_IDS } from '../../shared/types'
+import { APP_IDS, GLOBAL_PROFILE_ID } from '../../shared/types'
 import appIcon from './assets/app-icon.png'
 import { AuthChromePane, type AuthChromePhase } from './components/AuthChromePane'
 import { AdminLoginOverlay } from './components/AdminLoginOverlay'
@@ -649,41 +649,48 @@ function App(): React.JSX.Element {
   }, [email, createProfile, activateProfile, startGoogleAuth, loadProfiles])
 
   const handleCreateAndAuthProfile = useCallback(
-    async (displayName: string, targetEmail: string) => {
+    async (displayName: string, targetEmail: string, mode?: 'under_global' | 'individual') => {
       const hint = targetEmail.trim()
       if (!hint) return
       setLocalAuthPhase('google')
       setStatusLine('Opening Chrome for Google authentication…')
       try {
-        const profile = await createProfile(hint)
-        if (displayName.trim() && displayName.trim() !== hint) {
-          await window.api.profiles.setCustomName(profile.id, displayName.trim())
+        let targetProfileId: string
+        if (mode === 'under_global') {
+          const globalP = useProfileStore.getState().profiles.find((p) => p.id === GLOBAL_PROFILE_ID || p.isGlobalProfile)
+          targetProfileId = globalP ? globalP.id : (await createProfile(hint)).id
+        } else {
+          const profile = await createProfile(hint)
+          targetProfileId = profile.id
+          if (displayName.trim() && displayName.trim() !== hint) {
+            await window.api.profiles.setCustomName(profile.id, displayName.trim())
+          }
         }
         await loadProfiles()
 
-        const latest = useProfileStore.getState().profiles.find((p) => p.id === profile.id) ?? profile
-        const googleOk = latest.googleAuthStatus === 'signed-in'
+        const latest = useProfileStore.getState().profiles.find((p) => p.id === targetProfileId)
+        const googleOk = latest?.googleAuthStatus === 'signed-in'
 
         if (googleOk) {
-          await activateProfile(profile.id, viewportBounds())
+          await activateProfile(targetProfileId, viewportBounds())
           setToast(`Profile ${displayName || hint} already signed in.`)
           return
         }
 
         useProfileStore.setState((s) => ({
           profiles: s.profiles.map((p) =>
-            p.id === profile.id ? { ...p, googleAuthStatus: 'signing-in' } : p
+            p.id === targetProfileId ? { ...p, googleAuthStatus: 'signing-in' } : p
           )
         }))
-        await activateProfile(profile.id, viewportBounds())
+        await activateProfile(targetProfileId, viewportBounds())
         await nextPaint()
         await new Promise((r) => setTimeout(r, 50))
         setStatusLine('Waiting for Google / 2SV…')
-        await startGoogleAuth(profile.id, viewportBounds())
+        await startGoogleAuth(targetProfileId, viewportBounds())
         await loadProfiles()
-        const updated = useProfileStore.getState().profiles.find((p) => p.id === profile.id)
+        const updated = useProfileStore.getState().profiles.find((p) => p.id === targetProfileId)
         if (updated?.googleAuthStatus === 'signed-in') {
-          setToast(`Google verified! Profile ${displayName || hint} created.`)
+          setToast(mode === 'under_global' ? `Google verified and added to Global Accounts!` : `Google verified! Profile ${displayName || hint} created.`)
           setStatusLine('Google done. Open Slack under this profile to continue.')
         } else if (!updated) {
           setStatusLine('Cancelled — unsigned profile removed.')

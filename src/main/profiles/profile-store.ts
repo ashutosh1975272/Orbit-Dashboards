@@ -16,6 +16,7 @@ import type {
 } from '../../shared/types'
 import {
   APP_IDS,
+  GLOBAL_PROFILE_ID,
   emptyProfileApps,
   emptySlackSession,
   emptyTeamsSession,
@@ -578,6 +579,30 @@ export class ProfileStore {
       if (ao !== bo) return ao - bo
       return a.createdAt.localeCompare(b.createdAt)
     })
+  }
+
+  async ensureGlobalProfile(): Promise<Profile> {
+    const data = await this.read()
+    const found = data.profiles.find((p) => p.id === GLOBAL_PROFILE_ID || p.isGlobalProfile)
+    if (found) return found
+
+    const globalProfile: Profile = {
+      id: GLOBAL_PROFILE_ID,
+      displayName: 'Global Account',
+      customName: 'Global Account',
+      createdAt: '1970-01-01T00:00:00.000Z',
+      avatarColor: '#6366f1',
+      googleAuthStatus: 'not-signed-in',
+      sortOrder: -1,
+      muted: false,
+      hiddenInSidebar: false,
+      isGlobalProfile: true,
+      apps: emptyProfileApps(),
+      customLinks: []
+    }
+    data.profiles.unshift(globalProfile)
+    await this.write(data)
+    return globalProfile
   }
 
   async findByDisplayNameIgnoreCase(displayName: string): Promise<Profile | null> {

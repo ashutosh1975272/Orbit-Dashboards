@@ -12,6 +12,7 @@ import {
   type ProfileWorkspaceOption
 } from './sources'
 import type { ProjectSource } from '../../../../shared/dashboard-contract'
+import { GLOBAL_PROFILE_ID } from '../../../../shared/types'
 
 /**
  * Add-project wizard (v2.1 — docs/tickets/dashboard-v2.1.md):
@@ -160,7 +161,9 @@ export default function DashboardWizard({
   const profiles = useProfileStore((s) => s.profiles)
   const workspaceOptions = useMemo<ProfileWorkspaceOption[]>(() => {
     const list: ProfileWorkspaceOption[] = []
-    for (const p of profiles) {
+    // Workspaces for projects must come from individual separate profiles, NOT Global Account
+    const individualProfiles = profiles.filter((p) => p.id !== GLOBAL_PROFILE_ID && !p.isGlobalProfile)
+    for (const p of individualProfiles) {
       for (const w of p.apps.slack.availableWorkspaces) {
         list.push({
           profileId: p.id,

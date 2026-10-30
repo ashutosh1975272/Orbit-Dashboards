@@ -237,6 +237,8 @@ if (!gotSingleInstanceLock) {
 
     const userData = app.getPath('userData')
     const profileStore = new ProfileStore({ filePath: defaultProfileStorePath(userData) })
+    // Ensure default Global Account profile exists on application launch
+    await profileStore.ensureGlobalProfile().catch(() => undefined)
     const tokenStore = new TokenStore({ filePath: defaultTokenStorePath(userData) })
     const settingsStore = new AppSettingsStore(defaultAppSettingsPath(userData))
 

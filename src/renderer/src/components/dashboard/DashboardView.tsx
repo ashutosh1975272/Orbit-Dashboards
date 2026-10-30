@@ -13,6 +13,7 @@ import ErrorBoundary from './ErrorBoundary'
 import RecentStrip from './RecentStrip'
 import { NewProfileModal } from './NewProfileModal'
 import { useProfileStore } from '../../hooks/useProfiles'
+import { GLOBAL_PROFILE_ID } from '../../../../shared/types'
 import {
   filterCounts,
   matchesFilter,
@@ -565,12 +566,19 @@ export default function DashboardView(): React.ReactElement | null {
                   fontSize: '13px'
                 }}
               >
-                <option value="all">All Profiles ({profiles.length})</option>
-                {profiles.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.displayName || p.id}
-                  </option>
-                ))}
+                {(() => {
+                  const individualProfiles = profiles.filter((p) => p.id !== GLOBAL_PROFILE_ID && !p.isGlobalProfile)
+                  return (
+                    <>
+                      <option value="all">All Profiles ({individualProfiles.length})</option>
+                      {individualProfiles.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.displayName || p.id}
+                        </option>
+                      ))}
+                    </>
+                  )
+                })()}
               </select>
             </div>
 
@@ -763,20 +771,27 @@ export default function DashboardView(): React.ReactElement | null {
         <NewProfileModal
           open={newProfileModalOpen}
           onClose={() => setNewProfileModalOpen(false)}
-          onCreate={async (name, email) => {
-            const profile = await useProfileStore.getState().createProfile(email)
-            if (name.trim() && name.trim() !== email) {
-              await window.api.profiles.setCustomName(profile.id, name.trim())
+          onCreate={async (name, email, mode) => {
+            let targetProfileId: string
+            if (mode === 'under_global') {
+              const globalP = useProfileStore.getState().profiles.find((p) => p.id === GLOBAL_PROFILE_ID || p.isGlobalProfile)
+              targetProfileId = globalP ? globalP.id : (await useProfileStore.getState().createProfile(email)).id
+            } else {
+              const profile = await useProfileStore.getState().createProfile(email)
+              targetProfileId = profile.id
+              if (name.trim() && name.trim() !== email) {
+                await window.api.profiles.setCustomName(profile.id, name.trim())
+              }
             }
             await useProfileStore.getState().loadProfiles()
             // Initiate Google Authentication in Chrome
             try {
               useProfileStore.setState((s) => ({
                 profiles: s.profiles.map((p) =>
-                  p.id === profile.id ? { ...p, googleAuthStatus: 'signing-in' } : p
+                  p.id === targetProfileId ? { ...p, googleAuthStatus: 'signing-in' } : p
                 )
               }))
-              await useProfileStore.getState().startGoogleAuth(profile.id)
+              await useProfileStore.getState().startGoogleAuth(targetProfileId)
               await useProfileStore.getState().loadProfiles()
             } catch {
               // startGoogleAuth handles its own status & error state

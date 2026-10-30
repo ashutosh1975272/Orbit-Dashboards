@@ -71,6 +71,8 @@ export interface CustomLink {
   hiddenInSidebar?: boolean
 }
 
+export const GLOBAL_PROFILE_ID = 'global-account-profile'
+
 export interface Profile {
   id: string
   displayName: string
@@ -86,6 +88,8 @@ export interface Profile {
   muted?: boolean
   /** When true, hide profile row from left sidebar */
   hiddenInSidebar?: boolean
+  /** When true, indicates this is the special Global Account aggregator profile */
+  isGlobalProfile?: boolean
   /**
    * Google account cookies ready (Chrome password + 2SV).
    * App logins (Slack/Teams) happen separately after the user picks an app.
