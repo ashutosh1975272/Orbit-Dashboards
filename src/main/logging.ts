@@ -1,14 +1,22 @@
 type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
-const TOKEN_PATTERNS = [/xox[a-zA-Z]-[A-Za-z0-9-]+/g, /Bearer\s+[A-Za-z0-9._~+/=-]+/gi]
+const TOKEN_PATTERNS = [
+  /xox[a-zA-Z]-[A-Za-z0-9-]+/g,
+  /nvapi-[A-Za-z0-9-]+/g,
+  /Bearer\s+[A-Za-z0-9._~+/=-]+/gi
+]
+
+function redactString(value: string): string {
+  let redacted = value
+  for (const pattern of TOKEN_PATTERNS) {
+    redacted = redacted.replace(pattern, '[REDACTED]')
+  }
+  return redacted
+}
 
 function redact(value: unknown): unknown {
   if (typeof value === 'string') {
-    let redacted = value
-    for (const pattern of TOKEN_PATTERNS) {
-      redacted = redacted.replace(pattern, '[REDACTED]')
-    }
-    return redacted
+    return redactString(value)
   }
 
   if (Array.isArray(value)) {
@@ -18,7 +26,7 @@ function redact(value: unknown): unknown {
   if (value && typeof value === 'object') {
     const out: Record<string, unknown> = {}
     for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
-      if (/token|secret|password|authorization/i.test(key)) {
+      if (/token|secret|password|authorization|key/i.test(key)) {
         out[key] = '[REDACTED]'
       } else {
         out[key] = redact(nested)
@@ -33,7 +41,7 @@ function redact(value: unknown): unknown {
 function write(level: LogLevel, message: string, meta?: unknown): void {
   const entry = {
     level,
-    message,
+    message: redactString(message),
     ...(meta !== undefined ? { meta: redact(meta) } : {}),
     ts: new Date().toISOString()
   }

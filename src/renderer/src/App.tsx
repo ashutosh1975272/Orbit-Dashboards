@@ -17,6 +17,9 @@ import { useDashboardStore } from './hooks/useDashboard'
 import { SettingsPanel } from './components/SettingsPanel'
 import { SidebarPanelIcon } from './components/SidebarPanelIcon'
 import { SlackViewport } from './components/SlackViewport'
+import { PlatformSettingsPanel } from './components/dashboard/PlatformSettingsPanel'
+import { sidebarToastFor } from './lib/sidebar-toast'
+import { modKey, modShift } from './lib/shortcut-label'
 import { useProfileStore } from './hooks/useProfiles'
 import {
   applyAppBrandTheme,
@@ -73,6 +76,10 @@ function App(): React.JSX.Element {
   )
   const [cmdkOpen, setCmdkOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [platformSettings, setPlatformSettings] = useState<{
+    profileId: string
+    appId: AppId
+  } | null>(null)
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS)
   const [locked, setLocked] = useState(false)
   const [unlocking, setUnlocking] = useState(false)
@@ -92,6 +99,8 @@ function App(): React.JSX.Element {
     appId: AppId
   } | null>(null)
   const lastAppByProfile = useRef<Record<string, AppId>>({})
+  const sidebarCollapsedRef = useRef(settings.sidebarCollapsed)
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const {
     profiles,
@@ -224,13 +233,27 @@ function App(): React.JSX.Element {
   }, [])
 
   useEffect(() => {
-    let hideTimer: ReturnType<typeof setTimeout> | null = null
-    return window.api.app.onToast((message) => {
-      if (hideTimer) clearTimeout(hideTimer)
-      setToast(message)
-      hideTimer = setTimeout(() => setToast(null), 4500)
-    })
+    sidebarCollapsedRef.current = settings.sidebarCollapsed
+  }, [settings.sidebarCollapsed])
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
+    }
   }, [])
+
+  const showToast = useCallback((message: string, ms = 4500): void => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
+    setToast(message)
+    toastTimerRef.current = setTimeout(() => {
+      toastTimerRef.current = null
+      setToast(null)
+    }, ms)
+  }, [])
+
+  useEffect(() => {
+    return window.api.app.onToast((message) => showToast(message))
+  }, [showToast])
 
   useEffect(() => {
     return window.api.app.onSettingsChanged((next) => {
@@ -292,6 +315,8 @@ function App(): React.JSX.Element {
 
   const browserAuthBusy = authPhase === 'google' || authPhase === 'slack'
   const dashboardOpen = useDashboardStore((s) => s.dashboardOpen)
+  const closeDashboard = useDashboardStore((s) => s.closeDashboard)
+  const showDashboard = dashboardOpen && !browserAuthBusy
   const wizardOpen = useDashboardStore((s) => s.wizardOpenFor) != null
   const splitOn =
     settings.splitViewEnabled && Boolean(splitSecondary) && !browserAuthBusy && !locked
@@ -377,25 +402,35 @@ function App(): React.JSX.Element {
     [settings.sidebarWidth]
   )
 
-  const setSidebarCollapsed = useCallback((collapsed: boolean) => {
-    void window.api.app.setSettings({ sidebarCollapsed: collapsed }).then((s) => {
-      setSettings(s)
-      if (!s.sidebarCollapsed) {
-        applySidebarWidth(s.sidebarWidth)
-      }
-      if (collapsed) {
-        setToast('Sidebar hidden — press ⌘B or use the left panel button to show it again.')
-      }
-      window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(() => {
-          const bounds = viewportBounds()
-          if (useProfileStore.getState().activeAppId) {
-            void window.api.profiles.updateBounds(bounds)
+  const setSidebarCollapsed = useCallback(
+    (collapsed: boolean) => {
+      void window.api.app.setSettings({ sidebarCollapsed: collapsed }).then((s) => {
+        const previousCollapsed = sidebarCollapsedRef.current
+        sidebarCollapsedRef.current = s.sidebarCollapsed
+        setSettings(s)
+        if (!s.sidebarCollapsed) {
+          applySidebarWidth(s.sidebarWidth)
+          if (toastTimerRef.current) {
+            clearTimeout(toastTimerRef.current)
+            toastTimerRef.current = null
           }
+          setToast(null)
+        } else {
+          const message = sidebarToastFor(previousCollapsed, s.sidebarCollapsed)
+          if (message) showToast(message, 6000)
+        }
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => {
+            const bounds = viewportBounds()
+            if (useProfileStore.getState().activeAppId) {
+              void window.api.profiles.updateBounds(bounds)
+            }
+          })
         })
       })
-    })
-  }, [])
+    },
+    [showToast]
+  )
 
   const handleAuthDockBounds = useCallback((bounds: ViewportBounds) => {
     void window.api.profiles.syncChromeEmbedBounds(bounds)
@@ -430,6 +465,7 @@ function App(): React.JSX.Element {
   const handleSidebarSelectApp = useCallback(
     (profileId: string, appId: AppId) => {
       void (async () => {
+        closeDashboard()
         const refreshed = useProfileStore.getState().profiles.find((p) => p.id === profileId)
         const signedIn = refreshed?.apps[appId].sessionStatus === 'signed-in'
 
@@ -466,7 +502,7 @@ function App(): React.JSX.Element {
         )
       })()
     },
-    [selectApp, startAppLogin]
+    [closeDashboard, selectApp, startAppLogin]
   )
 
   const handleAddGoogle = useCallback(async () => {
@@ -534,6 +570,9 @@ function App(): React.JSX.Element {
 
   const handleOpenWorkspace = useCallback(
     (profileId: string, appId: AppId, teamId: string) => {
+      // Opening a workspace paints the native Slack view; the dashboard must
+      // close first so React and the embed stay in sync (same as app rows).
+      closeDashboard()
       void (async () => {
         await openWorkspace(profileId, appId, teamId, viewportBounds())
         const profile = useProfileStore.getState().profiles.find((p) => p.id === profileId)
@@ -549,7 +588,7 @@ function App(): React.JSX.Element {
         setSettings(next)
       })()
     },
-    [openWorkspace]
+    [closeDashboard, openWorkspace]
   )
 
   const emptyCopy = useMemo(() => {
@@ -739,6 +778,9 @@ function App(): React.JSX.Element {
                 void unpinWorkspace(profileId, appId, teamId)
               }}
               onDismissError={clearError}
+              onPlatformSettings={(profileId, appId) => {
+                setPlatformSettings({ profileId, appId })
+              }}
             />
             <div
               className="sidebar-resizer"
@@ -773,7 +815,7 @@ function App(): React.JSX.Element {
               type="button"
               className="sidebar-reopen"
               onClick={() => setSidebarCollapsed(false)}
-              title={`Show sidebar (⌘B) · ${APP_DISPLAY_NAME}`}
+              title={`Show sidebar (${modKey()}B) · ${APP_DISPLAY_NAME}`}
               aria-label="Show sidebar"
               tabIndex={settings.sidebarCollapsed ? 0 : -1}
             >
@@ -797,7 +839,7 @@ function App(): React.JSX.Element {
             </div>
           ) : null}
 
-          {dashboardOpen ? (
+          {showDashboard ? (
             <DashboardView />
           ) : showEmbed ? (
             <div className={`main-embed${splitOn ? ' is-split' : ''}`}>
@@ -815,7 +857,7 @@ function App(): React.JSX.Element {
               type="button"
               className="settings-float-btn"
               onClick={() => setSettingsOpen(true)}
-              title="Settings (⌘,)"
+              title={`Settings (${modKey()},)`}
               aria-label="Settings"
             >
               ⚙
@@ -828,8 +870,8 @@ function App(): React.JSX.Element {
               <h1>{emptyCopy.title}</h1>
               <p>{emptyCopy.body}</p>
               <p className="empty-main-hint">
-                Shortcuts: ⌘K jump · ⌘B sidebar · ⌘, settings · ⌘1–9 profiles · ⌘⇧S/T/W apps · ⌘L
-                lock
+                Shortcuts: {modKey()}K jump · {modKey()}B sidebar · {modKey()}, settings ·{' '}
+                {modKey()}1–9 profiles · {modShift()}S/T/W apps · {modKey()}L lock
               </p>
             </div>
           ) : null}
@@ -914,6 +956,15 @@ function App(): React.JSX.Element {
           })
         }}
       />
+
+      {platformSettings ? (
+        <PlatformSettingsPanel
+          open={true}
+          profileId={platformSettings.profileId}
+          appId={platformSettings.appId}
+          onClose={() => setPlatformSettings(null)}
+        />
+      ) : null}
 
       {showOnboarding && !locked ? (
         <div className="onboarding-backdrop">

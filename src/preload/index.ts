@@ -13,8 +13,26 @@ import type {
   WorkspaceThemePayload
 } from '../shared/types'
 import type {
+  DashboardAiModelsResult,
+  DashboardAiSettingsView,
+  DashboardAiTestResult,
+  DashboardChatPage,
+  DashboardChatTokenStatus,
+  DashboardGlobalConfig,
+  DashboardProjectActivity,
+  DashboardProjectChatChunkEvent,
+  DashboardProjectChatDoneEvent,
+  DashboardProjectChatErrorEvent,
+  DashboardProjectChatHistoryResult,
+  DashboardProjectChatPayload,
+  DashboardProjectChatStartResult,
+  DashboardProjectChatStatus,
+  DashboardSendMessageResult,
+  DashboardSchedulesState,
   DashboardSnapshot,
   DashboardSyncProgressPayload,
+  DashboardTeamWorkspace,
+  DashboardTeamWorkspaceCandidate,
   InsightHistoryEntryContract,
   RecentActivity,
   ProjectSidebarState,
@@ -161,6 +179,26 @@ const api: IpcApi = {
   },
   dashboard: {
     getSnapshot: () => ipcRenderer.invoke(IpcChannels.DashboardGetSnapshot),
+    markViewed: (payload) =>
+      ipcRenderer.invoke(IpcChannels.DashboardMarkViewed, payload) as Promise<string>,
+    getSchedules: () =>
+      ipcRenderer.invoke(IpcChannels.DashboardSchedulesGet) as Promise<DashboardSchedulesState>,
+    updateSchedules: (payload) =>
+      ipcRenderer.invoke(
+        IpcChannels.DashboardSchedulesUpdate,
+        payload
+      ) as Promise<DashboardSchedulesState>,
+    runSchedule: (payload) =>
+      ipcRenderer.invoke(
+        IpcChannels.DashboardSchedulesRun,
+        payload
+      ) as Promise<DashboardSchedulesState>,
+    onSchedulesChanged: (callback: (state: DashboardSchedulesState) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, state: DashboardSchedulesState): void =>
+        callback(state)
+      ipcRenderer.on(IpcChannels.DashboardSchedulesChanged, listener)
+      return () => ipcRenderer.removeListener(IpcChannels.DashboardSchedulesChanged, listener)
+    },
     getAppConfig: () => ipcRenderer.invoke(IpcChannels.DashboardGetAppConfig),
     getHistory: (payload: { projectId: string }) =>
       ipcRenderer.invoke(IpcChannels.DashboardGetHistory, payload) as Promise<
@@ -176,6 +214,11 @@ const api: IpcApi = {
     validateManualToken: (payload) =>
       ipcRenderer.invoke(IpcChannels.DashboardAddManualToken, payload),
     setView: (payload) => ipcRenderer.invoke(IpcChannels.DashboardViewSet, payload),
+    setPinnedOrder: (payload) =>
+      ipcRenderer.invoke(
+        IpcChannels.DashboardPinnedOrderSet,
+        payload
+      ) as Promise<DashboardSnapshot>,
     onSnapshotChanged: (callback: (snapshot: DashboardSnapshot) => void) => {
       const listener = (_event: Electron.IpcRendererEvent, snapshot: DashboardSnapshot): void =>
         callback(snapshot)
@@ -191,11 +234,128 @@ const api: IpcApi = {
       return () => ipcRenderer.removeListener(IpcChannels.DashboardSyncProgress, listener)
     },
     getSidebarState: (projectId: string) =>
-      ipcRenderer.invoke(IpcChannels.DashboardSidebarGet, { projectId }) as Promise<ProjectSidebarState>,
+      ipcRenderer.invoke(IpcChannels.DashboardSidebarGet, {
+        projectId
+      }) as Promise<ProjectSidebarState>,
     setSidebarState: (projectId: string, state: ProjectSidebarState) =>
       ipcRenderer.invoke(IpcChannels.DashboardSidebarSet, { projectId, state }),
-    updateSidebarState: (projectId: string, sidebar: 'left' | 'right', patch: Partial<SidebarState>) =>
-      ipcRenderer.invoke(IpcChannels.DashboardSidebarUpdate, { projectId, sidebar, patch }) as Promise<SidebarState>
+    updateSidebarState: (
+      projectId: string,
+      sidebar: 'left' | 'right',
+      patch: Partial<SidebarState>
+    ) =>
+      ipcRenderer.invoke(IpcChannels.DashboardSidebarUpdate, {
+        projectId,
+        sidebar,
+        patch
+      }) as Promise<SidebarState>,
+    getMessages: (payload) =>
+      ipcRenderer.invoke(IpcChannels.DashboardGetMessages, payload) as Promise<DashboardChatPage>,
+    sendMessage: (payload) =>
+      ipcRenderer.invoke(
+        IpcChannels.DashboardSendMessage,
+        payload
+      ) as Promise<DashboardSendMessageResult>,
+    getChatTokenStatus: (projectId) =>
+      ipcRenderer.invoke(
+        IpcChannels.DashboardChatTokenStatus,
+        projectId
+      ) as Promise<DashboardChatTokenStatus>,
+    getProjectActivity: (projectId: string) =>
+      ipcRenderer.invoke(
+        IpcChannels.DashboardProjectActivity,
+        projectId
+      ) as Promise<DashboardProjectActivity>,
+    projectChat: (payload: DashboardProjectChatPayload) =>
+      ipcRenderer.invoke(
+        IpcChannels.DashboardProjectChat,
+        payload
+      ) as Promise<DashboardProjectChatStartResult>,
+    cancelProjectChat: (payload: { projectId: string; runId?: string }) =>
+      ipcRenderer.invoke(IpcChannels.DashboardProjectChatCancel, payload) as Promise<{
+        ok: boolean
+      }>,
+    getProjectChatHistory: (projectId: string) =>
+      ipcRenderer.invoke(
+        IpcChannels.DashboardProjectChatHistory,
+        projectId
+      ) as Promise<DashboardProjectChatHistoryResult>,
+    clearProjectChat: (projectId: string) =>
+      ipcRenderer.invoke(IpcChannels.DashboardProjectChatClear, projectId) as Promise<{
+        ok: boolean
+      }>,
+    getProjectChatStatus: (projectId: string) =>
+      ipcRenderer.invoke(
+        IpcChannels.DashboardProjectChatStatus,
+        projectId
+      ) as Promise<DashboardProjectChatStatus>,
+    onProjectChatChunk: (callback: (event: DashboardProjectChatChunkEvent) => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        payload: DashboardProjectChatChunkEvent
+      ): void => callback(payload)
+      ipcRenderer.on(IpcChannels.DashboardProjectChatChunk, listener)
+      return () => ipcRenderer.removeListener(IpcChannels.DashboardProjectChatChunk, listener)
+    },
+    onProjectChatDone: (callback: (event: DashboardProjectChatDoneEvent) => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        payload: DashboardProjectChatDoneEvent
+      ): void => callback(payload)
+      ipcRenderer.on(IpcChannels.DashboardProjectChatDone, listener)
+      return () => ipcRenderer.removeListener(IpcChannels.DashboardProjectChatDone, listener)
+    },
+    onProjectChatError: (callback: (event: DashboardProjectChatErrorEvent) => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        payload: DashboardProjectChatErrorEvent
+      ): void => callback(payload)
+      ipcRenderer.on(IpcChannels.DashboardProjectChatError, listener)
+      return () => ipcRenderer.removeListener(IpcChannels.DashboardProjectChatError, listener)
+    },
+    getAiSettings: (payload) =>
+      ipcRenderer.invoke(
+        IpcChannels.DashboardGetAiSettings,
+        payload
+      ) as Promise<DashboardAiSettingsView>,
+    saveAiSettings: (payload) =>
+      ipcRenderer.invoke(
+        IpcChannels.DashboardSaveAiSettings,
+        payload
+      ) as Promise<DashboardAiSettingsView>,
+    listAiModels: (payload) =>
+      ipcRenderer.invoke(
+        IpcChannels.DashboardListAiModels,
+        payload
+      ) as Promise<DashboardAiModelsResult>,
+    testAi: (payload) =>
+      ipcRenderer.invoke(IpcChannels.DashboardTestAi, payload) as Promise<DashboardAiTestResult>,
+    getGlobalConfig: () =>
+      ipcRenderer.invoke(IpcChannels.DashboardConfigGet) as Promise<DashboardGlobalConfig>,
+    onConfigChanged: (callback: (config: DashboardGlobalConfig) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, config: DashboardGlobalConfig): void =>
+        callback(config)
+      ipcRenderer.on(IpcChannels.DashboardConfigChanged, listener)
+      return () => ipcRenderer.removeListener(IpcChannels.DashboardConfigChanged, listener)
+    },
+    getTeamWorkspace: () =>
+      ipcRenderer.invoke(IpcChannels.DashboardTeamWorkspaceGet) as Promise<DashboardTeamWorkspace>,
+    listTeamWorkspaceCandidates: () =>
+      ipcRenderer.invoke(IpcChannels.DashboardTeamWorkspaceCandidates) as Promise<
+        DashboardTeamWorkspaceCandidate[]
+      >,
+    connectTeamWorkspace: (payload) =>
+      ipcRenderer.invoke(
+        IpcChannels.DashboardTeamWorkspaceConnect,
+        payload
+      ) as Promise<DashboardTeamWorkspace>,
+    setTeamWorkspaceChannels: (payload) =>
+      ipcRenderer.invoke(
+        IpcChannels.DashboardTeamWorkspaceChannels,
+        payload
+      ) as Promise<DashboardTeamWorkspace>,
+    clearTeamWorkspace: () =>
+      ipcRenderer.invoke(IpcChannels.DashboardTeamWorkspaceClear) as Promise<DashboardTeamWorkspace>
   }
 }
 

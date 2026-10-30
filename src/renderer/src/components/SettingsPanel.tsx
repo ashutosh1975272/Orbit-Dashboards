@@ -1,5 +1,6 @@
 import { APP_DISPLAY_NAME } from '../../../shared/brand'
 import type { AppSettings } from '../../../shared/ipc-contract'
+import { modKey } from '../lib/shortcut-label'
 
 interface SettingsPanelProps {
   open: boolean
@@ -172,7 +173,9 @@ export function SettingsPanel({
             Sign out admin
           </button>
         </div>
-        <p className="settings-hint">⌘, opens settings · Auth / embed flows are unchanged.</p>
+        <p className="settings-hint">
+          {modKey()}, opens settings · Auth / embed flows are unchanged.
+        </p>
       </div>
     </div>
   )

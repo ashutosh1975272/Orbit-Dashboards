@@ -1,0 +1,269 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type {
+  DashboardProjectSnapshot,
+  DashboardScheduleRun,
+  DashboardUpdateSchedulePayload
+} from '../../src/shared/dashboard-contract'
+import {
+  DEFAULT_SCHEDULE_SETTINGS,
+  mergeScheduleSettings,
+  type StoredSchedules
+} from '../../src/main/dashboard/schedule-store'
+import { DashboardScheduler } from '../../src/main/dashboard/scheduler'
+import type { DashboardSyncEngine } from '../../src/main/dashboard/sync-engine'
+
+const T0 = new Date(2026, 9, 25, 10, 0, 0, 0)
+const MINUTE = 60_000
+
+function snapshot(name: string, newMessages = 0): DashboardProjectSnapshot {
+  return {
+    project: { id: name, name } as DashboardProjectSnapshot['project'],
+    summary: '',
+    newMessageCount: newMessages,
+    totalMessageCount: 0,
+    completion: 0,
+    pace: 'on-track',
+    mood: { state: 'neutral', signal: '' },
+    extractedDates: {},
+    effectiveDates: {},
+    perChannel: [],
+    lastUpdatedAt: T0.toISOString(),
+    syncState: 'idle'
+  }
+}
+
+class FakeStore {
+  data: StoredSchedules
+
+  constructor(initial: Partial<StoredSchedules> = {}) {
+    this.data = {
+      settings: DEFAULT_SCHEDULE_SETTINGS,
+      lastRunAt: { 'slack-sync': null, 'agent-analysis': null, 'daily-recheck': null },
+      runs: [],
+      ...initial
+    }
+  }
+
+  async read(): Promise<StoredSchedules> {
+    return this.data
+  }
+
+  async update(patch: DashboardUpdateSchedulePayload): Promise<StoredSchedules> {
+    this.data = {
+      ...this.data,
+      settings: mergeScheduleSettings(this.data.settings, patch)
+    }
+    return this.data
+  }
+
+  async recordRun(run: DashboardScheduleRun): Promise<StoredSchedules> {
+    this.data = {
+      ...this.data,
+      runs: [run, ...this.data.runs],
+      lastRunAt: { ...this.data.lastRunAt, [run.kind]: run.finishedAt }
+    }
+    return this.data
+  }
+}
+
+function engineWith(results: DashboardProjectSnapshot[]): {
+  engine: DashboardSyncEngine
+  syncAll: ReturnType<typeof vi.fn>
+} {
+  const syncAll = vi.fn(async () => results)
+  return { engine: { syncAll } as unknown as DashboardSyncEngine, syncAll }
+}
+
+describe('DashboardScheduler', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(T0)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('runs a startup catch-up when the last sync is overdue, then follows the interval', async () => {
+    const store = new FakeStore()
+    const { engine, syncAll } = engineWith([snapshot('A')])
+    const scheduler = new DashboardScheduler(engine, store, {
+      now: () => Date.now(),
+      newId: () => `id-${Math.random()}`
+    })
+    await scheduler.start()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(syncAll).toHaveBeenCalledTimes(1)
+    expect(store.data.runs[0]).toMatchObject({
+      kind: 'slack-sync',
+      status: 'ok'
+    })
+    expect(store.data.runs[0].detail).toContain('Startup catch-up')
+
+    const state = await scheduler.getState()
+    expect(state.nextRunAt).toBe(new Date(T0.getTime() + 5 * MINUTE).toISOString())
+
+    await vi.advanceTimersByTimeAsync(5 * MINUTE)
+    expect(syncAll).toHaveBeenCalledTimes(2)
+    expect(store.data.runs[0].detail).toContain('Scheduled run')
+    scheduler.stop()
+  })
+
+  it('does not catch up when the last sync is still inside the interval', async () => {
+    const store = new FakeStore({
+      lastRunAt: {
+        'slack-sync': new Date(T0.getTime() - MINUTE).toISOString(),
+        'agent-analysis': null,
+        'daily-recheck': null
+      }
+    })
+    const { engine, syncAll } = engineWith([snapshot('A')])
+    const scheduler = new DashboardScheduler(engine, store, { now: () => Date.now() })
+    await scheduler.start()
+    await vi.advanceTimersByTimeAsync(MINUTE)
+    expect(syncAll).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(4 * MINUTE)
+    expect(syncAll).toHaveBeenCalledTimes(1)
+    scheduler.stop()
+  })
+
+  it('pauses cleanly and clears the next run', async () => {
+    const store = new FakeStore({
+      lastRunAt: {
+        'slack-sync': T0.toISOString(),
+        'agent-analysis': null,
+        'daily-recheck': null
+      }
+    })
+    const { engine, syncAll } = engineWith([snapshot('A')])
+    const scheduler = new DashboardScheduler(engine, store, { now: () => Date.now() })
+    await scheduler.start()
+    const paused = await scheduler.updateSettings({ slackSync: { enabled: false } })
+    expect(paused.nextRunAt).toBeNull()
+    await vi.advanceTimersByTimeAsync(30 * MINUTE)
+    expect(syncAll).not.toHaveBeenCalled()
+    scheduler.stop()
+  })
+
+  it('applies a new interval immediately', async () => {
+    const store = new FakeStore({
+      lastRunAt: {
+        'slack-sync': T0.toISOString(),
+        'agent-analysis': null,
+        'daily-recheck': null
+      }
+    })
+    const { engine, syncAll } = engineWith([snapshot('A')])
+    const scheduler = new DashboardScheduler(engine, store, { now: () => Date.now() })
+    await scheduler.start()
+    const state = await scheduler.updateSettings({ slackSync: { intervalMinutes: 1 } })
+    expect(state.nextRunAt).toBe(new Date(T0.getTime() + MINUTE).toISOString())
+    await vi.advanceTimersByTimeAsync(MINUTE)
+    expect(syncAll).toHaveBeenCalledTimes(1)
+    scheduler.stop()
+  })
+
+  it('logs agent analysis only when a sync found new messages', async () => {
+    const quiet = engineWith([snapshot('A', 0)])
+    const quietStore = new FakeStore()
+    const quietScheduler = new DashboardScheduler(quiet.engine, quietStore, {
+      now: () => Date.now()
+    })
+    await quietScheduler.start()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(quietStore.data.runs.map((run) => run.kind)).toEqual(['slack-sync'])
+    quietScheduler.stop()
+
+    const noisy = engineWith([snapshot('A', 4), snapshot('B', 2)])
+    const noisyStore = new FakeStore()
+    const noisyScheduler = new DashboardScheduler(noisy.engine, noisyStore, {
+      now: () => Date.now()
+    })
+    await noisyScheduler.start()
+    await vi.advanceTimersByTimeAsync(0)
+    const agent = noisyStore.data.runs.find((run) => run.kind === 'agent-analysis')
+    expect(agent).toMatchObject({ status: 'ok', newMessages: 6 })
+    expect(agent?.detail).toContain('6 new messages')
+    noisyScheduler.stop()
+  })
+
+  it('records per-source failures without losing the successful side', async () => {
+    const failed: DashboardProjectSnapshot = {
+      ...snapshot('A'),
+      ourWorkspaceError: 'our token expired'
+    }
+    const store = new FakeStore()
+    const { engine } = engineWith([failed])
+    const scheduler = new DashboardScheduler(engine, store, { now: () => Date.now() })
+    await scheduler.start()
+    await vi.advanceTimersByTimeAsync(0)
+    const run = store.data.runs[0]
+    expect(run.sources).toEqual([
+      { source: 'client', ok: true, error: null },
+      { source: 'ours', ok: false, error: 'our token expired' }
+    ])
+    scheduler.stop()
+  })
+
+  it('records a failed run and keeps scheduling', async () => {
+    const store = new FakeStore()
+    const syncAll = vi.fn(async () => {
+      throw new Error('network down')
+    })
+    const scheduler = new DashboardScheduler({ syncAll } as unknown as DashboardSyncEngine, store, {
+      now: () => Date.now()
+    })
+    await scheduler.start()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(store.data.runs[0]).toMatchObject({ status: 'error' })
+    expect(store.data.runs[0].detail).toContain('network down')
+    const state = await scheduler.getState()
+    expect(state.nextRunAt).not.toBeNull()
+    scheduler.stop()
+  })
+
+  it('runs "Run now" manually and resets the cadence', async () => {
+    const store = new FakeStore({
+      lastRunAt: {
+        'slack-sync': T0.toISOString(),
+        'agent-analysis': null,
+        'daily-recheck': null
+      }
+    })
+    const { engine, syncAll } = engineWith([snapshot('A')])
+    const scheduler = new DashboardScheduler(engine, store, { now: () => Date.now() })
+    await scheduler.start()
+    const state = await scheduler.runNow('slack-sync')
+    expect(syncAll).toHaveBeenCalledTimes(1)
+    expect(store.data.runs[0].detail).toContain('Manual run')
+    expect(state.nextRunAt).toBe(new Date(T0.getTime() + 5 * MINUTE).toISOString())
+    scheduler.stop()
+  })
+
+  it('keeps the daily re-check off by default and runs it at the chosen hour', async () => {
+    const runDailyRecheck = vi.fn(async () => ({ checked: 2, skipped: 0 }))
+    const store = new FakeStore({
+      lastRunAt: {
+        'slack-sync': T0.toISOString(),
+        'agent-analysis': null,
+        'daily-recheck': null
+      }
+    })
+    const { engine } = engineWith([])
+    const scheduler = new DashboardScheduler(engine, store, {
+      now: () => Date.now(),
+      runDailyRecheck
+    })
+    await scheduler.start()
+    expect((await scheduler.getState()).nextDailyRunAt).toBeNull()
+
+    const enabled = await scheduler.updateSettings({ dailyRecheck: { enabled: true, hour: 12 } })
+    expect(enabled.nextDailyRunAt).toBe(new Date(2026, 9, 25, 12, 0, 0, 0).toISOString())
+
+    await vi.advanceTimersByTimeAsync(2 * 60 * MINUTE)
+    expect(runDailyRecheck).toHaveBeenCalledTimes(1)
+    const dailyRun = store.data.runs.find((run) => run.kind === 'daily-recheck')
+    expect(dailyRun).toMatchObject({ kind: 'daily-recheck', status: 'ok' })
+    scheduler.stop()
+  })
+})

@@ -28,6 +28,8 @@ export interface RecentFeedDeps {
   getLastInsight: (projectId: string) => Promise<ProjectInsight | null>
   /** how many messages arrived with the last sync (activity signal) */
   getNewMessageCount?: (projectId: string) => number
+  /** when the owner last opened this card (drives the "New" dot) */
+  getLastViewedAt?: (projectId: string) => Promise<string | null>
   now?: Date
 }
 
@@ -87,8 +89,12 @@ export async function buildRecentFeed(deps: RecentFeedDeps): Promise<RecentActiv
     const insight = await deps.getLastInsight(project.id)
     const status: InsightStatus = insight?.status ?? 'on-track'
 
+    const lastViewedAt = deps.getLastViewedAt ? await deps.getLastViewedAt(project.id) : null
+    const viewedMs = lastViewedAt ? new Date(lastViewedAt).getTime() : NaN
+
     // newest meaningful message of this project (own workspace bucket only)
     let newest: { msg: DashboardStoredMessage; channel: string } | null = null
+    let unread = 0
     for (const monitor of project.monitors) {
       const delta = await deps.deltaStore.load(project.profileId, project.teamId, monitor.channelId)
       for (const msg of delta?.messages ?? []) {
@@ -96,6 +102,7 @@ export async function buildRecentFeed(deps: RecentFeedDeps): Promise<RecentActiv
         if (!newest || compareTs(msg.ts, newest.msg.ts) > 0) {
           newest = { msg, channel: monitor.channelName }
         }
+        if (Number.isFinite(viewedMs) && Number(msg.ts) * 1000 > viewedMs) unread += 1
       }
     }
 
@@ -131,7 +138,8 @@ export async function buildRecentFeed(deps: RecentFeedDeps): Promise<RecentActiv
       }),
       oneLine: text,
       delta: insight?.statusChange || undefined,
-      hoursSinceLastMessage: hoursSince
+      hoursSinceLastMessage: hoursSince,
+      newMessages: unread
     })
   }
 

@@ -1,3 +1,4 @@
+const fakeVault = { encrypt: (p: string) => Buffer.from(p).toString('base64'), decrypt: (b: string) => Buffer.from(b, 'base64').toString('utf8') }
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -135,7 +136,7 @@ describe('importance scoring', () => {
 describe('recent feed', () => {
   it('builds one item per workspace, ranked, with the workspace attached', async () => {
     const dir = await tmpDir()
-    const monitorStore = new MonitorStore({ rootDir: dir, encryptionAvailable: false })
+    const monitorStore = new MonitorStore({ rootDir: dir, encryptionAvailable: true, vault: fakeVault })
     const deltaStore = new DashboardDeltaStore({ rootDir: dir })
 
     await monitorStore.upsertProject({ project: project() })
@@ -202,9 +203,60 @@ describe('recent feed', () => {
     expect(items.every((i) => i.teamName.length > 0)).toBe(true)
   })
 
+  it('counts only meaningful messages since the last visit', async () => {
+    const dir = await tmpDir()
+    const monitorStore = new MonitorStore({ rootDir: dir, encryptionAvailable: true, vault: fakeVault })
+    const deltaStore = new DashboardDeltaStore({ rootDir: dir })
+    await monitorStore.upsertProject({ project: project() })
+    await deltaStore.appendMessages({
+      profileId: 'manual:K1',
+      teamId: 'T1',
+      channelId: 'C1',
+      channelName: 'general',
+      messages: [
+        { ts: '1788419200.000001', user: 'U1', text: 'old update about the mockups' },
+        { ts: '1788419300.000001', user: 'U2', text: 'hiiiiiiiiiiiiiiii' },
+        { ts: '1788419400.000001', user: 'U3', text: 'new update about the mockups' }
+      ]
+    })
+
+    const items = await buildRecentFeed({
+      monitorStore,
+      deltaStore,
+      getLastInsight: async () => null,
+      getLastViewedAt: async () => new Date(1788419250 * 1000).toISOString(),
+      now: new Date('2026-10-21T12:00:00Z')
+    })
+
+    expect(items[0].newMessages).toBe(1)
+  })
+
+  it('shows no new dot when the card has never been viewed', async () => {
+    const dir = await tmpDir()
+    const monitorStore = new MonitorStore({ rootDir: dir, encryptionAvailable: true, vault: fakeVault })
+    const deltaStore = new DashboardDeltaStore({ rootDir: dir })
+    await monitorStore.upsertProject({ project: project() })
+    await deltaStore.appendMessages({
+      profileId: 'manual:K1',
+      teamId: 'T1',
+      channelId: 'C1',
+      channelName: 'general',
+      messages: [{ ts: '1788419200.000001', user: 'U1', text: 'update about the mockups' }]
+    })
+
+    const items = await buildRecentFeed({
+      monitorStore,
+      deltaStore,
+      getLastInsight: async () => null,
+      now: new Date('2026-10-21T12:00:00Z')
+    })
+
+    expect(items[0].newMessages).toBe(0)
+  })
+
   it('never shows greeting noise as the recent line', async () => {
     const dir = await tmpDir()
-    const monitorStore = new MonitorStore({ rootDir: dir, encryptionAvailable: false })
+    const monitorStore = new MonitorStore({ rootDir: dir, encryptionAvailable: true, vault: fakeVault })
     const deltaStore = new DashboardDeltaStore({ rootDir: dir })
     await monitorStore.upsertProject({ project: project() })
     await deltaStore.appendMessages({

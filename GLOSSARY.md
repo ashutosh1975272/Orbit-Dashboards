@@ -16,6 +16,14 @@
 | **Extracted Dates** | Start/deadline dates found by date-pattern heuristics in messages. Manual project dates (if set) win over extracted. |
 | **Secrets Panel** | Bottom-of-sidebar settings surface for adding manual tokens and creating/editing Projects (pick workspace + Watched Channels). |
 | **Dashboard Mode** | Renderer view state where the embedded Slack view is hidden and the card list is shown. |
-| **Wizard** | The 3-step add flow (Step1 Connect workspace, Step2 Choose channels, Step3 Confirm card). |
+| **Wizard** | The 5-step add flow (Create Slack app → Install & get token → Choose channels → Confirm card → Finish). Opens as an overlay for a new Project and inline in Settings for an existing one. |
 | **Wizard Edit Mode** | The wizard reopening prefilled for an existing project. |
 | **Baseline Sync** | First sync after a token is added: pulls the most recent 200 messages per channel as initial history. |
+| **Workspace Sidebar** | The nav tree inside one expanded card (not the application sidebar). One section per area, one centre body per row. State persists per project under `orbit.workspace.nav.<projectId>`. |
+| **Xomni** | The sidebar section holding this card's AI conversations: *Chat with project* and *Talk to AgentWork*. `Schedules` sits under it as a visibly inert placeholder. |
+| **Client Slack** | The Slack workspace a Project is bound to — its `teamId`/`teamName`, the source of the Project's Watched Channels. Readable and writable from the card. |
+| **Our Slack** | The user's own team workspace, connected once for all Projects (global, not per-card). Until it is connected the row shows a *Connect workspace* empty state, never an invented list. |
+| **Project info** | The sidebar section for everything the card has learned, nested in three sub-groups: *Needs attention*, *Project*, *Signals*. Sub-groups start closed. |
+| **Visualizations** | The sidebar section whose rows (Progress, Time elapsed, Last 7 days) render their chart in the centre panel only — never inside the sidebar. |
+| **Global Settings** | The dashboard's one settings modal, opened from the toolbar button beside *New project*. Holds the values shared by every Project — AI model and key first — each of which a card may override. Never called the "AI settings menu": the overflow-menu route is gone. |
+| **Inheritance** | How a card resolves one of those values: project override (only when its *Use global settings* switch is off) → Global Settings → environment default. The card shows which source is in effect. |

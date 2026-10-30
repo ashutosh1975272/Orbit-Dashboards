@@ -1,42 +1,197 @@
 import type React from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type {
+  DashboardGlobalConfig,
+  DashboardSyncProgressPayload
+} from '../../../../shared/dashboard-contract'
 import { useDashboardStore } from '../../hooks/useDashboard'
 import ProjectCard from './ProjectCard'
+import { buildCardSummary } from './card-view'
 import DashboardWizard from './DashboardWizard'
-import RecentStrip from './RecentStrip'
+import GlobalSettingsPanel from './GlobalSettingsPanel'
 import ErrorBoundary from './ErrorBoundary'
+import RecentStrip from './RecentStrip'
+import {
+  filterCounts,
+  matchesFilter,
+  movePinned,
+  normalisePinnedOrder,
+  pinProject,
+  sortUnpinned,
+  unpinProject,
+  type ProjectEntry,
+  type ProjectFilter
+} from './dashboard-page-selectors'
+
+function fmtAge(iso: string | null): string {
+  if (!iso) return 'never'
+  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60_000))
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.round(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.round(hours / 24)}d ago`
+}
+
+function GearGlyph(): React.JSX.Element {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+      />
+      <path
+        d="M19.4 13.5a7.7 7.7 0 0 0 0-3l2-1.5-2-3.5-2.4 1a7.8 7.8 0 0 0-2.6-1.5L14 2h-4l-.4 3a7.8 7.8 0 0 0-2.6 1.5l-2.4-1-2 3.5 2 1.5a7.7 7.7 0 0 0 0 3l-2 1.5 2 3.5 2.4-1a7.8 7.8 0 0 0 2.6 1.5L10 22h4l.4-3a7.8 7.8 0 0 0 2.6-1.5l2.4 1 2-3.5-2-1.5Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function SyncGlyph(): React.JSX.Element {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M20 11a8 8 0 0 0-14.9-4M4 13a8 8 0 0 0 14.9 4M4 5v6h6M20 19v-6h-6"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
 
 /**
- * Dashboard page (v2.4): header → top digest → "Recent" strip (mini cards,
- * most important first) → stacked FULL-WIDTH project cards (one workspace
- * per card) with three-column detail view.
+ * Dashboard page (v2.8): one header, one focus line, then a dense list of
+ * project rows. A row expands in place into the full workspace.
  */
 export default function DashboardView(): React.ReactElement | null {
   const snapshot = useDashboardStore((s) => s.snapshot)
   const loading = useDashboardStore((s) => s.loading)
   const error = useDashboardStore((s) => s.error)
   const loadSnapshot = useDashboardStore((s) => s.loadSnapshot)
+  const applySnapshot = useDashboardStore((s) => s.applySnapshot)
+  const applyProgress = useDashboardStore((s) => s.applyProgress)
   const deleteProject = useDashboardStore((s) => s.deleteProject)
+  const setPinnedOrder = useDashboardStore((s) => s.setPinnedOrder)
   const syncNow = useDashboardStore((s) => s.syncNow)
   const progress = useDashboardStore((s) => s.progress)
-  const wizardOpenFor = useDashboardStore((s) => s.wizardOpenFor)
-  const openWizard = useDashboardStore((s) => s.openWizard)
+  const syncingProjectIds = useDashboardStore((s) => s.syncingProjectIds)
   const recent = useDashboardStore((s) => s.recent)
   const loadRecent = useDashboardStore((s) => s.loadRecent)
+  const wizardOpenFor = useDashboardStore((s) => s.wizardOpenFor)
+  const openWizard = useDashboardStore((s) => s.openWizard)
   const [renderError, setRenderError] = useState<Error | null>(null)
-  const [viewMode, setViewMode] = useState<'compact' | 'expanded' | 'mixed'>('mixed')
+  const [viewMode, setViewMode] = useState<'compact' | 'expanded' | 'mixed'>(() => {
+    try {
+      const saved = localStorage.getItem('orbit.view') as 'compact' | 'expanded' | 'mixed' | null
+      return saved ?? 'mixed'
+    } catch {
+      return 'mixed'
+    }
+  })
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
-  const [accordionMode] = useState(false)
+  const [focusGuideSection, setFocusGuideSection] = useState<Record<string, number>>({})
+  const [focusDetailKey, setFocusDetailKey] = useState<
+    Record<string, 'needs-reply' | 'blockers' | 'risks'>
+  >({})
+  const [settingsTarget, setSettingsTarget] = useState<{
+    projectId: string
+    nonce: number
+  } | null>(null)
+  const [globalSettingsOpen, setGlobalSettingsOpen] = useState(false)
+  const [globalConfig, setGlobalConfig] = useState<DashboardGlobalConfig | null>(null)
+  const [filter, setFilter] = useState<ProjectFilter>(() => {
+    try {
+      const saved = localStorage.getItem('orbit.filter')
+      return saved === 'urgent' || saved === 'inactive' ? saved : 'all'
+    } catch {
+      return 'all'
+    }
+  })
+  const [schedulePaused, setSchedulePaused] = useState(false)
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [dropId, setDropId] = useState<string | null>(null)
+  const [syncRun, setSyncRun] = useState<{ total: number; done: number } | null>(null)
+  const lastProgressRef = useRef<DashboardSyncProgressPayload | null>(null)
+  const pointerDrag = useRef<{ id: string; pointerId: number } | null>(null)
+  const pointerDrop = useRef<string | null>(null)
 
   useEffect(() => {
     void loadSnapshot()
-    void loadRecent()
     const timer = window.setInterval(() => {
       void loadSnapshot().catch(() => {})
-      void loadRecent().catch(() => {})
     }, 60_000)
     return () => window.clearInterval(timer)
-  }, [loadSnapshot, loadRecent])
+  }, [loadSnapshot])
+
+  // Main pushes a snapshot the moment a sync finishes; the 60s poll is only a
+  // backstop. Progress events also drive the per-card "syncing" state.
+  useEffect(() => {
+    const offSnapshot = window.api.dashboard.onSnapshotChanged((snapshot) =>
+      applySnapshot(snapshot)
+    )
+    const offProgress = window.api.dashboard.onSyncProgress((payload) => {
+      applyProgress(payload)
+      if (payload.phase === 'complete' || payload.phase === 'error') {
+        window.setTimeout(() => {
+          void loadSnapshot().catch(() => {})
+        }, 250)
+      }
+    })
+    return () => {
+      offSnapshot()
+      offProgress()
+    }
+  }, [applySnapshot, applyProgress, loadSnapshot])
+
+  useEffect(() => {
+    let cancelled = false
+    void window.api.dashboard
+      .getGlobalConfig()
+      .then((next) => {
+        if (!cancelled) setGlobalConfig(next)
+      })
+      .catch(() => undefined)
+    const off = window.api.dashboard.onConfigChanged((next) => {
+      if (!cancelled) setGlobalConfig(next)
+    })
+    return () => {
+      cancelled = true
+      off()
+    }
+  }, [])
+
+  useEffect(() => {
+    const api = window.api?.dashboard
+    if (!api?.getSchedules || !api.onSchedulesChanged) return
+    let cancelled = false
+    const apply = (state: { settings: { slackSync: { enabled: boolean } } }): void => {
+      if (!cancelled) setSchedulePaused(!state.settings.slackSync.enabled)
+    }
+    void api
+      .getSchedules()
+      .then(apply)
+      .catch(() => undefined)
+    const off = api.onSchedulesChanged(apply)
+    return () => {
+      cancelled = true
+      off()
+    }
+  }, [])
+
+  useEffect(() => {
+    const load = (): void => {
+      void loadRecent().catch(() => undefined)
+    }
+    load()
+    const timer = window.setInterval(load, 60_000)
+    return () => window.clearInterval(timer)
+  }, [loadRecent])
 
   const focusProject = (projectId: string): void => {
     const el = document.getElementById(`dash-card-anchor-${projectId}`)
@@ -46,10 +201,53 @@ export default function DashboardView(): React.ReactElement | null {
     window.setTimeout(() => el.classList.remove('is-flash'), 1400)
   }
 
+  useEffect(() => {
+    if (!syncRun) return
+    if (!progress || progress === lastProgressRef.current) return
+    if (progress.phase !== 'complete' && progress.phase !== 'error') return
+    lastProgressRef.current = progress
+    setSyncRun((prev) => {
+      if (!prev) return null
+      const done = prev.done + 1
+      return done >= prev.total ? null : { ...prev, done }
+    })
+  }, [progress, syncRun])
+
+  useEffect(() => {
+    if (error) setSyncRun(null)
+  }, [error])
+
+  /** Drop any chip-driven tab focus so the gear can win. */
+  const clearCardFocus = (projectId: string): void => {
+    setFocusGuideSection((prev) => {
+      if (!(projectId in prev)) return prev
+      const next = { ...prev }
+      delete next[projectId]
+      return next
+    })
+    setFocusDetailKey((prev) => {
+      if (!(projectId in prev)) return prev
+      const next = { ...prev }
+      delete next[projectId]
+      return next
+    })
+  }
+
+  /** Card-header gear → expand the card and land on its Settings tab. */
+  const openProjectSettings = (projectId: string): void => {
+    clearCardFocus(projectId)
+    setExpandedIds((prev) => new Set(prev).add(projectId))
+    setSettingsTarget((prev) => ({ projectId, nonce: (prev?.nonce ?? 0) + 1 }))
+    window.setTimeout(() => focusProject(projectId), 140)
+  }
+
   // Render error boundary fallback
   if (renderError) {
     return (
-      <section className="flex flex-col h-full w-full bg-background-dark text-text-dark p-12" data-testid="dashboard-view-error">
+      <section
+        className="flex flex-col h-full w-full bg-background-dark text-text-dark p-12"
+        data-testid="dashboard-view-error"
+      >
         <div className="flex flex-col items-center justify-center h-full text-center">
           <h2 className="text-2xl font-semibold text-red-400 mb-4">Dashboard Error</h2>
           <p className="text-muted-dark mb-6">{renderError.message}</p>
@@ -68,9 +266,12 @@ export default function DashboardView(): React.ReactElement | null {
     )
   }
 
-  if (error) {
+  if (error && !snapshot) {
     return (
-      <section className="flex flex-col h-full w-full bg-background-dark text-text-dark p-12" data-testid="dashboard-view-error">
+      <section
+        className="flex flex-col h-full w-full bg-background-dark text-text-dark p-12"
+        data-testid="dashboard-view-error"
+      >
         <div className="flex flex-col items-center justify-center h-full text-center">
           <h2 className="text-2xl font-semibold text-red-400 mb-4">Failed to load dashboard</h2>
           <p className="text-muted-dark mb-6">{error}</p>
@@ -88,7 +289,10 @@ export default function DashboardView(): React.ReactElement | null {
 
   if (loading && !snapshot) {
     return (
-      <section className="flex flex-col h-full w-full bg-background-dark text-text-dark p-6" data-testid="dashboard-view-loading">
+      <section
+        className="flex flex-col h-full w-full bg-background-dark text-text-dark p-6"
+        data-testid="dashboard-view-loading"
+      >
         <div className="flex flex-col items-center justify-center h-full">
           <div className="w-12 h-12 border-4 border-accent border-t-transparent rounded-full animate-spin mb-4" />
           <p className="text-muted-dark">Loading dashboard…</p>
@@ -98,156 +302,440 @@ export default function DashboardView(): React.ReactElement | null {
   }
 
   const digest = snapshot?.digest ?? null
+  const projects = snapshot?.projects ?? []
+  const lastSync = projects.reduce<string | null>(
+    (acc, p) => (p.lastUpdatedAt && (!acc || p.lastUpdatedAt > acc) ? p.lastUpdatedAt : acc),
+    null
+  )
 
-  try {
+  const handleViewChange = (mode: 'compact' | 'expanded' | 'mixed'): void => {
+    setViewMode(mode)
+    try {
+      localStorage.setItem('orbit.view', mode)
+    } catch {
+      // localStorage can be unavailable in hardened sessions; view still changes.
+    }
+    if (mode === 'compact') setExpandedIds(new Set())
+    else if (mode === 'expanded')
+      setExpandedIds(new Set((snapshot?.projects ?? []).map((p) => p.project.id)))
+  }
+
+  const setupPending = Boolean(
+    globalConfig && (!globalConfig.ourSlack.connected || !globalConfig.nvidia.configured)
+  )
+
+  const cardEntries: ProjectEntry[] = projects.map((projectSnapshot, index) => ({
+    snapshot: projectSnapshot,
+    summary: buildCardSummary(projectSnapshot, index)
+  }))
+  const entryById = new Map(cardEntries.map((entry) => [entry.snapshot.project.id, entry]))
+  const projectIds = projects.map((projectSnapshot) => projectSnapshot.project.id)
+  const pinnedOrder = normalisePinnedOrder(snapshot?.pinnedOrder ?? [], projectIds)
+  const pinnedIds = new Set(pinnedOrder)
+  const pinnedEntries = pinnedOrder
+    .map((id) => entryById.get(id))
+    .filter((entry): entry is ProjectEntry => Boolean(entry))
+  const unpinnedEntries = sortUnpinned(
+    cardEntries.filter((entry) => !pinnedIds.has(entry.snapshot.project.id))
+  )
+  const counts = filterCounts(unpinnedEntries)
+  const filteredEntries = unpinnedEntries.filter((entry) => matchesFilter(filter, entry))
+  const syncingAll = Boolean(syncRun) || Boolean(progress?.syncing) || syncingProjectIds.length > 0
+  const syncLabel = syncRun
+    ? `Syncing ${Math.min(syncRun.total, syncRun.done + 1)}/${syncRun.total}`
+    : progress?.syncing
+      ? `Syncing ${progress.current}/${progress.total}`
+      : syncingAll
+        ? 'Syncing…'
+        : 'Sync all'
+
+  const changeFilter = (next: ProjectFilter): void => {
+    setFilter(next)
+    try {
+      localStorage.setItem('orbit.filter', next)
+    } catch {
+      // Filter still works for this session.
+    }
+  }
+
+  const togglePin = (projectId: string): void => {
+    const next = pinnedIds.has(projectId)
+      ? unpinProject(pinnedOrder, projectId)
+      : pinProject(pinnedOrder, projectId)
+    void setPinnedOrder(next)
+  }
+
+  const movePin = (projectId: string, delta: -1 | 1): void => {
+    void setPinnedOrder(movePinned(pinnedOrder, projectId, delta))
+  }
+
+  const dropPin = (fromId: string | null, toId: string): void => {
+    setDragId(null)
+    setDropId(null)
+    if (!fromId || fromId === toId) return
+    const next = [...pinnedOrder]
+    const fromIndex = next.indexOf(fromId)
+    const toIndex = next.indexOf(toId)
+    if (fromIndex < 0 || toIndex < 0) return
+    next.splice(fromIndex, 1)
+    next.splice(toIndex, 0, fromId)
+    void setPinnedOrder(next)
+  }
+
+  const pinnedUnder = (x: number, y: number): string | null => {
+    const slot = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-pinned-id]')
+    return slot?.dataset.pinnedId ?? null
+  }
+
+  const startPinDrag = (event: React.PointerEvent<HTMLButtonElement>, id: string): void => {
+    if (event.button !== 0) return
+    pointerDrag.current = { id, pointerId: event.pointerId }
+    pointerDrop.current = null
+    setDragId(id)
+    setDropId(null)
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+  }
+
+  const movePinDrag = (event: React.PointerEvent<HTMLButtonElement>): void => {
+    if (!pointerDrag.current) return
+    event.preventDefault()
+    const target = pinnedUnder(event.clientX, event.clientY)
+    if (target !== pointerDrop.current) {
+      pointerDrop.current = target
+      setDropId(target)
+    }
+    if (event.clientY < 90) window.scrollBy({ top: -18 })
+    else if (window.innerHeight - event.clientY < 90) window.scrollBy({ top: 18 })
+  }
+
+  const endPinDrag = (event: React.PointerEvent<HTMLButtonElement>): void => {
+    const drag = pointerDrag.current
+    if (!drag) return
+    pointerDrag.current = null
+    const target = pinnedUnder(event.clientX, event.clientY) ?? pointerDrop.current
+    pointerDrop.current = null
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture?.(event.pointerId)
+    }
+    dropPin(drag.id, target ?? drag.id)
+  }
+
+  const cancelPinDrag = (): void => {
+    pointerDrag.current = null
+    pointerDrop.current = null
+    setDragId(null)
+    setDropId(null)
+  }
+
+  const openFromRecent = (projectId: string): void => {
+    const entry = entryById.get(projectId)
+    if (entry && !matchesFilter(filter, entry)) changeFilter('all')
+    if (viewMode === 'compact') handleViewChange('mixed')
+    if (!expandedIds.has(projectId)) {
+      setExpandedIds((prev) => new Set(prev).add(projectId))
+    }
+    window.setTimeout(() => focusProject(projectId), 180)
+  }
+
+  const toggleCard = (projectId: string): void => {
+    // A single click in Compact or Expanded must not be swallowed by the
+    // page-wide mode: move to Mixed so the clicked card is the one that changes.
+    if (viewMode === 'expanded') {
+      handleViewChange('mixed')
+      setExpandedIds((prev) => {
+        const next = new Set(prev)
+        next.delete(projectId)
+        return next
+      })
+      setSettingsTarget((prev) => (prev?.projectId === projectId ? null : prev))
+    } else {
+      const willCollapse = expandedIds.has(projectId)
+      if (!willCollapse && viewMode === 'compact') handleViewChange('mixed')
+      setExpandedIds((prev) => {
+        const next = new Set(prev)
+        if (next.has(projectId)) next.delete(projectId)
+        else next.add(projectId)
+        return next
+      })
+      if (willCollapse) {
+        setSettingsTarget((prev) => (prev?.projectId === projectId ? null : prev))
+      }
+    }
+    const el = document.getElementById(`dash-card-anchor-${projectId}`)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      el.classList.add('is-flash')
+      window.setTimeout(() => el.classList.remove('is-flash'), 1400)
+    }
+  }
+
+  const renderCard = (entry: ProjectEntry, index: number, pinned: boolean): React.ReactElement => {
+    const projectSnapshot = entry.snapshot
+    const id = projectSnapshot.project.id
+    const isExpanded = viewMode === 'expanded' || (viewMode === 'mixed' && expandedIds.has(id))
+    const pinIndex = pinnedOrder.indexOf(id)
     return (
-      <ErrorBoundary label="dashboard-view">
-      <section className="dash-view flex flex-col h-full w-full bg-background-dark text-text-dark p-6 overflow-y-auto" data-testid="dashboard-view">
-        <header className="flex items-center justify-between gap-4 flex-wrap mb-6">
-          <h2 className="text-xl font-semibold">Client projects — Slack</h2>
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-sm text-muted-dark">
-              auto-sync: every {snapshot?.syncIntervalSeconds ?? 300}s
-              {progress?.syncing ? ` · syncing ${progress.current}/${progress.total}` : ''}
-            </span>
-            <button
-              type="button"
-              className="px-4 py-2 bg-accent text-accent-on rounded-lg font-medium text-sm hover:bg-accent-dim transition-colors min-h-[44px]"
-              onClick={() => void syncNow()}
-            >
-              ⟳ Sync all
-            </button>
-            <button
-              type="button"
-              className="px-4 py-2 bg-accent text-accent-on rounded-lg font-medium text-sm hover:bg-accent-dim transition-colors min-h-[44px]"
-              onClick={() => openWizard()}
-            >
-              ＋ Set up new project
-            </button>
-          </div>
-        </header>
+      <ErrorBoundary key={id} label={`card-${index}`}>
+        <ProjectCard
+          snapshot={projectSnapshot}
+          index={index}
+          expanded={isExpanded}
+          pinned={pinned}
+          onTogglePin={() => togglePin(id)}
+          canMoveUp={pinned && pinIndex > 0}
+          canMoveDown={pinned && pinIndex >= 0 && pinIndex < pinnedOrder.length - 1}
+          onMoveUp={() => movePin(id, -1)}
+          onMoveDown={() => movePin(id, 1)}
+          pinOrderKey={pinnedOrder.join('|')}
+          pageMode={viewMode}
+          initialTab={settingsTarget?.projectId === id ? 'settings' : undefined}
+          tabNonce={settingsTarget?.projectId === id ? settingsTarget.nonce : 0}
+          initialGuideSection={focusGuideSection[id]}
+          initialDetailKey={focusDetailKey[id]}
+          onOpenSettings={openProjectSettings}
+          onToggle={() => toggleCard(id)}
+          onDelete={(projectId) => void deleteProject(projectId)}
+          onExpandSection={(section) => {
+            setSettingsTarget((prev) => (prev?.projectId === id ? null : prev))
+            if (section === 101) {
+              setFocusDetailKey((prev) => ({ ...prev, [id]: 'needs-reply' }))
+              setFocusGuideSection((prev) => {
+                const next = { ...prev }
+                delete next[id]
+                return next
+              })
+            } else if (section === 102) {
+              setFocusDetailKey((prev) => ({ ...prev, [id]: 'blockers' }))
+              setFocusGuideSection((prev) => {
+                const next = { ...prev }
+                delete next[id]
+                return next
+              })
+            } else if (section === 103) {
+              setFocusDetailKey((prev) => ({ ...prev, [id]: 'risks' }))
+              setFocusGuideSection((prev) => {
+                const next = { ...prev }
+                delete next[id]
+                return next
+              })
+            } else {
+              setFocusGuideSection((prev) => ({ ...prev, [id]: section }))
+              setFocusDetailKey((prev) => {
+                const next = { ...prev }
+                delete next[id]
+                return next
+              })
+            }
+            setExpandedIds((prev) => new Set(prev).add(id))
+          }}
+        />
+      </ErrorBoundary>
+    )
+  }
 
-        {digest ? (
-          <div className="dash-digest flex items-center gap-3 flex-wrap p-4 bg-surface-dark border border-border-dark border-l-3 border-accent rounded-lg mb-5" data-testid="dash-digest">
-            <span className="text-xs uppercase tracking-wider text-muted-dark">
-              {digest.source === 'ai' ? 'AI digest' : 'digest'}
-            </span>
-            <span className="text-base font-medium">{digest.topPriority}</span>
-            {(digest.needsReply?.length ?? 0) > 0 && (
-              <span className="flex gap-2 flex-wrap">
-                {(digest.needsReply ?? []).map((w, i) => (
-                  <span key={`nr-${w}-${i}`} className="px-2 py-1 bg-red-500/15 text-red-400 border border-red-500/30 rounded-full text-xs font-medium">
-                    ⚠ {w}
-                  </span>
-                ))}
+  return (
+    <ErrorBoundary label="dashboard-view">
+      <section className="dash-view" data-testid="dashboard-view">
+        <header className="dash-head">
+          <div className="dash-head-copy">
+            <h1>Client projects</h1>
+            <p className="dash-head-sub">
+              <span>{projects.length === 1 ? '1 project' : `${projects.length} projects`}</span>
+              <span>
+                {progress?.syncing
+                  ? `Syncing ${progress.current}/${progress.total}`
+                  : `Synced ${fmtAge(lastSync)}`}
               </span>
-            )}
-            {(digest.atRisk?.length ?? 0) > 0 && (
-              <span className="flex gap-2 flex-wrap">
-                {(digest.atRisk ?? []).map((w, i) => (
-                  <span key={`ar-${w}-${i}`} className="px-2 py-1 bg-yellow-500/15 text-yellow-400 border border-yellow-500/30 rounded-full text-xs font-medium">
-                    {w}
-                  </span>
-                ))}
-              </span>
-            )}
+              <span>Every {Math.round((snapshot?.syncIntervalSeconds ?? 300) / 60)} min</span>
+            </p>
           </div>
-        ) : null}
 
-        <RecentStrip items={recent} onSelect={focusProject} />
-
-        {/* WORKSPACES heading row */}
-        <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <h3 className="text-lg font-semibold">Workspaces</h3>
-            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-accent/20 text-accent border border-accent/30">
-              {snapshot?.projects?.length ?? 0}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              type="button"
-              className="px-3 py-1.5 text-xs font-medium border border-border-dark rounded-lg text-muted-dark hover:border-accent hover:text-accent transition-colors"
-              onClick={() => setExpandedIds(new Set())}
-            >
-              Collapse all
-            </button>
-            <button
-              type="button"
-              className="px-3 py-1.5 text-xs font-medium border border-border-dark rounded-lg text-muted-dark hover:border-accent hover:text-accent transition-colors"
-              onClick={() => setExpandedIds(new Set((snapshot?.projects ?? []).map((p) => p.project.id)))}
-            >
-              Expand all
-            </button>
-            <div className="flex border border-border-dark rounded-lg overflow-hidden">
+          <div className="dash-head-actions">
+            <div className="segmented" role="group" aria-label="View mode">
               {(['compact', 'expanded', 'mixed'] as const).map((mode) => (
                 <button
                   key={mode}
                   type="button"
-                  className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                    viewMode === mode
-                      ? 'bg-accent text-accent-on'
-                      : 'text-muted-dark hover:bg-accent/10 hover:text-text-dark'
-                  }`}
-                  onClick={() => {
-                    setViewMode(mode)
-                    if (mode === 'compact') setExpandedIds(new Set())
-                    else if (mode === 'expanded') setExpandedIds(new Set((snapshot?.projects ?? []).map((p) => p.project.id)))
-                  }}
+                  data-mode={mode}
+                  aria-pressed={viewMode === mode}
+                  onClick={() => handleViewChange(mode)}
                 >
                   {mode.charAt(0).toUpperCase() + mode.slice(1)}
                 </button>
               ))}
             </div>
-          </div>
-        </div>
 
-        <div className="dash-grid w-full max-w-7xl mx-auto space-y-6" data-testid="dash-grid">
-          {(snapshot?.projects ?? []).map((projectSnapshot, index) => {
-            const isExpanded = viewMode === 'expanded' || (viewMode === 'mixed' && expandedIds.has(projectSnapshot.project.id))
-            return (
-            <ErrorBoundary key={projectSnapshot.project.id} label={`card-${index}`}>
-              <ProjectCard
-                snapshot={projectSnapshot}
-                index={index}
-                expanded={isExpanded}
-                onToggle={() => {
-                  setExpandedIds((prev) => {
-                    const next = new Set(prev)
-                    if (next.has(projectSnapshot.project.id)) next.delete(projectSnapshot.project.id)
-                    else {
-                      if (accordionMode) next.clear()
-                      next.add(projectSnapshot.project.id)
-                    }
-                    return next
-                  })
-                  // Scroll to card
-                  const el = document.getElementById(`dash-card-anchor-${projectSnapshot.project.id}`)
-                  if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('is-flash'); setTimeout(() => el.classList.remove('is-flash'), 1400) }
-                }}
-                onDelete={(id) => void deleteProject(id)}
-                onExpandSection={(_section) => {
-                  // Expand the card and open that section
-                  setExpandedIds((prev) => { const next = new Set(prev); next.add(projectSnapshot.project.id); return next })
-                }}
-              />
-            </ErrorBoundary>
-            )
-          })}
-          {(snapshot?.projects ?? []).length === 0 && (
-            <p className="text-muted-dark text-center py-12">
-              No project cards yet — click <b>＋ Set up new project</b> above. A 5-step guide walks
-              you through: create the Slack app → get the token → channels → card → live sync.
-            </p>
-          )}
-        </div>
+            <button
+              type="button"
+              className="btn btn-secondary dash-sync-all"
+              data-testid="sync-all"
+              disabled={syncingAll}
+              aria-label={syncLabel}
+              onClick={() => void syncNow()}
+            >
+              <SyncGlyph />
+              {syncLabel}
+            </button>
+
+            {schedulePaused ? <span className="dash-paused">Schedule paused</span> : null}
+
+            <button
+              type="button"
+              className="btn btn-secondary dash-settings-btn"
+              data-testid="global-settings-open"
+              onClick={() => setGlobalSettingsOpen(true)}
+            >
+              <GearGlyph />
+              Settings
+            </button>
+
+            <button type="button" className="btn btn-primary" onClick={() => openWizard()}>
+              New project
+            </button>
+          </div>
+        </header>
+
+        {setupPending ? (
+          <button
+            type="button"
+            className="dash-global-pending"
+            data-testid="global-setup-pending"
+            onClick={() => setGlobalSettingsOpen(true)}
+          >
+            <span>
+              <b>Global setup pending</b> —{' '}
+              {!globalConfig?.ourSlack.connected && !globalConfig?.nvidia.configured
+                ? 'connect Our Slack and NVIDIA'
+                : !globalConfig?.ourSlack.connected
+                  ? 'connect Our Slack'
+                  : 'add an NVIDIA key'}{' '}
+              in Settings. Cards keep their client data; AI and Our Slack stay off until then.
+            </span>
+            <span aria-hidden>→</span>
+          </button>
+        ) : null}
+
+        {digest ? (
+          <p className="dash-focus" data-testid="dash-digest">
+            <span className="dash-focus-label">Across workspaces</span>
+            <span>{digest.topPriority}</span>
+          </p>
+        ) : null}
+
+        {error ? (
+          <p className="dash-inline-error" role="alert">
+            Sync failed: {error}
+          </p>
+        ) : null}
+
+        <RecentStrip items={recent} pinnedIds={pinnedIds} onOpen={openFromRecent} />
+
+        {pinnedEntries.length > 0 ? (
+          <section className="dash-section dash-pinned" aria-labelledby="dash-pinned-title">
+            <div className="dash-section-head">
+              <h2 id="dash-pinned-title">
+                Pinned <span className="dash-count">{pinnedEntries.length}</span>
+              </h2>
+            </div>
+            <div className="dash-list" data-testid="dash-pinned">
+              {pinnedEntries.map((entry, index) => {
+                const id = entry.snapshot.project.id
+                return (
+                  <div
+                    key={id}
+                    data-pinned-id={id}
+                    className={`dash-pinned-slot${dragId === id ? ' is-dragging' : ''}${
+                      dropId === id && dragId !== id ? ' is-drop-target' : ''
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      className="dash-grip"
+                      aria-label={`Reorder ${entry.summary.name}`}
+                      title="Drag to reorder"
+                      onPointerDown={(event) => startPinDrag(event, id)}
+                      onPointerMove={movePinDrag}
+                      onPointerUp={endPinDrag}
+                      onPointerCancel={cancelPinDrag}
+                      onLostPointerCapture={() => {
+                        if (pointerDrag.current) cancelPinDrag()
+                      }}
+                      onKeyDown={(event) => {
+                        if (!event.altKey) return
+                        if (event.key === 'ArrowUp') {
+                          event.preventDefault()
+                          movePin(id, -1)
+                        } else if (event.key === 'ArrowDown') {
+                          event.preventDefault()
+                          movePin(id, 1)
+                        }
+                      }}
+                    >
+                      <span aria-hidden>⠿</span>
+                    </button>
+                    {renderCard(entry, index, true)}
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        ) : null}
+
+        <section className="dash-section dash-projects" aria-labelledby="dash-projects-title">
+          <div className="dash-section-head">
+            <h2 id="dash-projects-title">
+              Projects <span className="dash-count">{counts.all}</span>
+            </h2>
+            <div className="dash-filters" role="group" aria-label="Filter projects">
+              {(
+                [
+                  ['all', 'All'],
+                  ['urgent', 'Urgent'],
+                  ['inactive', 'Inactive 24h+']
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={`dash-filter${filter === value ? ' is-active' : ''}`}
+                  aria-pressed={filter === value}
+                  onClick={() => changeFilter(value)}
+                >
+                  {label} <span>{counts[value]}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="dash-list" data-testid="dash-grid">
+            {filteredEntries.map((entry, index) => renderCard(entry, index, false))}
+
+            {projects.length === 0 ? (
+              <div className="empty-state" data-testid="empty-state">
+                <div className="icon" aria-hidden="true">
+                  +
+                </div>
+                <h3>No project cards yet</h3>
+                <p>
+                  Click <strong>New project</strong>. A guided setup walks you through it: create
+                  the Slack app, get the token, pick channels, then sync.
+                </p>
+                <button type="button" className="btn btn-primary" onClick={() => openWizard()}>
+                  New project
+                </button>
+              </div>
+            ) : filteredEntries.length === 0 ? (
+              <p className="dash-filter-empty">Nothing matches this filter.</p>
+            ) : null}
+          </div>
+        </section>
 
         {wizardOpenFor ? <DashboardWizard /> : null}
+        <GlobalSettingsPanel
+          open={globalSettingsOpen}
+          onClose={() => setGlobalSettingsOpen(false)}
+        />
       </section>
-      </ErrorBoundary>
-    )
-  } catch (err) {
-    setRenderError(err instanceof Error ? err : new Error(String(err)))
-    return null
-  }
+    </ErrorBoundary>
+  )
 }

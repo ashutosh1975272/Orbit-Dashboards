@@ -1,9 +1,30 @@
 import { BrowserWindow } from 'electron'
 import { IpcChannels } from '../../shared/ipc-contract'
 import type {
+  DashboardAiModelsQueryPayload,
+  DashboardAiModelsResult,
+  DashboardAiSettingsQueryPayload,
+  DashboardAiSettingsSavePayload,
+  DashboardAiSettingsView,
+  DashboardAiTestResult,
+  DashboardGlobalConfig,
   DashboardManualToken,
+  DashboardChatPage,
+  DashboardChatQueryPayload,
+  DashboardChatTokenStatus,
+  DashboardProjectChatPayload,
+  DashboardProjectActivity,
+  DashboardListChannelsPayload,
+  DashboardMarkViewedPayload,
+  DashboardRunSchedulePayload,
+  DashboardSendMessagePayload,
+  DashboardSendMessageResult,
   DashboardSnapshot,
   DashboardSyncProgressPayload,
+  DashboardUpdateSchedulePayload,
+  DashboardTeamWorkspaceCandidate,
+  DashboardTeamWorkspaceChannelsPayload,
+  DashboardTeamWorkspaceConnectPayload,
   ManualTokenPayload,
   ProjectDeletePayload,
   ProjectUpsertPayload,
@@ -12,15 +33,22 @@ import type {
   ProjectSidebarState,
   SidebarState
 } from '../../shared/dashboard-contract'
+import type { AiSettingsService } from '../dashboard/ai-settings'
 import type { DashboardSyncEngine } from '../dashboard/sync-engine'
 import type { DashboardScheduler } from '../dashboard/scheduler'
 import type { MonitorStore } from '../dashboard/monitor-store'
+import type { DashboardChatService } from '../dashboard/chat-service'
 import { SlackPoller } from '../dashboard/slack-poller'
 import { listChannels } from '../slack/slack-api-client'
 import type { SlackChannelSummary } from '../../shared/types'
-import { handleInvoke } from './handle'
+import { handleInvoke, handleInvokeWithEvent } from './handle'
 import type { HistoryStore } from '../dashboard/history-store'
 import type { DashboardSidebarStateStore } from '../dashboard/sidebar-state'
+import { maskToken, type TeamWorkspaceStore } from '../dashboard/team-workspace-store'
+import type { ConfigService } from '../dashboard/config-service'
+import type { ProjectChatService, ProjectChatSink } from '../dashboard/project-chat-service'
+import { describeMissingScopes, missingSlackScopes } from '../dashboard/slack-scopes'
+import type { DashboardViewedStore } from '../dashboard/viewed-store'
 
 export interface DashboardIpcDeps {
   monitorStore: MonitorStore
@@ -36,6 +64,19 @@ export interface DashboardIpcDeps {
   getDigest?: () => Promise<DashboardSnapshot['digest']>
   /** v2.4 — sidebar state per project */
   sidebarStateStore?: DashboardSidebarStateStore
+  /** v2.6 — Slack Chat tab (local history + replies) */
+  chatService?: DashboardChatService
+  projectChatService?: ProjectChatService
+  /** v2.7 — global + per-project AI provider settings */
+  aiSettings?: AiSettingsService
+  /** v2.8 — one effective config resolver for Slack + AI */
+  configService?: ConfigService
+  /** v3 — the one team workspace shared by every card */
+  teamWorkspace?: TeamWorkspaceStore
+  /** v3 — workspaces the app can already reach, offered when connecting ours */
+  listTeamWorkspaceCandidates?: () => Promise<DashboardTeamWorkspaceCandidate[]>
+  /** Phase A — when a card's Dashboard was last looked at */
+  viewedStore?: DashboardViewedStore
 }
 
 export interface DashboardIpcRegistration {
@@ -69,23 +110,55 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
     return {
       projects,
       manualTokens,
-      syncIntervalSeconds: await deps.monitorStore.syncIntervalSeconds(),
-      digest: deps.getDigest ? await deps.getDigest() : null
+      syncIntervalSeconds:
+        (await deps.scheduler.getState()).settings.slackSync.intervalMinutes * 60,
+      digest: deps.getDigest ? await deps.getDigest() : null,
+      pinnedOrder: await deps.monitorStore.readPinnedOrder()
     }
+  }
+
+  const broadcastConfigChanged = async (): Promise<void> => {
+    if (!deps.configService) return
+    broadcast(IpcChannels.DashboardConfigChanged, await deps.configService.publicGlobalConfig())
   }
 
   handleInvoke(IpcChannels.DashboardGetSnapshot, async () => publicSnapshot())
 
   handleInvoke(
+    IpcChannels.DashboardMarkViewed,
+    async (payload: DashboardMarkViewedPayload): Promise<string> => {
+      if (!deps.viewedStore) throw new Error('Dashboard viewing state is unavailable.')
+      const projectId = String(payload?.projectId ?? '').trim()
+      if (!projectId) throw new Error('A project id is required.')
+      return deps.viewedStore.markViewed(projectId, payload.atIso)
+    }
+  )
+
+  handleInvoke(IpcChannels.DashboardSchedulesGet, async () => deps.scheduler.getState())
+
+  handleInvoke(
+    IpcChannels.DashboardSchedulesUpdate,
+    async (payload: DashboardUpdateSchedulePayload) => deps.scheduler.updateSettings(payload ?? {})
+  )
+
+  handleInvoke(IpcChannels.DashboardSchedulesRun, async (payload: DashboardRunSchedulePayload) => {
+    if (payload?.kind !== 'slack-sync' && payload?.kind !== 'daily-recheck') {
+      throw new Error('Unknown schedule.')
+    }
+    return deps.scheduler.runNow(payload.kind)
+  })
+
+  handleInvoke(
     IpcChannels.DashboardListChannels,
-    async (payload: {
-      tokenSource: 'oauth' | 'manual'
-      profileId?: string
-      teamId?: string
-      manualTokenKey?: string
-    }): Promise<SlackChannelSummary[]> => {
+    async (payload: DashboardListChannelsPayload): Promise<SlackChannelSummary[]> => {
       let token: string | null = null
-      if (payload.tokenSource === 'manual') {
+      if (payload.source === 'ours') {
+        const connection = await deps.teamWorkspace?.getConnection()
+        if (!connection) return []
+        token =
+          connection.token ??
+          (await deps.oauthTokenProvider.tryGet(connection.profileId, connection.teamId))
+      } else if (payload.tokenSource === 'manual') {
         token = payload.manualTokenKey
           ? await deps.monitorStore.getManualToken(payload.manualTokenKey)
           : null
@@ -106,6 +179,17 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
     }
   )
 
+  handleInvoke(
+    IpcChannels.DashboardPinnedOrderSet,
+    async (payload: { order?: unknown }): Promise<DashboardSnapshot> => {
+      const order = Array.isArray(payload?.order)
+        ? payload.order.filter((id): id is string => typeof id === 'string')
+        : []
+      await deps.monitorStore.setPinnedOrder(order)
+      return broadcastSnapshot()
+    }
+  )
+
   handleInvoke(IpcChannels.DashboardUpsertProject, async (payload: ProjectUpsertPayload) => {
     await deps.monitorStore.upsertProject(payload)
     return broadcastSnapshot()
@@ -113,6 +197,7 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
 
   handleInvoke(IpcChannels.DashboardDeleteProject, async (payload: ProjectDeletePayload) => {
     await deps.monitorStore.deleteProject(payload.projectId)
+    await deps.aiSettings?.clearProject(payload.projectId)
     return broadcastSnapshot()
   })
 
@@ -205,9 +290,8 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
 
   // v2.4 — Sidebar state per project
   if (deps.sidebarStateStore) {
-    handleInvoke(
-      IpcChannels.DashboardSidebarGet,
-      async (payload: { projectId: string }) => deps.sidebarStateStore!.get(payload.projectId)
+    handleInvoke(IpcChannels.DashboardSidebarGet, async (payload: { projectId: string }) =>
+      deps.sidebarStateStore!.get(payload.projectId)
     )
 
     handleInvoke(
@@ -219,12 +303,199 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
 
     handleInvoke(
       IpcChannels.DashboardSidebarUpdate,
-      async (payload: { projectId: string; sidebar: 'left' | 'right'; patch: Partial<SidebarState> }) => {
+      async (payload: {
+        projectId: string
+        sidebar: 'left' | 'right'
+        patch: Partial<SidebarState>
+      }) => {
         if (payload.sidebar === 'left') {
           return deps.sidebarStateStore!.updateLeft(payload.projectId, payload.patch)
         } else {
           return deps.sidebarStateStore!.updateRight(payload.projectId, payload.patch)
         }
+      }
+    )
+  }
+
+  // v2.6 — Slack Chat tab: local message history + replies (chat.postMessage)
+  if (deps.chatService) {
+    handleInvoke(
+      IpcChannels.DashboardGetMessages,
+      async (payload: DashboardChatQueryPayload): Promise<DashboardChatPage> =>
+        deps.chatService!.loadMessages(payload)
+    )
+    handleInvoke(
+      IpcChannels.DashboardSendMessage,
+      async (payload: DashboardSendMessagePayload): Promise<DashboardSendMessageResult> =>
+        deps.chatService!.sendMessage(payload)
+    )
+    handleInvoke(
+      IpcChannels.DashboardChatTokenStatus,
+      async (projectId: string): Promise<DashboardChatTokenStatus> =>
+        deps.chatService!.chatTokenStatus(projectId)
+    )
+    handleInvoke(
+      IpcChannels.DashboardProjectActivity,
+      async (projectId: string): Promise<DashboardProjectActivity> => {
+        if (typeof projectId !== 'string' || !projectId.trim()) {
+          return {
+            recent: [],
+            latestClientAt: null,
+            latestOursAt: null,
+            ballInCourt: null,
+            participants: [],
+            channels: [],
+            counts14d: { client: 0, ours: 0 }
+          }
+        }
+        return deps.chatService!.projectActivity(projectId)
+      }
+    )
+  }
+  if (deps.projectChatService) {
+    const service = deps.projectChatService
+    handleInvokeWithEvent(
+      IpcChannels.DashboardProjectChat,
+      async (event, payload: DashboardProjectChatPayload) => {
+        // Replies go only to the window that asked, tagged with projectId+runId.
+        const sender = event.sender
+        const send = (channel: string, data: unknown): void => {
+          if (!sender.isDestroyed()) sender.send(channel, data)
+        }
+        const sink: ProjectChatSink = {
+          chunk: (data) => send(IpcChannels.DashboardProjectChatChunk, data),
+          done: (data) => send(IpcChannels.DashboardProjectChatDone, data),
+          error: (data) => send(IpcChannels.DashboardProjectChatError, data)
+        }
+        try {
+          return await service.start(payload, sink)
+        } catch (err) {
+          return {
+            ok: false as const,
+            code: 'INTERNAL' as const,
+            error: err instanceof Error ? err.message : 'Chat failed.'
+          }
+        }
+      }
+    )
+    handleInvoke(
+      IpcChannels.DashboardProjectChatCancel,
+      async (payload: { projectId: string; runId?: string }) => ({
+        ok: service.cancel(String(payload?.projectId ?? ''), payload?.runId)
+      })
+    )
+    handleInvoke(IpcChannels.DashboardProjectChatHistory, async (projectId: string) => ({
+      messages: await service.loadHistory(String(projectId ?? ''))
+    }))
+    handleInvoke(IpcChannels.DashboardProjectChatStatus, async (projectId: string) =>
+      service.status(String(projectId ?? ''))
+    )
+    handleInvoke(IpcChannels.DashboardProjectChatClear, async (projectId: string) => {
+      await service.clearHistory(String(projectId ?? ''))
+      return { ok: true }
+    })
+  }
+
+  // v3 — our team workspace: connect once, pin its channels, every card reads it.
+  if (deps.teamWorkspace) {
+    const store = deps.teamWorkspace
+    handleInvoke(IpcChannels.DashboardTeamWorkspaceGet, async () => store.readPublic())
+
+    handleInvoke(
+      IpcChannels.DashboardTeamWorkspaceCandidates,
+      async (): Promise<DashboardTeamWorkspaceCandidate[]> =>
+        (await deps.listTeamWorkspaceCandidates?.()) ?? []
+    )
+
+    handleInvoke(
+      IpcChannels.DashboardTeamWorkspaceConnect,
+      async (payload: DashboardTeamWorkspaceConnectPayload) => {
+        const poller = new SlackPoller()
+        let token: string | null = null
+        if (payload.source === 'manual') {
+          token = payload.token?.trim() ?? null
+          if (!token) throw new Error('Paste a Slack token to connect our workspace.')
+        } else {
+          if (!payload.profileId || !payload.teamId) {
+            throw new Error('Pick a workspace to connect.')
+          }
+          token = await deps.oauthTokenProvider.tryGet(payload.profileId, payload.teamId)
+          if (!token) {
+            throw new Error('That workspace has no stored token any more. Reconnect it first.')
+          }
+        }
+        // Verify with Slack before storing: a dead token must never look connected.
+        const check = await poller.authTest(token)
+        if (!check.valid) throw new Error(check.error ?? 'Slack rejected this token')
+        // OAuth tokens can be under-scoped too; warn at connect instead of later.
+        const missing = missingSlackScopes(check.scopes)
+        if (missing.length > 0) throw new Error(describeMissingScopes(missing))
+        const teamId = check.teamId ?? payload.teamId ?? ''
+        if (!teamId) throw new Error('Slack did not report a workspace id for this token.')
+        const next = await store.connect({
+          payload,
+          profileId:
+            payload.source === 'manual' ? `manual:${teamId}` : (payload.profileId as string),
+          teamId,
+          teamName: check.teamName ?? teamId,
+          token: payload.source === 'manual' ? (token as string) : undefined,
+          maskedToken: maskToken(token),
+          status: 'connected'
+        })
+        await broadcastConfigChanged()
+        return next
+      }
+    )
+
+    handleInvoke(
+      IpcChannels.DashboardTeamWorkspaceChannels,
+      async (payload: DashboardTeamWorkspaceChannelsPayload) => {
+        const next = await store.setChannels(payload.channels)
+        await broadcastConfigChanged()
+        return next
+      }
+    )
+
+    handleInvoke(IpcChannels.DashboardTeamWorkspaceClear, async () => {
+      const next = await store.clear()
+      await broadcastConfigChanged()
+      return next
+    })
+  }
+
+  // v2.8 — one effective config resolver for Slack + AI.
+  if (deps.configService) {
+    handleInvoke(IpcChannels.DashboardConfigGet, async (): Promise<DashboardGlobalConfig> =>
+      deps.configService!.publicGlobalConfig()
+    )
+  }
+
+  // v2.7 — AI provider settings (keys stay in main; public views are masked)
+  if (deps.aiSettings) {
+    handleInvoke(
+      IpcChannels.DashboardGetAiSettings,
+      async (payload?: DashboardAiSettingsQueryPayload): Promise<DashboardAiSettingsView> =>
+        deps.aiSettings!.publicView(payload?.projectId)
+    )
+    handleInvoke(
+      IpcChannels.DashboardSaveAiSettings,
+      async (payload: DashboardAiSettingsSavePayload): Promise<DashboardAiSettingsView> => {
+        const next = await deps.aiSettings!.save(payload)
+        await broadcastConfigChanged()
+        return next
+      }
+    )
+    handleInvoke(
+      IpcChannels.DashboardListAiModels,
+      async (payload?: DashboardAiModelsQueryPayload): Promise<DashboardAiModelsResult> =>
+        deps.aiSettings!.listModels(payload?.projectId)
+    )
+    handleInvoke(
+      IpcChannels.DashboardTestAi,
+      async (payload?: DashboardAiSettingsQueryPayload): Promise<DashboardAiTestResult> => {
+        const result = await deps.aiSettings!.testConnection(payload?.projectId)
+        await broadcastConfigChanged()
+        return result
       }
     )
   }

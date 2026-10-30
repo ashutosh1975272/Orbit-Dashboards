@@ -94,8 +94,14 @@ describe('insights prompt + merge', () => {
         null
       )
     )
+    // the status change needs an evidenced item beside it (H1 guard)
     const merged = mergeInsight(
-      { status: 'on-track', progress: 60, situationLine: 'moving' },
+      {
+        status: 'on-track',
+        progress: 60,
+        situationLine: 'moving',
+        decisions: [{ what: 'Client approved the scope' }]
+      },
       { ...prev, blockers: [{ what: 'assets' }] }
     )
     expect(merged.status).toBe('on-track')

@@ -38,6 +38,7 @@ interface DashboardState {
       | (Omit<DashboardProject, 'createdAt'> & { id: string })
   ) => Promise<void>
   deleteProject: (projectId: string) => Promise<void>
+  setPinnedOrder: (order: string[]) => Promise<void>
   syncNow: (projectId?: string) => Promise<void>
   addManualToken: (
     key: string,
@@ -66,6 +67,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   setDashRailExpanded: (expanded) => set({ dashRailExpanded: expanded }),
 
   loadSnapshot: async () => {
+    const state = get()
+    if (state.loading) return
     set({ loading: true, error: null })
     try {
       const snapshot = await window.api.dashboard.getSnapshot()
@@ -94,6 +97,11 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
   deleteProject: async (projectId) => {
     const snapshot = await window.api.dashboard.deleteProject({ projectId })
+    set({ snapshot })
+  },
+
+  setPinnedOrder: async (order) => {
+    const snapshot = await window.api.dashboard.setPinnedOrder({ order })
     set({ snapshot })
   },
 

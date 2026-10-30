@@ -177,7 +177,7 @@ export default function AccordionSidebar({
       <aside
         className="dash-sidebar dash-sidebar-loading flex flex-col bg-surface-dark border-r border-border-dark"
         data-sidebar={sidebarId}
-        style={{ width: `${NARROW_WIDTH}px` }}
+        style={{ width: `${NARROW_WIDTH}px`, minWidth: 0 }}
         role="navigation"
         aria-label={`${sidebarId === 'left' ? 'PROJECT GUIDE' : 'ATTENTION'} (loading)`}
       >
@@ -193,7 +193,7 @@ export default function AccordionSidebar({
       <aside
         className="dash-sidebar dash-sidebar-collapsed flex flex-col bg-surface-dark border-r border-border-dark"
         data-sidebar={sidebarId}
-        style={{ width: `${COLLAPSED_RAIL_WIDTH}px` }}
+        style={{ width: `${COLLAPSED_RAIL_WIDTH}px`, minWidth: 0 }}
         role="navigation"
         aria-label={`${sidebarId === 'left' ? 'PROJECT GUIDE' : 'ATTENTION'} (collapsed)`}
       >
@@ -245,7 +245,7 @@ export default function AccordionSidebar({
               className={`dash-sidebar-width-btn w-8 h-8 rounded-lg border border-border-dark bg-surface-2-dark text-muted-dark hover:bg-accent/10 hover:border-accent hover:text-accent transition-colors flex items-center justify-center ${
                 width === WIDE_WIDTH ? 'text-accent' : ''
               }`}
-              onClick={() => setWidth(width === WIDE_WIDTH ? NARROW_WIDTH : WIDE_WIDTH)}
+              onClick={() => { const nw = width === WIDE_WIDTH ? NARROW_WIDTH : WIDE_WIDTH; setWidth(nw); onWidthChange?.(nw) }}
               aria-label={`Switch to ${width === WIDE_WIDTH ? 'narrow' : 'wide'} width`}
               title={width === WIDE_WIDTH ? 'Narrow (290px)' : 'Wide (380px)'}
             >
@@ -269,7 +269,7 @@ export default function AccordionSidebar({
     <aside
       className="dash-sidebar dash-sidebar-expanded flex flex-col bg-surface-dark border-r border-border-dark"
       data-sidebar={sidebarId}
-      style={{ width: `${width}px` }}
+      style={{ width: `${width}px`, minWidth: 0 }}
       role="navigation"
       aria-label={`${sidebarId === 'left' ? 'PROJECT GUIDE' : 'ATTENTION'} (expanded)`}
     >
@@ -281,7 +281,7 @@ export default function AccordionSidebar({
           <button
             type="button"
             className="dash-sidebar-width-btn w-8 h-8 rounded-lg border border-border-dark bg-surface-2-dark text-muted-dark hover:bg-accent/10 hover:border-accent hover:text-accent transition-colors flex items-center justify-center"
-            onClick={() => setWidth(width === WIDE_WIDTH ? NARROW_WIDTH : WIDE_WIDTH)}
+            onClick={() => { const nw = width === WIDE_WIDTH ? NARROW_WIDTH : WIDE_WIDTH; setWidth(nw); onWidthChange?.(nw) }}
             aria-label={`Switch to ${width === WIDE_WIDTH ? 'narrow' : 'wide'} width`}
             title={width === WIDE_WIDTH ? 'Narrow (290px)' : 'Wide (380px)'}
           >

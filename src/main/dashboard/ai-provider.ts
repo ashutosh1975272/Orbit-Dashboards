@@ -38,6 +38,93 @@ export interface NimChatResult {
   tokens: number
 }
 
+export interface NimStreamOptions extends NimChatOptions {
+  signal?: AbortSignal
+}
+
+/** HTTP failures keep the old `nim http <status>` message and add the status. */
+export class NimHttpError extends Error {
+  readonly status: number
+  readonly retryAfterMs: number | undefined
+
+  constructor(status: number, message: string, retryAfterMs?: number) {
+    super(message)
+    this.name = 'NimHttpError'
+    this.status = status
+    this.retryAfterMs = retryAfterMs
+  }
+}
+
+function abortError(): Error {
+  const err = new Error('The operation was aborted')
+  err.name = 'AbortError'
+  return err
+}
+
+function isAbort(err: unknown, signal?: AbortSignal): boolean {
+  void err
+  // Only a caller-initiated abort suppresses the fallback; the internal
+  // timeout still tries the secondary model.
+  return signal?.aborted === true
+}
+
+function retryAfterMsOf(res: Response): number | undefined {
+  const raw = res.headers.get('retry-after')
+  if (!raw) return undefined
+  const seconds = Number(raw)
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : undefined
+}
+
+/**
+ * Read an OpenAI-compatible SSE body. Robust to arbitrary chunk boundaries,
+ * CRLF, comments, blank lines, malformed JSON and a missing trailing newline.
+ * Yields only non-empty `choices[0].delta.content` strings.
+ */
+export async function* readSseContent(
+  stream: ReadableStream<Uint8Array>,
+  signal?: AbortSignal
+): AsyncGenerator<string> {
+  const reader = stream.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  const consumeLine = function* (line: string): Generator<string> {
+    const clean = line.endsWith('\r') ? line.slice(0, -1) : line
+    if (!clean.startsWith('data:')) return
+    const data = clean.slice(5).trimStart()
+    if (!data || data === '[DONE]') return
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(data)
+    } catch {
+      return
+    }
+    const choices = (parsed as { choices?: Array<{ delta?: { content?: unknown } }> })?.choices
+    const piece = choices?.[0]?.delta?.content
+    if (typeof piece === 'string' && piece.length > 0) yield piece
+  }
+
+  try {
+    for (;;) {
+      if (signal?.aborted) throw abortError()
+      const { value, done } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      let index = buffer.indexOf('\n')
+      while (index >= 0) {
+        const line = buffer.slice(0, index)
+        buffer = buffer.slice(index + 1)
+        yield* consumeLine(line)
+        index = buffer.indexOf('\n')
+      }
+    }
+    buffer += decoder.decode()
+    if (buffer.length > 0) yield* consumeLine(buffer)
+  } finally {
+    reader.releaseLock()
+  }
+}
+
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
@@ -89,7 +176,11 @@ export class NimProvider {
         body: JSON.stringify(payload)
       })
       if (!res.ok) {
-        throw new Error(`nim http ${res.status}`)
+        throw new NimHttpError(
+          res.status,
+          `nim http ${res.status}`,
+          res.status === 429 ? retryAfterMsOf(res) : undefined
+        )
       }
       const body = (await res.json()) as {
         model?: string
@@ -134,6 +225,89 @@ export class NimProvider {
     if (!res.ok) throw new Error(`nim models http ${res.status}`)
     const body = (await res.json()) as { data?: Array<{ id?: string }> }
     return (body.data ?? []).map((m) => m.id ?? '').filter(Boolean)
+  }
+
+  private async *streamOnce(
+    model: string,
+    messages: NimChatMessage[],
+    opts: NimStreamOptions
+  ): AsyncGenerator<string> {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? this.defaultTimeoutMs)
+    const onAbort = (): void => controller.abort()
+    if (opts.signal) {
+      if (opts.signal.aborted) {
+        clearTimeout(timer)
+        throw abortError()
+      }
+      opts.signal.addEventListener('abort', onAbort, { once: true })
+    }
+    try {
+      const payload: Record<string, unknown> = {
+        model,
+        messages,
+        max_tokens: opts.maxTokens ?? this.defaultMaxTokens,
+        temperature: opts.temperature ?? 0.2,
+        stream: true
+      }
+      if (!this.enableThinking) {
+        payload.chat_template_kwargs = { enable_thinking: false }
+      }
+      const res = await fetch(`${this.baseUrl}/chat/completions`, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+          Accept: 'text/event-stream'
+        },
+        body: JSON.stringify(payload)
+      })
+      if (!res.ok) {
+        throw new NimHttpError(
+          res.status,
+          `nim http ${res.status}`,
+          res.status === 429 ? retryAfterMsOf(res) : undefined
+        )
+      }
+      if (!res.body) throw new Error('nim stream had no body')
+      yield* readSseContent(res.body, controller.signal)
+    } catch (err) {
+      if (isAbort(err, opts.signal)) throw abortError()
+      throw err
+    } finally {
+      clearTimeout(timer)
+      opts.signal?.removeEventListener('abort', onAbort)
+    }
+  }
+
+  /**
+   * Stream a chat completion. Falls back to the secondary model only when the
+   * primary fails before emitting any text, so output is never duplicated.
+   */
+  async *streamChat(
+    messages: NimChatMessage[],
+    opts: NimStreamOptions = {}
+  ): AsyncGenerator<string> {
+    let emitted = false
+    let primaryError: unknown
+    try {
+      for await (const piece of this.streamOnce(this.modelPrimary, messages, opts)) {
+        emitted = true
+        yield piece
+      }
+      return
+    } catch (err) {
+      primaryError = err
+      if (isAbort(err, opts.signal) || emitted || !this.modelFallback) throw err
+    }
+    try {
+      yield* this.streamOnce(this.modelFallback, messages, opts)
+    } catch (err) {
+      throw new Error(
+        `nim primary failed (${errorMessage(primaryError)}); fallback failed (${errorMessage(err)})`
+      )
+    }
   }
 
   /**
