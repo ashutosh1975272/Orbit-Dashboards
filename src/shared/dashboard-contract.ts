@@ -96,6 +96,8 @@ export interface ProjectSource {
   updatedAt: string
 }
 
+export type ProjectWorkflowStatus = 'active' | 'stopped' | 'removed' | 'completed'
+
 export interface DashboardProject {
   id: string
   /** Display name, e.g. "Acme redesign". */
@@ -114,6 +116,8 @@ export interface DashboardProject {
   /** Slack user id of the token owner (= the freelancer, not the client). */
   selfUserId?: string
   monitors: DashboardMonitor[]
+  /** Project lifecycle/workflow status (Active, Stopped, Removed/Cancelled, Completed) */
+  workflowStatus?: ProjectWorkflowStatus
   /** Additive multi-source model (SLK-1) */
   sources?: ProjectSource[]
   sourcePreference?: 'token_first' | 'browser_only'
