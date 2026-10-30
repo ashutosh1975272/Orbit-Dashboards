@@ -4,7 +4,7 @@ import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { AppSettings } from '../../shared/ipc-contract'
 import { DEFAULT_APP_SETTINGS } from '../../shared/ipc-contract'
 import type { AppId, Profile, ViewportBounds } from '../../shared/types'
-import { APP_IDS, GLOBAL_PROFILE_ID } from '../../shared/types'
+import { APP_IDS } from '../../shared/types'
 import appIcon from './assets/app-icon.png'
 import { AuthChromePane, type AuthChromePhase } from './components/AuthChromePane'
 import { AdminLoginOverlay } from './components/AdminLoginOverlay'
@@ -655,22 +655,17 @@ function App(): React.JSX.Element {
       setLocalAuthPhase('google')
       setStatusLine('Opening Chrome for Google authentication…')
       try {
-        let targetProfileId: string
+        const profile = await createProfile(hint)
+        const targetProfileId = profile.id
+        const finalDisplayName = displayName.trim() || hint
+        await window.api.profiles.setCustomName(profile.id, finalDisplayName)
+
+        // If created under global scope: keep visible in main sidebar
+        // If created as individual profile: hide from main sidebar (appears in dashboard project dropdown)
         if (mode === 'under_global') {
-          const globalP = useProfileStore.getState().profiles.find((p) => p.id === GLOBAL_PROFILE_ID || p.isGlobalProfile)
-          if (globalP) {
-            targetProfileId = globalP.id
-          } else {
-            const created = await createProfile(hint)
-            targetProfileId = created.id
-            await window.api.profiles.setCustomName(created.id, 'Global Account')
-          }
+          await window.api.profiles.setHiddenInSidebar(targetProfileId, false)
         } else {
-          const profile = await createProfile(hint)
-          targetProfileId = profile.id
-          if (displayName.trim() && displayName.trim() !== hint) {
-            await window.api.profiles.setCustomName(profile.id, displayName.trim())
-          }
+          await window.api.profiles.setHiddenInSidebar(targetProfileId, true)
         }
         await loadProfiles()
 

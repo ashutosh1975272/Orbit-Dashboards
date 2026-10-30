@@ -19,8 +19,8 @@ export function NewProfileModal({ open, onClose, onCreate }: NewProfileModalProp
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (mode === 'individual' && !name.trim()) {
-      setError('Please enter an individual profile name')
+    if (!name.trim()) {
+      setError(mode === 'under_global' ? 'Please enter an account name (e.g. Ashutosh, Agency)' : 'Please enter an individual profile name')
       return
     }
     if (!email.trim() || !email.includes('@')) {
@@ -30,8 +30,7 @@ export function NewProfileModal({ open, onClose, onCreate }: NewProfileModalProp
     setError(null)
     setSubmitting(true)
     try {
-      const finalName = mode === 'under_global' ? 'Global Account' : name.trim()
-      await onCreate(finalName, email.trim(), mode)
+      await onCreate(name.trim(), email.trim(), mode)
       setName('')
       setEmail('')
       onClose()
@@ -158,30 +157,28 @@ export function NewProfileModal({ open, onClose, onCreate }: NewProfileModalProp
             </div>
           </div>
 
-          {mode === 'individual' && (
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#cbd5e1', marginBottom: '6px' }}>
-                Profile Name
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Ayush, Ashutosh, Work Client"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                autoFocus
-                style={{
-                  width: '100%',
-                  padding: '9px 12px',
-                  borderRadius: '6px',
-                  background: '#020617',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
-                  color: '#fff',
-                  fontSize: '13px',
-                  boxSizing: 'border-box'
-                }}
-              />
-            </div>
-          )}
+          <div>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#cbd5e1', marginBottom: '6px' }}>
+              {mode === 'under_global' ? 'Global Account / Profile Name' : 'Individual Profile Name'}
+            </label>
+            <input
+              type="text"
+              placeholder={mode === 'under_global' ? 'e.g. Ashutosh, Agency Global, Support' : 'e.g. Ayush, Client Project Profile'}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoFocus
+              style={{
+                width: '100%',
+                padding: '9px 12px',
+                borderRadius: '6px',
+                background: '#020617',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                color: '#fff',
+                fontSize: '13px',
+                boxSizing: 'border-box'
+              }}
+            />
+          </div>
 
           <div>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#cbd5e1', marginBottom: '6px' }}>
@@ -192,7 +189,6 @@ export function NewProfileModal({ open, onClose, onCreate }: NewProfileModalProp
               placeholder="e.g. name@company.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              autoFocus={mode === 'under_global'}
               style={{
                 width: '100%',
                 padding: '9px 12px',

@@ -567,13 +567,13 @@ export default function DashboardView(): React.ReactElement | null {
                 }}
               >
                 {(() => {
-                  const individualProfiles = profiles.filter((p) => p.id !== GLOBAL_PROFILE_ID && !p.isGlobalProfile)
+                  const individualProfiles = profiles.filter((p) => p.hiddenInSidebar || (!p.isGlobalProfile && p.id !== GLOBAL_PROFILE_ID))
                   return (
                     <>
                       <option value="all">All Profiles ({individualProfiles.length})</option>
                       {individualProfiles.map((p) => (
                         <option key={p.id} value={p.id}>
-                          {p.displayName || p.id}
+                          {p.customName || p.displayName || p.id}
                         </option>
                       ))}
                     </>
