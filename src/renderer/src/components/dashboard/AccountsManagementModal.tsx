@@ -1,6 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import type { DashboardProject, ProjectWorkflowStatus } from '../../../../shared/dashboard-contract'
-import { CustomLink, Profile, profileDisplayLabel } from '../../../../shared/types'
+import {
+  CustomLink,
+  Profile,
+  isGlobalAccountProfile,
+  isIndividualProfile,
+  profileDisplayLabel
+} from '../../../../shared/types'
 import { useDashboardStore } from '../../hooks/useDashboard'
 import { useProfileStore } from '../../hooks/useProfiles'
 import { POPULAR_PRESETS } from './AddPlatformPage'
@@ -28,7 +34,13 @@ export function AccountsManagementModal({
   const loadSnapshot = useDashboardStore((s) => s.loadSnapshot)
   const upsertProject = useDashboardStore((s) => s.upsertProject)
 
-  // Navigation State in Hub
+  // Strict Scopes Separation:
+  // Global company accounts (e.g. Rajesh)
+  const globalProfiles = useMemo(() => profiles.filter(isGlobalAccountProfile), [profiles])
+  // Genuine individual client profiles (e.g. ashutosh, unknown)
+  const individualProfiles = useMemo(() => profiles.filter(isIndividualProfile), [profiles])
+
+  // Navigation State in Hub: default to individual if available, else global
   const [activeSection, setActiveSection] = useState<HubNavSection>('individual')
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null)
   const [profilesDropdownExpanded, setProfilesDropdownExpanded] = useState(true)
@@ -49,17 +61,21 @@ export function AccountsManagementModal({
     }
   }, [open, loadSnapshot])
 
-  // Select initial profile if none selected
+  // Select initial individual profile strictly
   useEffect(() => {
-    if (profiles.length > 0 && !selectedProfileId) {
-      setSelectedProfileId(activeProfileId || profiles[0]!.id)
+    if (individualProfiles.length > 0) {
+      if (!selectedProfileId || !individualProfiles.some((p) => p.id === selectedProfileId)) {
+        setSelectedProfileId(individualProfiles[0]!.id)
+      }
+    } else {
+      setSelectedProfileId(null)
     }
-  }, [profiles, activeProfileId, selectedProfileId])
+  }, [individualProfiles, selectedProfileId])
 
-  // Get current active profile object
+  // Current selected individual profile
   const currentProfile = useMemo(() => {
-    return profiles.find((p) => p.id === selectedProfileId) || profiles[0] || null
-  }, [profiles, selectedProfileId])
+    return individualProfiles.find((p) => p.id === selectedProfileId) || individualProfiles[0] || null
+  }, [individualProfiles, selectedProfileId])
 
   // All projects across entire app
   const allProjects: DashboardProject[] = useMemo(() => {
@@ -316,7 +332,7 @@ export function AccountsManagementModal({
                 <span>Global Accounts</span>
               </div>
               <span style={{ fontSize: '10px', color: '#4ade80', background: 'rgba(74, 222, 128, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>
-                {profiles.length} Connected
+                {globalProfiles.length} Connected
               </span>
             </button>
 
@@ -343,7 +359,7 @@ export function AccountsManagementModal({
                   textAlign: 'left'
                 }}
               >
-                <span>Individual Profiles ({profiles.length})</span>
+                <span>Individual Profiles ({individualProfiles.length})</span>
                 <span style={{ fontSize: '10px', opacity: 0.7, transform: profilesDropdownExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s ease' }}>
                   ▸
                 </span>
@@ -351,55 +367,61 @@ export function AccountsManagementModal({
 
               {profilesDropdownExpanded && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginTop: '4px', paddingLeft: '8px' }}>
-                  {profiles.map((profile) => {
-                    const isSelected = activeSection === 'individual' && selectedProfileId === profile.id
-                    const isSigned = profile.googleAuthStatus === 'signed-in'
-                    const pProjects = allProjects.filter((p) => p.profileId === profile.id)
+                  {individualProfiles.length === 0 ? (
+                    <div style={{ fontSize: '11.5px', color: '#64748b', padding: '6px 10px', fontStyle: 'italic' }}>
+                      No individual profiles
+                    </div>
+                  ) : (
+                    individualProfiles.map((profile) => {
+                      const isSelected = activeSection === 'individual' && selectedProfileId === profile.id
+                      const isSigned = profile.googleAuthStatus === 'signed-in'
+                      const pProjects = allProjects.filter((p) => p.profileId === profile.id)
 
-                    return (
-                      <button
-                        key={profile.id}
-                        type="button"
-                        onClick={() => {
-                          setActiveSection('individual')
-                          setSelectedProfileId(profile.id)
-                        }}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '7px 10px',
-                          borderRadius: '6px',
-                          background: isSelected ? 'rgba(59, 130, 246, 0.18)' : 'transparent',
-                          color: isSelected ? '#60a5fa' : '#cbd5e1',
-                          border: isSelected ? '1px solid rgba(59, 130, 246, 0.35)' : '1px solid transparent',
-                          cursor: 'pointer',
-                          fontSize: '12.5px',
-                          fontWeight: isSelected ? 600 : 400,
-                          textAlign: 'left',
-                          transition: 'all 0.12s ease'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                          <span
-                            style={{
-                              width: '7px',
-                              height: '7px',
-                              borderRadius: '50%',
-                              background: isSigned ? '#4ade80' : '#f59e0b',
-                              flexShrink: 0
-                            }}
-                          />
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {profileDisplayLabel(profile)}
+                      return (
+                        <button
+                          key={profile.id}
+                          type="button"
+                          onClick={() => {
+                            setActiveSection('individual')
+                            setSelectedProfileId(profile.id)
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '7px 10px',
+                            borderRadius: '6px',
+                            background: isSelected ? 'rgba(59, 130, 246, 0.18)' : 'transparent',
+                            color: isSelected ? '#60a5fa' : '#cbd5e1',
+                            border: isSelected ? '1px solid rgba(59, 130, 246, 0.35)' : '1px solid transparent',
+                            cursor: 'pointer',
+                            fontSize: '12.5px',
+                            fontWeight: isSelected ? 600 : 400,
+                            textAlign: 'left',
+                            transition: 'all 0.12s ease'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                            <span
+                              style={{
+                                width: '7px',
+                                height: '7px',
+                                borderRadius: '50%',
+                                background: isSigned ? '#4ade80' : '#f59e0b',
+                                flexShrink: 0
+                              }}
+                            />
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {profileDisplayLabel(profile)}
+                            </span>
+                          </div>
+                          <span style={{ fontSize: '10.5px', color: '#64748b' }}>
+                            {pProjects.length} cards
                           </span>
-                        </div>
-                        <span style={{ fontSize: '10.5px', color: '#64748b' }}>
-                          {pProjects.length} cards
-                        </span>
-                      </button>
-                    )
-                  })}
+                        </button>
+                      )
+                    })
+                  )}
                 </div>
               )}
             </div>
@@ -445,82 +467,103 @@ export function AccountsManagementModal({
                 </header>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '14px' }}>
-                  {profiles.map((profile) => (
-                    <div
-                      key={profile.id}
-                      style={{
-                        background: 'rgba(15, 23, 42, 0.45)',
-                        border: '1px solid rgba(255, 255, 255, 0.07)',
-                        borderRadius: '10px',
-                        padding: '16px'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div
+                  {globalProfiles.length === 0 ? (
+                    <div style={{ color: '#64748b', fontSize: '13px', fontStyle: 'italic', padding: '20px' }}>
+                      No global company accounts connected yet.
+                    </div>
+                  ) : (
+                    globalProfiles.map((profile) => (
+                      <div
+                        key={profile.id}
+                        style={{
+                          background: 'rgba(15, 23, 42, 0.45)',
+                          border: '1px solid rgba(255, 255, 255, 0.07)',
+                          borderRadius: '10px',
+                          padding: '16px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div
+                              style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '50%',
+                                background: profile.avatarColor || '#3b82f6',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 600,
+                                fontSize: '13px',
+                                color: '#fff'
+                              }}
+                            >
+                              {profile.displayName.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: '14px', color: '#f8fafc' }}>
+                                {profileDisplayLabel(profile)}
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#94a3b8' }}>{profile.displayName}</div>
+                            </div>
+                          </div>
+                          <span
                             style={{
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: '50%',
-                              background: profile.avatarColor || '#3b82f6',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontWeight: 600,
-                              fontSize: '13px',
-                              color: '#fff'
+                              fontSize: '11px',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              background: profile.googleAuthStatus === 'signed-in' ? 'rgba(74, 222, 128, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                              color: profile.googleAuthStatus === 'signed-in' ? '#4ade80' : '#f59e0b'
                             }}
                           >
-                            {profile.displayName.charAt(0).toUpperCase()}
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: 600, fontSize: '14px', color: '#f8fafc' }}>
-                              {profileDisplayLabel(profile)}
-                            </div>
-                            <div style={{ fontSize: '11px', color: '#94a3b8' }}>{profile.displayName}</div>
-                          </div>
+                            {profile.googleAuthStatus === 'signed-in' ? 'Connected' : 'Login needed'}
+                          </span>
                         </div>
-                        <span
-                          style={{
-                            fontSize: '11px',
-                            padding: '2px 8px',
-                            borderRadius: '4px',
-                            background: profile.googleAuthStatus === 'signed-in' ? 'rgba(74, 222, 128, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                            color: profile.googleAuthStatus === 'signed-in' ? '#4ade80' : '#f59e0b'
-                          }}
-                        >
-                          {profile.googleAuthStatus === 'signed-in' ? 'Connected' : 'Login needed'}
-                        </span>
-                      </div>
 
-                      {/* Platforms Pill List */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px' }}>
-                          <span style={{ color: '#cbd5e1' }}>💬 Slack Workspace</span>
-                          <span style={{ color: profile.apps.slack.sessionStatus === 'signed-in' ? '#4ade80' : '#64748b' }}>
-                            {profile.apps.slack.sessionStatus === 'signed-in' ? 'Active Session' : 'Not Connected'}
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px' }}>
-                          <span style={{ color: '#cbd5e1' }}>👥 Teams Workspace</span>
-                          <span style={{ color: profile.apps.teams.sessionStatus === 'signed-in' ? '#4ade80' : '#64748b' }}>
-                            {profile.apps.teams.sessionStatus === 'signed-in' ? 'Active Session' : 'Not Connected'}
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px' }}>
-                          <span style={{ color: '#cbd5e1' }}>📱 WhatsApp</span>
-                          <span style={{ color: profile.apps.whatsapp.sessionStatus === 'signed-in' ? '#4ade80' : '#64748b' }}>
-                            {profile.apps.whatsapp.sessionStatus === 'signed-in' ? 'Active' : 'Not Connected'}
-                          </span>
+                        {/* Platforms Pill List */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px' }}>
+                            <span style={{ color: '#cbd5e1' }}>💬 Slack Workspace</span>
+                            <span style={{ color: profile.apps.slack.sessionStatus === 'signed-in' ? '#4ade80' : '#64748b' }}>
+                              {profile.apps.slack.sessionStatus === 'signed-in' ? 'Active Session' : 'Not Connected'}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px' }}>
+                            <span style={{ color: '#cbd5e1' }}>👥 Teams Workspace</span>
+                            <span style={{ color: profile.apps.teams.sessionStatus === 'signed-in' ? '#4ade80' : '#64748b' }}>
+                              {profile.apps.teams.sessionStatus === 'signed-in' ? 'Active Session' : 'Not Connected'}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px' }}>
+                            <span style={{ color: '#cbd5e1' }}>📱 WhatsApp</span>
+                            <span style={{ color: profile.apps.whatsapp.sessionStatus === 'signed-in' ? '#4ade80' : '#64748b' }}>
+                              {profile.apps.whatsapp.sessionStatus === 'signed-in' ? 'Active' : 'Not Connected'}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
             )}
 
             {/* VIEW 3: INDIVIDUAL PROFILE WORKSPACE & CARDS */}
+            {activeSection === 'individual' && !currentProfile && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', justifyContent: 'center', minHeight: '360px', textAlign: 'center' }}>
+                <span style={{ fontSize: '42px', opacity: 0.7 }}>👤</span>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '16px', color: '#f8fafc', fontWeight: 600 }}>
+                    No Individual Profiles Created Yet
+                  </h3>
+                  <p style={{ margin: '6px 0 0', fontSize: '13px', color: '#94a3b8', maxWidth: '420px' }}>
+                    Individual profiles are private client or project profiles separate from your Global Account (e.g. Rajesh).
+                    Create an individual profile via <b>+ Profile</b> in the sidebar.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {activeSection === 'individual' && currentProfile && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
                 {/* Profile Identity & Quick Bar */}

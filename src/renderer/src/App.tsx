@@ -637,6 +637,9 @@ function App(): React.JSX.Element {
       const updated = useProfileStore.getState().profiles.find((p) => p.id === profile.id)
       if (updated?.googleAuthStatus === 'signed-in') {
         setEmail('')
+        // Sidebar Google logins always belong to Global Accounts
+        await window.api.profiles.setAccountScope(profile.id, 'global')
+        await loadProfiles()
         setStatusLine('Google done. Open Slack under this profile to continue.')
       } else if (!updated) {
         setStatusLine('Cancelled — unsigned profile removed.')

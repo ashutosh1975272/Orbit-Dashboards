@@ -108,6 +108,22 @@ export function profileDisplayLabel(profile: Profile): string {
   return custom || profile.displayName
 }
 
+/** Strictly check if a profile is a Global Company Account */
+export function isGlobalAccountProfile(profile: Profile): boolean {
+  if (profile.id === GLOBAL_PROFILE_ID || profile.isGlobalProfile === true) return true
+  if (profile.accountScope === 'global') return true
+  // Any profile visible in the main sidebar (hiddenInSidebar !== true) and not explicitly marked individual is Global
+  if (profile.hiddenInSidebar !== true && profile.accountScope !== 'individual') return true
+  return false
+}
+
+/** Strictly check if a profile is an Individual Profile */
+export function isIndividualProfile(profile: Profile): boolean {
+  if (isGlobalAccountProfile(profile)) return false
+  if (profile.accountScope === 'observer') return false
+  return profile.accountScope === 'individual' || profile.hiddenInSidebar === true
+}
+
 export interface ProfileSessionStatusPayload {
   profileId: string
   appId: AppId

@@ -14,7 +14,7 @@ import ErrorBoundary from './ErrorBoundary'
 import RecentStrip from './RecentStrip'
 import { NewProfileModal } from './NewProfileModal'
 import { useProfileStore } from '../../hooks/useProfiles'
-import { GLOBAL_PROFILE_ID } from '../../../../shared/types'
+import { isIndividualProfile } from '../../../../shared/types'
 import {
   filterCounts,
   matchesFilter,
@@ -568,14 +568,7 @@ export default function DashboardView(): React.ReactElement | null {
                 }}
               >
                 {(() => {
-                  const individualProfiles = profiles.filter((p) => {
-                    // Strictly exclude any profile belonging to Global Accounts
-                    if (p.isGlobalProfile || p.id === GLOBAL_PROFILE_ID || p.accountScope === 'global') {
-                      return false
-                    }
-                    // Only include profiles scoped as individual or hidden from main sidebar
-                    return p.accountScope === 'individual' || p.hiddenInSidebar === true
-                  })
+                  const individualProfiles = profiles.filter(isIndividualProfile)
                   return (
                     <>
                       <option value="all">All Profiles ({individualProfiles.length})</option>

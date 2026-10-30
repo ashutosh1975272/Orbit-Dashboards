@@ -463,10 +463,14 @@ function normalizeProfile(raw: RawProfile): Profile {
         : 'not-signed-in',
     muted: raw.muted === true,
     hiddenInSidebar: raw.hiddenInSidebar === true,
-    ...(raw.accountScope === 'global' || raw.accountScope === 'individual'
+    ...(raw.accountScope === 'global' || raw.accountScope === 'individual' || raw.accountScope === 'observer'
       ? { accountScope: raw.accountScope }
+      : raw.hiddenInSidebar !== true
+        ? { accountScope: 'global' as const }
+        : {}),
+    ...(raw.isGlobalProfile === true || (raw.hiddenInSidebar !== true && raw.accountScope !== 'individual')
+      ? { isGlobalProfile: true }
       : {}),
-    ...(raw.isGlobalProfile === true ? { isGlobalProfile: true } : {}),
     ...(typeof sortOrder === 'number' ? { sortOrder } : {}),
     ...(customName ? { customName } : {}),
     ...(avatarUrl ? { avatarUrl } : {}),

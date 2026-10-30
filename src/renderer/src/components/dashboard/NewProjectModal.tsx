@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { useProfileStore } from '../../hooks/useProfiles'
 import { useDashboardStore } from '../../hooks/useDashboard'
-import { GLOBAL_PROFILE_ID } from '../../../../shared/types'
+import { isIndividualProfile } from '../../../../shared/types'
 import type { DashboardProject, ProjectSource } from '../../../../shared/dashboard-contract'
 import { CardAddModal } from './CardAddModal'
 
@@ -30,20 +30,9 @@ export function NewProjectModal({
   const syncNow = useDashboardStore((s) => s.syncNow)
 
   // Filter strictly for Individual Profiles:
-  // Must have (accountScope === 'individual' || hiddenInSidebar === true),
-  // and cannot be isGlobalProfile, GLOBAL_PROFILE_ID, accountScope === 'global', or 'observer'
+  // Must satisfy isIndividualProfile (excludes Rajesh / global accounts)
   const individualProfiles = useMemo(() => {
-    return profiles.filter((p) => {
-      if (
-        p.isGlobalProfile ||
-        p.id === GLOBAL_PROFILE_ID ||
-        p.accountScope === 'global' ||
-        p.accountScope === 'observer'
-      ) {
-        return false
-      }
-      return p.accountScope === 'individual' || p.hiddenInSidebar === true
-    })
+    return profiles.filter(isIndividualProfile)
   }, [profiles])
 
   const [selectedProfileId, setSelectedProfileId] = useState<string>(() => {
