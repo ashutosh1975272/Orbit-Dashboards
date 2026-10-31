@@ -102,8 +102,23 @@ export default function DashboardView(): React.ReactElement | null {
   })
   const [schedulePaused, setSchedulePaused] = useState(false)
   const [newProfileModalOpen, setNewProfileModalOpen] = useState(false)
-  const [selectedProfileFilter, setSelectedProfileFilter] = useState<string>('all')
+  const cosmicLevel1 = useDashboardStore((s) => s.cosmicLevel1)
+  const [selectedProfileFilter, setSelectedProfileFilter] = useState<string>(() => {
+    if (cosmicLevel1 && cosmicLevel1 !== 'all' && cosmicLevel1 !== 'global') {
+      return cosmicLevel1
+    }
+    return 'all'
+  })
   const profiles = useProfileStore((s) => s.profiles)
+
+  // Synchronize dashboard profile filter when cosmicLevel1 changes
+  useEffect(() => {
+    if (cosmicLevel1 && cosmicLevel1 !== 'all' && cosmicLevel1 !== 'global') {
+      setSelectedProfileFilter(cosmicLevel1)
+    } else if (cosmicLevel1 === 'all' || cosmicLevel1 === 'global') {
+      setSelectedProfileFilter('all')
+    }
+  }, [cosmicLevel1])
   const [dragId, setDragId] = useState<string | null>(null)
   const [dropId, setDropId] = useState<string | null>(null)
   const [syncRun, setSyncRun] = useState<{ total: number; done: number } | null>(null)

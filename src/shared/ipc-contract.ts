@@ -246,12 +246,15 @@ export interface AppSettings {
   showSidebarItemActions?: boolean
   /** When true, display the hide (👁) button on profile headers in the main sidebar. Default: false. */
   showSidebarProfileHideButton?: boolean
+  /** When true, display Profile and Dashboard navigation buttons when a profile is selected in Cosmic Look. Default: true. */
+  showCosmicProfileNavButtons?: boolean
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   baseAppLayout: 'standard',
   showSidebarItemActions: true,
   showSidebarProfileHideButton: false,
+  showCosmicProfileNavButtons: true,
   notificationsEnabled: true,
   idleLockMinutes: 15,
   theme: 'dark',

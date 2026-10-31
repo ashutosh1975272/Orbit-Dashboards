@@ -534,6 +534,22 @@ export function UnifiedSettingsModal({
 
                       <label className="settings-row">
                         <span>
+                          New Cosmic Profile Sidebar Buttons
+                          <span style={{ display: 'block', fontSize: '11px', color: '#64748b' }}>
+                            Show Profile and Dashboard quick navigation buttons when a profile is selected in Cosmic Look
+                          </span>
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={settings.showCosmicProfileNavButtons ?? true}
+                          onChange={(e) =>
+                            onChangeSettings({ showCosmicProfileNavButtons: e.target.checked })
+                          }
+                        />
+                      </label>
+
+                      <label className="settings-row">
+                        <span>
                           Show Quick Actions on Sidebar Items
                           <span style={{ display: 'block', fontSize: '11px', color: '#64748b' }}>
                             Show hide (👁) and remove (×) action buttons when hovering over custom links in the sidebar

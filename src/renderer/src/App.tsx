@@ -339,8 +339,12 @@ function App(): React.JSX.Element {
   const showCosmicCard = Boolean(isCosmicActive && cosmicSelectedCardId && !browserAuthBusy)
   const dashboardOpen = useDashboardStore((s) => s.dashboardOpen)
   const closeDashboard = useDashboardStore((s) => s.closeDashboard)
+  const isCosmicProfileActive = Boolean(
+    isCosmicActive && cosmicLevel1 && cosmicLevel1 !== 'all' && cosmicLevel1 !== 'global'
+  )
   const showDashboard =
-    (dashboardOpen || (isCosmicActive && cosmicLevel1 === 'all')) &&
+    (dashboardOpen ||
+      (isCosmicActive && (cosmicLevel1 === 'all' || (isCosmicProfileActive && !cosmicSelectedCardId)))) &&
     !browserAuthBusy &&
     !showCosmicCard
   const wizardOpen = useDashboardStore((s) => s.wizardOpenFor) != null
@@ -878,6 +882,7 @@ function App(): React.JSX.Element {
               baseAppLayout={settings.baseAppLayout ?? 'standard'}
               showSidebarItemActions={settings.showSidebarItemActions ?? true}
               showSidebarProfileHideButton={settings.showSidebarProfileHideButton ?? false}
+              showCosmicProfileNavButtons={settings.showCosmicProfileNavButtons ?? true}
               sidebarButtons={settings.sidebarButtons}
               onLookChange={(look) => {
                 void window.api.app.setSettings({ sidebarLook: look }).then((next) => {

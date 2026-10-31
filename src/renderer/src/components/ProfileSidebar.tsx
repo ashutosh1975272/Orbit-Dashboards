@@ -81,6 +81,7 @@ interface ProfileSidebarProps {
   baseAppLayout?: 'none' | 'standard' | 'extended' | 'full'
   showSidebarItemActions?: boolean
   showSidebarProfileHideButton?: boolean
+  showCosmicProfileNavButtons?: boolean
   sidebarButtons?: {
     addWebsite?: boolean
     newProject?: boolean
@@ -359,6 +360,7 @@ export const ProfileSidebar = memo(function ProfileSidebar({
   baseAppLayout = 'standard',
   showSidebarItemActions = true,
   showSidebarProfileHideButton = false,
+  showCosmicProfileNavButtons = true,
   sidebarButtons = {
     addWebsite: true,
     newProject: true,
@@ -368,13 +370,15 @@ export const ProfileSidebar = memo(function ProfileSidebar({
   },
   onLookChange
 }: ProfileSidebarProps): React.JSX.Element {
-  const cosmicSelectedCardId = useDashboardStore((s) => s.cosmicSelectedCardId)
+  const activeLook = propSidebarLook ?? 'ancient'
+  const cosmicLevel1 = useDashboardStore((s) => s.cosmicLevel1)
+  const isCosmicProfileSelected =
+    activeLook === 'new-cosmic' && Boolean(cosmicLevel1 && cosmicLevel1 !== 'all' && cosmicLevel1 !== 'global')
   const [profileExpanded, setProfileExpanded] = useState<Record<string, boolean>>({})
   const [appExpanded, setAppExpanded] = useState<Record<string, boolean>>({})
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [dragId, setDragId] = useState<string | null>(null)
-  const activeLook = propSidebarLook ?? 'ancient'
 
   const handleSetLook = (look: 'minimal' | 'ancient' | 'new-cosmic'): void => {
     onLookChange?.(look)
@@ -550,13 +554,18 @@ export const ProfileSidebar = memo(function ProfileSidebar({
       </div>
 
       {activeLook === 'new-cosmic' ? (
-        <CosmicSidebarContent profiles={profiles} />
+        <CosmicSidebarContent
+          profiles={profiles}
+          showCosmicProfileNavButtons={showCosmicProfileNavButtons}
+          onOpenProfilesHub={onOpenProfilesHub}
+          onNewProject={onNewProject}
+        />
       ) : (
         dashboardSlot
       )}
 
-      {/* When a specific project card is selected in Cosmic Look, CosmicSidebarContent handles its in-sidebar workspace tools */}
-      {!(activeLook === 'new-cosmic' && Boolean(cosmicSelectedCardId)) && (
+      {/* When NOT viewing a specific profile in Cosmic Look, render the full global sidebar rules (Recent, Google email, profile tree) */}
+      {!isCosmicProfileSelected && (
         <>
           {showRecentSection && visibleRecents.length > 0 ? (
         <div className="recent-strip" aria-label="Recent workspaces">
