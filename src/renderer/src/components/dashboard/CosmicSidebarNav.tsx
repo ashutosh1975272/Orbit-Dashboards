@@ -4,6 +4,7 @@ import { useProfileStore } from '../../hooks/useProfiles'
 import { profileDisplayLabel, Profile } from '../../../../shared/types'
 
 interface CosmicSidebarContentProps {
+  isMinimalLook?: boolean
   profiles?: Profile[]
   showCosmicProfileNavButtons?: boolean
   onOpenProfilesHub?: () => void
@@ -11,6 +12,7 @@ interface CosmicSidebarContentProps {
 }
 
 export function CosmicSidebarContent({
+  isMinimalLook = false,
   profiles: propProfiles,
   showCosmicProfileNavButtons = true,
   onOpenProfilesHub,
@@ -34,17 +36,24 @@ export function CosmicSidebarContent({
     }
   }, [snapshot, loadSnapshot, profiles.length])
 
+  // In Minimal look, always enforce 'all' navigation if currently set to something else
+  useEffect(() => {
+    if (isMinimalLook && cosmicLevel1 !== 'all') {
+      setCosmicNavigation('all', cosmicSelectedCardId)
+    }
+  }, [isMinimalLook, cosmicLevel1, cosmicSelectedCardId, setCosmicNavigation])
+
   // All selectable user profiles (exclude special global-account-profile singleton)
   const selectableProfiles = useMemo(() => {
     return profiles.filter((p) => p.id !== 'global-account-profile')
   }, [profiles])
 
   // Active projects to display:
-  // For 'all': all active projects across all profiles
+  // For 'all' (or minimal): all active projects across all profiles
   // For a specific profile: all active projects for that profile
   const displayedProjects = useMemo(() => {
     if (!snapshot) return []
-    if (cosmicLevel1 === 'all') {
+    if (isMinimalLook || cosmicLevel1 === 'all') {
       return snapshot.projects.filter(
         (p) =>
           p.project.workflowStatus !== 'completed' &&
@@ -60,7 +69,7 @@ export function CosmicSidebarContent({
         p.project.workflowStatus !== 'completed' &&
         p.project.workflowStatus !== 'removed'
     )
-  }, [snapshot, cosmicLevel1])
+  }, [snapshot, cosmicLevel1, isMinimalLook])
 
   const handleLevel1Change = useCallback(
     (val: string) => {
@@ -83,9 +92,9 @@ export function CosmicSidebarContent({
     [snapshot, setCosmicNavigation]
   )
 
-  const isAllProjects = cosmicLevel1 === 'all'
+  const isAllProjects = isMinimalLook || cosmicLevel1 === 'all'
   const isProfileSelected = Boolean(
-    cosmicLevel1 && cosmicLevel1 !== 'all' && cosmicLevel1 !== 'global'
+    !isMinimalLook && cosmicLevel1 && cosmicLevel1 !== 'all' && cosmicLevel1 !== 'global'
   )
   const showCardsSection = isAllProjects || isProfileSelected
 
@@ -111,24 +120,45 @@ export function CosmicSidebarContent({
           borderBottom: showCardsSection ? '1px solid rgba(255, 255, 255, 0.06)' : 'none'
         }}
       >
-        <select
-          id="cosmic-level1-select"
-          aria-label="Dashboard"
-          value={cosmicLevel1}
-          onChange={(e) => handleLevel1Change(e.target.value)}
-          style={{
-            width: '100%',
-            padding: '7px 10px',
-            fontSize: '12.5px',
-            fontWeight: 600,
-            borderRadius: '7px',
-            background: 'color-mix(in srgb, var(--surface, #1e293b) 90%, black)',
-            color: '#fff',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
-            outline: 'none',
-            cursor: 'pointer'
-          }}
-        >
+        {isMinimalLook ? (
+          <div
+            style={{
+              width: '100%',
+              padding: '7px 10px',
+              fontSize: '12.5px',
+              fontWeight: 600,
+              borderRadius: '7px',
+              background: 'color-mix(in srgb, var(--surface, #1e293b) 90%, black)',
+              color: '#fff',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              boxSizing: 'border-box'
+            }}
+          >
+            <span>▦</span>
+            <span>All Projects</span>
+          </div>
+        ) : (
+          <select
+            id="cosmic-level1-select"
+            aria-label="Dashboard"
+            value={cosmicLevel1}
+            onChange={(e) => handleLevel1Change(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '7px 10px',
+              fontSize: '12.5px',
+              fontWeight: 600,
+              borderRadius: '7px',
+              background: 'color-mix(in srgb, var(--surface, #1e293b) 90%, black)',
+              color: '#fff',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              outline: 'none',
+              cursor: 'pointer'
+            }}
+          >
             <option value="all">▦ All Projects</option>
             <option value="global">🌐 Global Accounts</option>
             {selectableProfiles.length > 0 && (
@@ -147,6 +177,7 @@ export function CosmicSidebarContent({
               </optgroup>
             )}
           </select>
+        )}
       </div>
 
       {/* When All Projects or a Profile is selected: Show Profile & Dashboard buttons + compact projects list */}

@@ -1,8 +1,9 @@
 import type React from 'react'
-import { Fragment, useRef, useMemo, useState } from 'react'
+import { Fragment, useRef, useMemo, useState, useEffect } from 'react'
 import type { DashboardProject } from '../../../../shared/dashboard-contract'
 import type { CardView } from './card-view'
 import NavIcon from './nav-icons'
+import { AppIcon } from '../AppIcon'
 import { detailMeta } from './guide-model'
 import { useSidebarLayout } from './use-sidebar-layout'
 import { useProfileStore } from '../../hooks/useProfiles'
@@ -46,6 +47,7 @@ interface WorkspaceSidebarProps {
   onToggleCollapse: () => void
   onResize: (width: number) => void
   onOpenAdd?: () => void
+  sidebarLook?: 'minimal' | 'ancient' | 'new-cosmic'
 }
 
 /** Real counts only — a row with nothing in it is dimmed, never given a badge. */
@@ -167,12 +169,23 @@ export default function WorkspaceSidebar({
   onToggleConnector,
   onToggleCollapse,
   onResize,
-  onOpenAdd
+  onOpenAdd,
+  sidebarLook: propSidebarLook
 }: WorkspaceSidebarProps): React.ReactElement {
   const collapsed = nav.collapsed
   const asideRef = useRef<HTMLElement>(null)
   const { layout } = useSidebarLayout(projectId)
   const profiles = useProfileStore((s) => s.profiles)
+  const [appLook, setAppLook] = useState<'minimal' | 'ancient' | 'new-cosmic'>('ancient')
+
+  useEffect(() => {
+    void window.api?.app?.getSettings?.().then((s) => {
+      if (s?.sidebarLook) setAppLook(s.sidebarLook)
+    })
+  }, [])
+
+  const isMinimal = layout.mode === 'minimal' || propSidebarLook === 'minimal' || appLook === 'minimal'
+  const isAddHidden = isMinimal ? (layout.custom.hideAddButton ?? true) : Boolean(layout.custom.hideAddButton)
   const [globalAccountsOpen, setGlobalAccountsOpen] = useState(true)
 
   // Collect all globally available workspaces and links grouped across profiles
@@ -218,8 +231,8 @@ export default function WorkspaceSidebar({
   }, [globalProfileGroups])
 
   const activeSections = useMemo(() => {
-    if (layout.mode === 'minimal') {
-      return []
+    if (isMinimal) {
+      return NAV_SECTIONS.filter((s) => s.key === 'slack')
     }
     if (layout.mode === 'full') {
       return NAV_SECTIONS
@@ -237,7 +250,7 @@ export default function WorkspaceSidebar({
       if (idxB === -1) return -1
       return idxA - idxB
     })
-  }, [layout])
+  }, [isMinimal, layout])
 
   const rowActive = (row: NavRow): boolean =>
     nav.openGroup === sectionOfSelection(row.id) && nav.selection === row.id
@@ -382,7 +395,7 @@ export default function WorkspaceSidebar({
                 ) : section.key === 'slack' ? (
                   <>
                     {/* SECTION 1: GLOBAL ACCOUNTS */}
-                    {!layout.custom.hiddenItems?.['slack']?.includes('global_accounts') && (
+                    {!isMinimal && !layout.custom.hiddenItems?.['slack']?.includes('global_accounts') && (
                     <div className="ws-nav-group" style={{ marginBottom: 4 }}>
                       <button
                         type="button"
@@ -488,6 +501,9 @@ export default function WorkspaceSidebar({
 
                     {/* SECTION 2 & 3: MY ACCOUNTS & CLIENT ACCOUNTS (Platforms like Discord, Upwork, Teams appear inside these if added) */}
                     {NAV_CONNECTORS.filter((c) => {
+                      if (isMinimal) {
+                        return c.key === 'team'
+                      }
                       // Only show top-level My Accounts ('team') and Client Accounts ('client')
                       if (c.key !== 'team' && c.key !== 'client') return false
                       const hiddenSub = layout.custom.hiddenItems?.['slack'] ?? []
@@ -521,77 +537,157 @@ export default function WorkspaceSidebar({
                             <NavIcon name={connector.icon} />
                           </span>
                           <span className="ws-nav-label">{connector.label}</span>
-                          {(entries.length > 0 || extraSources.length > 0) && (
-                            <span className="ws-nav-count">{entries.length + extraSources.length}</span>
+                          {(entries.length > 0 || extraSources.length > 0 || isMinimal) && (
+                            <span className="ws-nav-count">
+                              {isMinimal ? 3 : entries.length + extraSources.length}
+                            </span>
                           )}
                           <Chevron open={open} />
                         </button>
                         {open && (
                           <>
-                            {allId && (
-                              <Row
-                                leaf
-                                label="All channels"
-                                title={connector.note}
-                                active={nav.selection === allId}
-                                onClick={() => onSelect(allId)}
-                              />
+                            {isMinimal ? (
+                              <>
+                                {/* 1. Slack */}
+                                <button
+                                  type="button"
+                                  className={`ws-nav-subitem${nav.selection === 's:team' || (nav.selection && nav.selection.startsWith('c:team')) ? ' is-active' : ''}`}
+                                  title="Slack Workspace & Channels"
+                                  onClick={() => onSelect('s:team')}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: '4px 12px 4px 28px',
+                                    width: '100%',
+                                    textAlign: 'left'
+                                  }}
+                                >
+                                  <span className="ws-nav-label" style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <AppIcon appId="slack" size={13} />
+                                    <span>Slack</span>
+                                  </span>
+                                  <span className="ws-nav-tag" style={{ fontSize: 10, opacity: 0.7 }}>
+                                    {entries.length > 0 ? `${entries.length} ch` : 'Active'}
+                                  </span>
+                                </button>
+
+                                {/* 2. Microsoft Teams */}
+                                <button
+                                  type="button"
+                                  className={`ws-nav-subitem${nav.selection?.startsWith('c:teams') ? ' is-active' : ''}`}
+                                  title="Microsoft Teams"
+                                  onClick={() => onSelect('c:teams:main')}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: '4px 12px 4px 28px',
+                                    width: '100%',
+                                    textAlign: 'left'
+                                  }}
+                                >
+                                  <span className="ws-nav-label" style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <AppIcon appId="teams" size={13} />
+                                    <span>Microsoft Teams</span>
+                                  </span>
+                                  <span className="ws-nav-tag" style={{ fontSize: 10, opacity: 0.7 }}>
+                                    Teams
+                                  </span>
+                                </button>
+
+                                {/* 3. WhatsApp */}
+                                <button
+                                  type="button"
+                                  className={`ws-nav-subitem${nav.selection?.startsWith('c:whatsapp') ? ' is-active' : ''}`}
+                                  title="WhatsApp"
+                                  onClick={() => onSelect('c:whatsapp:main')}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: '4px 12px 4px 28px',
+                                    width: '100%',
+                                    textAlign: 'left'
+                                  }}
+                                >
+                                  <span className="ws-nav-label" style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <AppIcon appId="whatsapp" size={13} />
+                                    <span>WhatsApp</span>
+                                  </span>
+                                  <span className="ws-nav-tag" style={{ fontSize: 10, opacity: 0.7 }}>
+                                    WhatsApp
+                                  </span>
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                {allId && (
+                                  <Row
+                                    leaf
+                                    label="All channels"
+                                    title={connector.note}
+                                    active={nav.selection === allId}
+                                    onClick={() => onSelect(allId)}
+                                  />
+                                )}
+                                {list?.loading && <p className="ws-nav-note">Loading channels…</p>}
+                                {list?.error && (
+                                  <p className="ws-nav-note is-error" style={{ fontSize: '11px', lineHeight: 1.4 }}>
+                                    {list.error.includes('token_revoked')
+                                      ? 'Client token revoked. Please reconnect token or use Browser Session.'
+                                      : list.error}
+                                  </p>
+                                )}
+                                {!list?.loading && !list?.error && entries.length === 0 && extraSources.length === 0 && (
+                                  <p className="ws-nav-note">{connector.note}</p>
+                                )}
+                                {entries.map((channel) => (
+                                  <Row
+                                    key={channel.id}
+                                    leaf
+                                    label={`#${channel.name}`}
+                                    tag={channel.watched ? 'synced' : undefined}
+                                    title={channel.name}
+                                    active={
+                                      nav.selection === channelSelectionId(connector.key, channel.id)
+                                    }
+                                    onClick={() =>
+                                      onSelect(channelSelectionId(connector.key, channel.id))
+                                    }
+                                  />
+                                ))}
+                                {extraSources.map((src: any) => (
+                                  <button
+                                    key={src.id}
+                                    type="button"
+                                    className="ws-nav-subitem"
+                                    title={src.url ? `${src.workspaceName} (${src.url})` : `${src.workspaceName} (${src.platform})`}
+                                    onClick={() => {
+                                      if (src.url) {
+                                        window.open(src.url, '_blank')
+                                      }
+                                    }}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      padding: '4px 12px 4px 28px',
+                                      width: '100%',
+                                      textAlign: 'left',
+                                      cursor: src.url ? 'pointer' : 'default'
+                                    }}
+                                  >
+                                    <span className="ws-nav-label" style={{ fontSize: 12 }}>
+                                      {src.url ? '🌐' : '🔌'} {src.workspaceName}
+                                    </span>
+                                    <span className="ws-nav-tag" style={{ fontSize: 10, opacity: 0.7, textTransform: 'capitalize' }}>
+                                      {src.url ? 'link ↗' : src.platform}
+                                    </span>
+                                  </button>
+                                ))}
+                              </>
                             )}
-                            {list?.loading && <p className="ws-nav-note">Loading channels…</p>}
-                            {list?.error && (
-                              <p className="ws-nav-note is-error" style={{ fontSize: '11px', lineHeight: 1.4 }}>
-                                {list.error.includes('token_revoked')
-                                  ? 'Client token revoked. Please reconnect token or use Browser Session.'
-                                  : list.error}
-                              </p>
-                            )}
-                            {!list?.loading && !list?.error && entries.length === 0 && extraSources.length === 0 && (
-                              <p className="ws-nav-note">{connector.note}</p>
-                            )}
-                            {entries.map((channel) => (
-                              <Row
-                                key={channel.id}
-                                leaf
-                                label={`#${channel.name}`}
-                                tag={channel.watched ? 'synced' : undefined}
-                                title={channel.name}
-                                active={
-                                  nav.selection === channelSelectionId(connector.key, channel.id)
-                                }
-                                onClick={() =>
-                                  onSelect(channelSelectionId(connector.key, channel.id))
-                                }
-                              />
-                            ))}
-                            {extraSources.map((src: any) => (
-                              <button
-                                key={src.id}
-                                type="button"
-                                className="ws-nav-subitem"
-                                title={src.url ? `${src.workspaceName} (${src.url})` : `${src.workspaceName} (${src.platform})`}
-                                onClick={() => {
-                                  if (src.url) {
-                                    window.open(src.url, '_blank')
-                                  }
-                                }}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  padding: '4px 12px 4px 28px',
-                                  width: '100%',
-                                  textAlign: 'left',
-                                  cursor: src.url ? 'pointer' : 'default'
-                                }}
-                              >
-                                <span className="ws-nav-label" style={{ fontSize: 12 }}>
-                                  {src.url ? '🌐' : '🔌'} {src.workspaceName}
-                                </span>
-                                <span className="ws-nav-tag" style={{ fontSize: 10, opacity: 0.7, textTransform: 'capitalize' }}>
-                                  {src.url ? 'link ↗' : src.platform}
-                                </span>
-                              </button>
-                            ))}
                           </>
                         )}
                       </div>
@@ -622,7 +718,7 @@ export default function WorkspaceSidebar({
         style={{
           display: collapsed ? 'flex' : 'grid',
           flexDirection: collapsed ? 'column' : undefined,
-          gridTemplateColumns: !collapsed ? (onOpenAdd && !layout.custom.hideAddButton ? '1fr 1fr' : '1fr') : undefined,
+          gridTemplateColumns: !collapsed ? (onOpenAdd && !isAddHidden ? '1fr 1fr' : '1fr') : undefined,
           gap: 6,
           padding: collapsed ? '8px 6px' : '8px 10px',
           alignItems: 'center',
@@ -630,7 +726,7 @@ export default function WorkspaceSidebar({
           boxSizing: 'border-box'
         }}
       >
-        {onOpenAdd && !layout.custom.hideAddButton && (
+        {onOpenAdd && !isAddHidden && (
           <button
             type="button"
             className="ws-nav-item ws-nav-add-btn"

@@ -373,7 +373,8 @@ export const ProfileSidebar = memo(function ProfileSidebar({
   const activeLook = propSidebarLook ?? 'ancient'
   const cosmicLevel1 = useDashboardStore((s) => s.cosmicLevel1)
   const isCosmicManagedMiddle =
-    activeLook === 'new-cosmic' && cosmicLevel1 !== 'global'
+    activeLook === 'minimal' ||
+    (activeLook === 'new-cosmic' && cosmicLevel1 !== 'global')
   const [profileExpanded, setProfileExpanded] = useState<Record<string, boolean>>({})
   const [appExpanded, setAppExpanded] = useState<Record<string, boolean>>({})
   const [renamingId, setRenamingId] = useState<string | null>(null)
@@ -555,6 +556,14 @@ export const ProfileSidebar = memo(function ProfileSidebar({
 
       {activeLook === 'new-cosmic' ? (
         <CosmicSidebarContent
+          profiles={profiles}
+          showCosmicProfileNavButtons={showCosmicProfileNavButtons}
+          onOpenProfilesHub={onOpenProfilesHub}
+          onNewProject={onNewProject}
+        />
+      ) : activeLook === 'minimal' ? (
+        <CosmicSidebarContent
+          isMinimalLook
           profiles={profiles}
           showCosmicProfileNavButtons={showCosmicProfileNavButtons}
           onOpenProfilesHub={onOpenProfilesHub}

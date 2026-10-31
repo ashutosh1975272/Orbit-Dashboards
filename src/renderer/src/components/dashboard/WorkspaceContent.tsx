@@ -15,6 +15,7 @@ import ProjectSettingsTab from './ProjectSettingsTab'
 import AgentChatPanel from './AgentChatPanel'
 import { requestMessageJump } from './jump-to-message'
 import SchedulesPage from './SchedulesPage'
+import { AppIcon } from '../AppIcon'
 import {
   channelIdOf,
   connectorOf,
@@ -171,6 +172,34 @@ export default function WorkspaceContent({
           profileId={pId}
           teamId={tId}
         />
+      )
+    } else if (sel && sel.startsWith('c:teams')) {
+      body = (
+        <div className="ws-agent">
+          <div className="ws-agent-empty">
+            <span className="ws-agent-empty-icon" style={{ display: 'inline-flex', padding: 8 }}>
+              <AppIcon appId="teams" size={36} />
+            </span>
+            <p className="ws-agent-empty-title">Microsoft Teams</p>
+            <p className="ws-agent-empty-hint">
+              Microsoft Teams integration for this card. Connect or open Teams from the app sidebar or profiles hub.
+            </p>
+          </div>
+        </div>
+      )
+    } else if (sel && sel.startsWith('c:whatsapp')) {
+      body = (
+        <div className="ws-agent">
+          <div className="ws-agent-empty">
+            <span className="ws-agent-empty-icon" style={{ display: 'inline-flex', padding: 8 }}>
+              <AppIcon appId="whatsapp" size={36} />
+            </span>
+            <p className="ws-agent-empty-title">WhatsApp</p>
+            <p className="ws-agent-empty-hint">
+              WhatsApp integration for this card. Connect or open WhatsApp from the app sidebar or profiles hub.
+            </p>
+          </div>
+        </div>
       )
     } else if (slackSourceOf(nav) === 'team' && !channels.teamConnected) {
       body = (

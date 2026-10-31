@@ -336,7 +336,9 @@ function App(): React.JSX.Element {
   const cosmicLevel1 = useDashboardStore((s) => s.cosmicLevel1)
   const cosmicSelectedCardId = useDashboardStore((s) => s.cosmicSelectedCardId)
   const isCosmicActive = settings.sidebarLook === 'new-cosmic'
-  const showCosmicCard = Boolean(isCosmicActive && cosmicSelectedCardId && !browserAuthBusy)
+  const isMinimalActive = settings.sidebarLook === 'minimal'
+  const isCosmicOrMinimal = isCosmicActive || isMinimalActive
+  const showCosmicCard = Boolean(isCosmicOrMinimal && cosmicSelectedCardId && !browserAuthBusy)
   const dashboardOpen = useDashboardStore((s) => s.dashboardOpen)
   const closeDashboard = useDashboardStore((s) => s.closeDashboard)
   const isCosmicProfileActive = Boolean(
@@ -344,7 +346,7 @@ function App(): React.JSX.Element {
   )
   const showDashboard =
     (dashboardOpen ||
-      (isCosmicActive && (cosmicLevel1 === 'all' || (isCosmicProfileActive && !cosmicSelectedCardId)))) &&
+      (isCosmicOrMinimal && (cosmicLevel1 === 'all' || isMinimalActive || (isCosmicProfileActive && !cosmicSelectedCardId)))) &&
     !browserAuthBusy &&
     !showCosmicCard
   const wizardOpen = useDashboardStore((s) => s.wizardOpenFor) != null
