@@ -14,6 +14,7 @@ import { modKey } from '../lib/shortcut-label'
 import { formatUnreadBadge, unreadKey } from '../lib/unread-badge'
 import { AppIcon } from './AppIcon'
 import { SidebarPanelIcon } from './SidebarPanelIcon'
+import { CosmicSidebarContent } from './dashboard/CosmicSidebarNav'
 
 interface RecentWorkspace {
   profileId: string
@@ -546,7 +547,18 @@ export const ProfileSidebar = memo(function ProfileSidebar({
         ) : null}
       </div>
 
-      {dashboardSlot}
+      {activeLook === 'new-cosmic' ? (
+        <CosmicSidebarContent
+          onAddPlatform={onAddPlatform}
+          onNewProject={onNewProject}
+          onNewProfile={onNewProfile}
+          onObserver={onObserver}
+          onOpenAccountsSettings={onOpenAccountsSettings}
+          onOpenProfilesHub={onOpenProfilesHub}
+        />
+      ) : (
+        <>
+          {dashboardSlot}
 
       {showRecentSection && visibleRecents.length > 0 ? (
         <div className="recent-strip" aria-label="Recent workspaces">
@@ -974,6 +986,8 @@ export const ProfileSidebar = memo(function ProfileSidebar({
           })
         )}
       </ul>
+    </>
+  )}
 
       {/* Observer View Header — shown only when enabled in Settings */}
       {showObserverViewHeader && (

@@ -13,6 +13,7 @@ import { LockOverlay } from './components/LockOverlay'
 import { ProfileSidebar } from './components/ProfileSidebar'
 import DashboardView from './components/dashboard/DashboardView'
 import DashboardRail from './components/dashboard/DashboardRail'
+import { CosmicWorkspaceView } from './components/dashboard/CosmicWorkspaceView'
 import { useDashboardStore } from './hooks/useDashboard'
 import { SettingsPanel } from './components/SettingsPanel'
 import { SidebarPanelIcon } from './components/SidebarPanelIcon'
@@ -332,9 +333,12 @@ function App(): React.JSX.Element {
       : localAuthPhase
 
   const browserAuthBusy = authPhase === 'google' || authPhase === 'slack'
+  const cosmicSelectedCardId = useDashboardStore((s) => s.cosmicSelectedCardId)
+  const isCosmicActive = settings.sidebarLook === 'new-cosmic'
+  const showCosmicCard = Boolean(isCosmicActive && cosmicSelectedCardId && !browserAuthBusy)
   const dashboardOpen = useDashboardStore((s) => s.dashboardOpen)
   const closeDashboard = useDashboardStore((s) => s.closeDashboard)
-  const showDashboard = dashboardOpen && !browserAuthBusy
+  const showDashboard = dashboardOpen && !browserAuthBusy && !showCosmicCard
   const wizardOpen = useDashboardStore((s) => s.wizardOpenFor) != null
   const splitOn =
     settings.splitViewEnabled && Boolean(splitSecondary) && !browserAuthBusy && !locked
@@ -346,6 +350,7 @@ function App(): React.JSX.Element {
     activeProfile &&
     (activeAppId || activeCustomLinkId) &&
     !dashboardOpen &&
+    !showCosmicCard &&
     !wizardOpen &&
     !browserAuthBusy &&
     !locked &&
@@ -933,7 +938,9 @@ function App(): React.JSX.Element {
             </div>
           ) : null}
 
-          {showDashboard ? (
+          {showCosmicCard ? (
+            <CosmicWorkspaceView />
+          ) : showDashboard ? (
             <DashboardView />
           ) : showEmbed ? (
             <div className={`main-embed${splitOn ? ' is-split' : ''}`}>
@@ -946,7 +953,7 @@ function App(): React.JSX.Element {
             </div>
           ) : null}
 
-          {!browserAuthBusy && !showEmbed && !dashboardOpen && !locked ? (
+          {!browserAuthBusy && !showEmbed && !dashboardOpen && !showCosmicCard && !locked ? (
             <div className="empty-main">
               <img className="empty-main-icon" src={appIcon} alt="" aria-hidden />
               <h1>{emptyCopy.title}</h1>

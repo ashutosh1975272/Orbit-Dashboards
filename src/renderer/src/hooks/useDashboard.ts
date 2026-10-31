@@ -23,6 +23,11 @@ interface DashboardState {
   dashRailExpanded: boolean
   /** v2.3 — the "Recent" strip (one item per workspace, importance ranked) */
   recent: RecentActivity[]
+  /** Cosmic look: Level 1 selection ('all' | 'global' | profileId) */
+  cosmicLevel1: string
+  /** Cosmic look: Level 2 active project card id if selected */
+  cosmicSelectedCardId: string | null
+  setCosmicNavigation: (level1: string, cardId?: string | null) => void
 
   openDashboard: (appId?: 'slack') => void
   closeDashboard: () => void
@@ -59,6 +64,14 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   dashboardAppId: null,
   snapshot: null,
   recent: [],
+  cosmicLevel1: 'all',
+  cosmicSelectedCardId: null,
+  setCosmicNavigation: (level1, cardId = null) =>
+    set({
+      cosmicLevel1: level1,
+      cosmicSelectedCardId: cardId,
+      dashboardOpen: level1 === 'all' || cardId !== null
+    }),
   loading: false,
   syncingProjectIds: [],
   progress: null,
