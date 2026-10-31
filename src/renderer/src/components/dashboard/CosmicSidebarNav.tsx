@@ -95,7 +95,7 @@ export function CosmicSidebarContent({
       style={{
         display: 'flex',
         flexDirection: 'column',
-        flex: 1,
+        flex: showCardsSection ? 1 : '0 0 auto',
         minHeight: 0,
         gap: '4px'
       }}
@@ -104,11 +104,11 @@ export function CosmicSidebarContent({
       <div
         className="cosmic-nav-selectors"
         style={{
-          padding: '4px 10px 8px',
+          padding: showCardsSection ? '4px 10px 8px' : '0 0 2px',
           display: 'flex',
           flexDirection: 'column',
-          background: 'rgba(255, 255, 255, 0.02)',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
+          background: showCardsSection ? 'rgba(255, 255, 255, 0.02)' : 'transparent',
+          borderBottom: showCardsSection ? '1px solid rgba(255, 255, 255, 0.06)' : 'none'
         }}
       >
         <select
