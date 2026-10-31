@@ -8,10 +8,11 @@ import { CardAddModal } from './CardAddModal'
 import { buildCardView } from './card-view'
 import { buildConnectorChannelLists } from './workspace-nav'
 import type { DashboardTeamWorkspace } from '../../../../shared/dashboard-contract'
-import { profileDisplayLabel, isIndividualProfile } from '../../../../shared/types'
+import { profileDisplayLabel, Profile } from '../../../../shared/types'
 
 interface CosmicSidebarContentProps {
-  onAddPlatform: () => void
+  profiles?: Profile[]
+  onAddPlatform?: () => void
   onNewProject?: () => void
   onNewProfile?: () => void
   onObserver?: () => void
@@ -20,6 +21,7 @@ interface CosmicSidebarContentProps {
 }
 
 export function CosmicSidebarContent({
+  profiles: propProfiles,
   onAddPlatform: _onAddPlatform,
   onNewProject: _onNewProject,
   onNewProfile: _onNewProfile,
@@ -32,7 +34,8 @@ export function CosmicSidebarContent({
   const setCosmicNavigation = useDashboardStore((s) => s.setCosmicNavigation)
   const snapshot = useDashboardStore((s) => s.snapshot)
   const loadSnapshot = useDashboardStore((s) => s.loadSnapshot)
-  const profiles = useProfileStore((s) => s.profiles)
+  const storeProfiles = useProfileStore((s) => s.profiles)
+  const profiles = propProfiles && propProfiles.length > 0 ? propProfiles : storeProfiles
 
   const [cardAddOpen, setCardAddOpen] = useState(false)
   const [teamWorkspace, setTeamWorkspace] = useState<DashboardTeamWorkspace | null>(null)
@@ -66,10 +69,9 @@ export function CosmicSidebarContent({
     }
   }, [])
 
-  // Filter individual / selectable profiles
+  // All selectable user profiles (exclude special global-account-profile singleton)
   const selectableProfiles = useMemo(() => {
-    const individual = profiles.filter(isIndividualProfile)
-    return individual.length > 0 ? individual : profiles
+    return profiles.filter((p) => p.id !== 'global-account-profile')
   }, [profiles])
 
   // Active projects for the selected profile in Level 1 (excluding completed & removed)
@@ -84,6 +86,17 @@ export function CosmicSidebarContent({
         p.project.workflowStatus !== 'removed'
     )
   }, [snapshot, cosmicLevel1])
+
+  // When a profile is selected in Level 1, if active projects exist and none is selected, auto-select first project
+  useEffect(() => {
+    const isProfile = Boolean(cosmicLevel1 && cosmicLevel1 !== 'all' && cosmicLevel1 !== 'global')
+    if (isProfile && activeProfileProjects.length > 0) {
+      const currentValid = activeProfileProjects.some((p) => p.project.id === cosmicSelectedCardId)
+      if (!currentValid) {
+        setCosmicNavigation(cosmicLevel1, activeProfileProjects[0]!.project.id)
+      }
+    }
+  }, [cosmicLevel1, activeProfileProjects, cosmicSelectedCardId, setCosmicNavigation])
 
   // Selected project snapshot
   const activeProjectSnapshot = useMemo(() => {
@@ -169,78 +182,81 @@ export function CosmicSidebarContent({
     cosmicLevel1 && cosmicLevel1 !== 'all' && cosmicLevel1 !== 'global'
   )
 
-  return (
-    <div
-      className="cosmic-sidebar-wrapper"
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        flex: 1,
-        minHeight: 0,
-        overflow: 'hidden'
-      }}
-    >
-      {/* Dropdowns Navigation Container */}
+  // When a card is selected in Cosmic Look, render its full in-sidebar workspace navigation
+  if (isProfileSelected && activeProjectSnapshot && cardView && project) {
+    return (
       <div
-        className="cosmic-nav-selectors"
+        className="cosmic-sidebar-wrapper"
         style={{
-          padding: '8px 10px 10px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '8px',
-          background: 'rgba(255, 255, 255, 0.02)',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
+          flex: 1,
+          minHeight: 0,
+          overflow: 'hidden'
         }}
       >
-        {/* Level 1 Selector */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-          <label
-            htmlFor="cosmic-level1-select"
-            style={{
-              fontSize: '10.5px',
-              fontWeight: 650,
-              textTransform: 'uppercase',
-              letterSpacing: '0.06em',
-              color: 'var(--text-faint, #64748b)'
-            }}
-          >
-            Navigation
-          </label>
-          <select
-            id="cosmic-level1-select"
-            value={cosmicLevel1}
-            onChange={(e) => handleLevel1Change(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '7px 10px',
-              fontSize: '12.5px',
-              fontWeight: 600,
-              borderRadius: '7px',
-              background: 'color-mix(in srgb, var(--surface, #1e293b) 90%, black)',
-              color: '#fff',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              outline: 'none',
-              cursor: 'pointer'
-            }}
-          >
-            <option value="all">▦ All Projects</option>
-            <option value="global">🌐 Global Accounts</option>
-            <optgroup label="Profiles">
-              {selectableProfiles.map((p) => {
-                const label = profileDisplayLabel(p)
-                const emailSuffix = p.displayName && p.displayName !== label ? ` (${p.displayName})` : ''
-                return (
-                  <option key={p.id} value={p.id}>
-                    👤 {label}{emailSuffix}
-                  </option>
-                )
-              })}
-            </optgroup>
-          </select>
-        </div>
+        {/* Dropdowns Navigation Container */}
+        <div
+          className="cosmic-nav-selectors"
+          style={{
+            padding: '8px 10px 10px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            background: 'rgba(255, 255, 255, 0.02)',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
+          }}
+        >
+          {/* Level 1 Selector */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+            <label
+              htmlFor="cosmic-level1-select"
+              style={{
+                fontSize: '10.5px',
+                fontWeight: 650,
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                color: 'var(--text-faint, #64748b)'
+              }}
+            >
+              Navigation
+            </label>
+            <select
+              id="cosmic-level1-select"
+              value={cosmicLevel1}
+              onChange={(e) => handleLevel1Change(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '7px 10px',
+                fontSize: '12.5px',
+                fontWeight: 600,
+                borderRadius: '7px',
+                background: 'color-mix(in srgb, var(--surface, #1e293b) 90%, black)',
+                color: '#fff',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                outline: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              <option value="all">▦ All Projects</option>
+              <option value="global">🌐 Global Accounts</option>
+              <optgroup label="Profiles">
+                {selectableProfiles.map((p) => {
+                  const label = profileDisplayLabel(p)
+                  const emailSuffix =
+                    p.displayName && p.displayName !== label ? ` (${p.displayName})` : ''
+                  return (
+                    <option key={p.id} value={p.id}>
+                      👤 {label}
+                      {emailSuffix}
+                    </option>
+                  )
+                })}
+              </optgroup>
+            </select>
+          </div>
 
-        {/* Level 2 Selector (Active projects for selected profile) */}
-        {isProfileSelected && (
+          {/* Level 2 Selector */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
             <label
               htmlFor="cosmic-level2-select"
@@ -284,75 +300,155 @@ export function CosmicSidebarContent({
               )}
             </select>
           </div>
-        )}
-      </div>
+        </div>
 
-      {/* Main Body of Sidebar in Cosmic mode */}
-      <div
-        className="cosmic-sidebar-body"
-        style={{
-          flex: 1,
-          minHeight: 0,
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          display: 'flex',
-          flexDirection: 'column'
-        }}
-      >
-        {isProfileSelected && activeProjectSnapshot && cardView && project ? (
-          <div
-            className="cosmic-card-nav-container"
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              flex: 1,
-              minHeight: 0
-            }}
-          >
-            <WorkspaceSidebar
-              projectId={project.id}
-              sources={project.sources}
-              view={cardView}
-              nav={navControl.nav}
-              channels={channelLists}
-              onOpenGroup={navControl.openGroup}
-              onSelect={navControl.select}
-              onToggleSection={navControl.toggleSection}
-              onToggleInfoGroup={navControl.toggleInfoGroup}
-              onToggleConnector={navControl.toggleConnector}
-              onToggleCollapse={navControl.toggleCollapse}
-              onResize={navControl.resize}
-              onOpenAdd={() => setCardAddOpen(true)}
+        <div
+          className="cosmic-sidebar-body"
+          style={{
+            flex: 1,
+            minHeight: 0,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            display: 'flex',
+            flexDirection: 'column'
+          }}
+        >
+          <WorkspaceSidebar
+            projectId={project.id}
+            sources={project.sources}
+            view={cardView}
+            nav={navControl.nav}
+            channels={channelLists}
+            onOpenGroup={navControl.openGroup}
+            onSelect={navControl.select}
+            onToggleSection={navControl.toggleSection}
+            onToggleInfoGroup={navControl.toggleInfoGroup}
+            onToggleConnector={navControl.toggleConnector}
+            onToggleCollapse={navControl.toggleCollapse}
+            onResize={navControl.resize}
+            onOpenAdd={() => setCardAddOpen(true)}
+          />
+
+          {cardAddOpen && (
+            <CardAddModal
+              open={cardAddOpen}
+              project={project}
+              onClose={() => setCardAddOpen(false)}
             />
+          )}
+        </div>
+      </div>
+    )
+  }
 
-            {cardAddOpen && (
-              <CardAddModal
-                open={cardAddOpen}
-                project={project}
-                onClose={() => setCardAddOpen(false)}
-              />
-            )}
-          </div>
-        ) : (
-          <div
+  // Otherwise, return just the Level 1 and Level 2 selectors at the top so the main sidebar rules (recent workspaces, google email, profile tree) render cleanly below it!
+  return (
+    <div
+      className="cosmic-nav-selectors"
+      style={{
+        padding: '8px 10px 10px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+        background: 'rgba(255, 255, 255, 0.02)',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
+      }}
+    >
+      {/* Level 1 Selector */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+        <label
+          htmlFor="cosmic-level1-select"
+          style={{
+            fontSize: '10.5px',
+            fontWeight: 650,
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+            color: 'var(--text-faint, #64748b)'
+          }}
+        >
+          Navigation
+        </label>
+        <select
+          id="cosmic-level1-select"
+          value={cosmicLevel1}
+          onChange={(e) => handleLevel1Change(e.target.value)}
+          style={{
+            width: '100%',
+            padding: '7px 10px',
+            fontSize: '12.5px',
+            fontWeight: 600,
+            borderRadius: '7px',
+            background: 'color-mix(in srgb, var(--surface, #1e293b) 90%, black)',
+            color: '#fff',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            outline: 'none',
+            cursor: 'pointer'
+          }}
+        >
+          <option value="all">▦ All Projects</option>
+          <option value="global">🌐 Global Accounts</option>
+          <optgroup label="Profiles">
+            {selectableProfiles.map((p) => {
+              const label = profileDisplayLabel(p)
+              const emailSuffix =
+                p.displayName && p.displayName !== label ? ` (${p.displayName})` : ''
+              return (
+                <option key={p.id} value={p.id}>
+                  👤 {label}
+                  {emailSuffix}
+                </option>
+              )
+            })}
+          </optgroup>
+        </select>
+      </div>
+
+      {/* Level 2 Selector (Active projects for selected profile) */}
+      {isProfileSelected && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+          <label
+            htmlFor="cosmic-level2-select"
             style={{
-              padding: '24px 16px',
-              textAlign: 'center',
-              color: 'var(--text-faint, #64748b)',
-              fontSize: '12.5px',
-              lineHeight: 1.5
+              fontSize: '10.5px',
+              fontWeight: 650,
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              color: 'var(--text-faint, #64748b)'
             }}
           >
-            {cosmicLevel1 === 'all' ? (
-              <p>Viewing all projects in full-screen view. Select a profile above to manage individual cards.</p>
-            ) : cosmicLevel1 === 'global' ? (
-              <p>Viewing global accounts workspace. Select a profile or project to expand its card.</p>
+            Active Workspace Card
+          </label>
+          <select
+            id="cosmic-level2-select"
+            value={cosmicSelectedCardId ?? ''}
+            onChange={(e) => handleLevel2Change(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '7px 10px',
+              fontSize: '12.5px',
+              fontWeight: 600,
+              borderRadius: '7px',
+              background: 'color-mix(in srgb, var(--surface, #1e293b) 90%, black)',
+              color: '#fff',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              outline: 'none',
+              cursor: 'pointer'
+            }}
+          >
+            {activeProfileProjects.length === 0 ? (
+              <option value="" disabled>
+                No active projects
+              </option>
             ) : (
-              <p>No active project cards found for this profile. Use + Project below to create one.</p>
+              activeProfileProjects.map((entry) => (
+                <option key={entry.project.id} value={entry.project.id}>
+                  📁 {entry.project.name || entry.project.teamName || 'Project'}
+                </option>
+              ))
             )}
-          </div>
-        )}
-      </div>
+          </select>
+        </div>
+      )}
     </div>
   )
 }

@@ -333,12 +333,16 @@ function App(): React.JSX.Element {
       : localAuthPhase
 
   const browserAuthBusy = authPhase === 'google' || authPhase === 'slack'
+  const cosmicLevel1 = useDashboardStore((s) => s.cosmicLevel1)
   const cosmicSelectedCardId = useDashboardStore((s) => s.cosmicSelectedCardId)
   const isCosmicActive = settings.sidebarLook === 'new-cosmic'
   const showCosmicCard = Boolean(isCosmicActive && cosmicSelectedCardId && !browserAuthBusy)
   const dashboardOpen = useDashboardStore((s) => s.dashboardOpen)
   const closeDashboard = useDashboardStore((s) => s.closeDashboard)
-  const showDashboard = dashboardOpen && !browserAuthBusy && !showCosmicCard
+  const showDashboard =
+    (dashboardOpen || (isCosmicActive && cosmicLevel1 === 'all')) &&
+    !browserAuthBusy &&
+    !showCosmicCard
   const wizardOpen = useDashboardStore((s) => s.wizardOpenFor) != null
   const splitOn =
     settings.splitViewEnabled && Boolean(splitSecondary) && !browserAuthBusy && !locked
@@ -349,7 +353,7 @@ function App(): React.JSX.Element {
     adminAuthenticated &&
     activeProfile &&
     (activeAppId || activeCustomLinkId) &&
-    !dashboardOpen &&
+    !showDashboard &&
     !showCosmicCard &&
     !wizardOpen &&
     !browserAuthBusy &&

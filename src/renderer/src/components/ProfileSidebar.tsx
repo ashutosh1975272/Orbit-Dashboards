@@ -1,5 +1,6 @@
 import { memo, useMemo, useState } from 'react'
 import { useProfileStore } from '../hooks/useProfiles'
+import { useDashboardStore } from '../hooks/useDashboard'
 import { APP_DISPLAY_NAME } from '../../../shared/brand'
 import type { AppId, AppSession, AppSessionStatus, CustomLink, Profile } from '../../../shared/types'
 import {
@@ -367,6 +368,7 @@ export const ProfileSidebar = memo(function ProfileSidebar({
   },
   onLookChange
 }: ProfileSidebarProps): React.JSX.Element {
+  const cosmicSelectedCardId = useDashboardStore((s) => s.cosmicSelectedCardId)
   const [profileExpanded, setProfileExpanded] = useState<Record<string, boolean>>({})
   const [appExpanded, setAppExpanded] = useState<Record<string, boolean>>({})
   const [renamingId, setRenamingId] = useState<string | null>(null)
@@ -548,19 +550,15 @@ export const ProfileSidebar = memo(function ProfileSidebar({
       </div>
 
       {activeLook === 'new-cosmic' ? (
-        <CosmicSidebarContent
-          onAddPlatform={onAddPlatform}
-          onNewProject={onNewProject}
-          onNewProfile={onNewProfile}
-          onObserver={onObserver}
-          onOpenAccountsSettings={onOpenAccountsSettings}
-          onOpenProfilesHub={onOpenProfilesHub}
-        />
+        <CosmicSidebarContent profiles={profiles} />
       ) : (
-        <>
-          {dashboardSlot}
+        dashboardSlot
+      )}
 
-      {showRecentSection && visibleRecents.length > 0 ? (
+      {/* When a specific project card is selected in Cosmic Look, CosmicSidebarContent handles its in-sidebar workspace tools */}
+      {!(activeLook === 'new-cosmic' && Boolean(cosmicSelectedCardId)) && (
+        <>
+          {showRecentSection && visibleRecents.length > 0 ? (
         <div className="recent-strip" aria-label="Recent workspaces">
           <div className="recent-strip-head">
             <p className="recent-label">Recent</p>
@@ -986,8 +984,8 @@ export const ProfileSidebar = memo(function ProfileSidebar({
           })
         )}
       </ul>
-    </>
-  )}
+      </>
+      )}
 
       {/* Observer View Header — shown only when enabled in Settings */}
       {showObserverViewHeader && (
