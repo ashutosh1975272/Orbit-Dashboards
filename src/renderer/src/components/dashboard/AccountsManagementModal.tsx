@@ -9,7 +9,6 @@ import {
 } from '../../../../shared/types'
 import { useDashboardStore } from '../../hooks/useDashboard'
 import { useProfileStore } from '../../hooks/useProfiles'
-import { POPULAR_PRESETS } from './AddPlatformPage'
 
 export type HubNavSection = 'observer' | 'global' | 'individual'
 
@@ -31,8 +30,8 @@ export function AccountsManagementModal({
   onNewProject,
   onNewProfile,
   onAddGoogleAccount,
-  onSelectProfile,
-  onOpenCustomLink
+  onSelectProfile: _onSelectProfile,
+  onOpenCustomLink: _onOpenCustomLink
 }: AccountsManagementModalProps): React.JSX.Element | null {
   const profiles = useProfileStore((s) => s.profiles)
   const activeProfileId = useProfileStore((s) => s.activeProfileId)
@@ -53,12 +52,7 @@ export function AccountsManagementModal({
 
   // Project Filter State: 'all' | 'active' | 'stopped' | 'archived'
   const [projectStatusFilter, setProjectStatusFilter] = useState<'all' | 'active' | 'stopped' | 'archived'>('all')
-
-  // Adding Custom Link state
-  const [addingLinkForProfileId, setAddingLinkForProfileId] = useState<string | null>(null)
-  const [customName, setCustomName] = useState('')
-  const [customUrl, setCustomUrl] = useState('')
-  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [errorMsg] = useState<string | null>(null)
 
   // Ensure snapshot is loaded when hub opens
   useEffect(() => {
@@ -144,41 +138,6 @@ export function AccountsManagementModal({
       }))
     } catch (err) {
       console.error('Failed to toggle profile sidebar visibility', err)
-    }
-  }, [])
-
-  const handleToggleLinkVisibility = useCallback(async (profileId: string, link: CustomLink) => {
-    try {
-      const nextHidden = !link.hiddenInSidebar
-      const updated = await window.api.profiles.setLinkHiddenInSidebar(profileId, link.id, nextHidden)
-      useProfileStore.setState((prev) => ({
-        profiles: prev.profiles.map((p) => (p.id === updated.id ? updated : p))
-      }))
-    } catch (err) {
-      console.error('Failed to toggle link sidebar visibility', err)
-    }
-  }, [])
-
-  const handleRemoveLink = useCallback(async (profileId: string, linkId: string) => {
-    try {
-      const updated = await window.api.profiles.removeCustomLink(profileId, linkId)
-      useProfileStore.setState((prev) => ({
-        profiles: prev.profiles.map((p) => (p.id === updated.id ? updated : p))
-      }))
-    } catch (err) {
-      console.error('Failed to remove custom link', err)
-    }
-  }, [])
-
-  const handleAddPresetToProfile = useCallback(async (profileId: string, name: string, url: string) => {
-    setErrorMsg(null)
-    try {
-      const updated = await window.api.profiles.addCustomLink(profileId, { name, url })
-      useProfileStore.setState((prev) => ({
-        profiles: prev.profiles.map((p) => (p.id === updated.id ? updated : p))
-      }))
-    } catch (err: unknown) {
-      setErrorMsg(err instanceof Error ? err.message : String(err))
     }
   }, [])
 
@@ -845,165 +804,6 @@ export function AccountsManagementModal({
                           </div>
                         )
                       })}
-                    </div>
-                  )}
-                </div>
-
-                {/* Section: Custom Tabs & AI Agents */}
-                <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                    <div>
-                      <h4 style={{ margin: 0, fontSize: '14.5px', fontWeight: 600, color: '#e2e8f0' }}>
-                        Custom Tabs &amp; AI Agents ({currentProfile.customLinks?.length || 0})
-                      </h4>
-                      <p style={{ margin: '2px 0 0', fontSize: '11.5px', color: '#64748b' }}>
-                        Scoped to this individual profile and available inside its project cards (isolated from global sidebar).
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      className="btn ghost btn-sm"
-                      style={{ fontSize: '12px', padding: '4px 10px' }}
-                      onClick={() =>
-                        setAddingLinkForProfileId(
-                          addingLinkForProfileId === currentProfile.id ? null : currentProfile.id
-                        )
-                      }
-                    >
-                      {addingLinkForProfileId === currentProfile.id ? 'Cancel' : '+ Add custom link'}
-                    </button>
-                  </div>
-
-                  {/* 1-Click Presets */}
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
-                    {POPULAR_PRESETS.slice(0, 6).map((preset) => (
-                      <button
-                        key={preset.name}
-                        type="button"
-                        className="btn ghost btn-sm"
-                        style={{ padding: '4px 8px', fontSize: '11.5px', display: 'flex', alignItems: 'center', gap: '5px' }}
-                        onClick={() => handleAddPresetToProfile(currentProfile.id, preset.name, preset.url)}
-                      >
-                        <span>{preset.icon}</span> + {preset.name}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Inline Form */}
-                  {addingLinkForProfileId === currentProfile.id && (
-                    <div
-                      style={{
-                        background: 'rgba(15, 23, 42, 0.6)',
-                        padding: '12px 14px',
-                        borderRadius: '6px',
-                        display: 'flex',
-                        gap: '8px',
-                        marginBottom: '12px',
-                        border: '1px solid rgba(255, 255, 255, 0.08)'
-                      }}
-                    >
-                      <input
-                        type="text"
-                        placeholder="Name (e.g. Claude)"
-                        value={customName}
-                        onChange={(e) => setCustomName(e.target.value)}
-                        style={{
-                          flex: 1,
-                          padding: '6px 8px',
-                          fontSize: '0.82rem',
-                          background: '#0a0f1d',
-                          color: '#fff',
-                          border: '1px solid rgba(255,255,255,0.1)',
-                          borderRadius: '4px'
-                        }}
-                      />
-                      <input
-                        type="url"
-                        placeholder="https://..."
-                        value={customUrl}
-                        onChange={(e) => setCustomUrl(e.target.value)}
-                        style={{
-                          flex: 2,
-                          padding: '6px 8px',
-                          fontSize: '0.82rem',
-                          background: '#0a0f1d',
-                          color: '#fff',
-                          border: '1px solid rgba(255,255,255,0.1)',
-                          borderRadius: '4px'
-                        }}
-                      />
-                      <button
-                        type="button"
-                        className="btn primary btn-sm"
-                        style={{ padding: '6px 14px', fontSize: '0.8rem' }}
-                        onClick={async () => {
-                          await handleAddPresetToProfile(currentProfile.id, customName, customUrl)
-                          setCustomName('')
-                          setCustomUrl('')
-                          setAddingLinkForProfileId(null)
-                        }}
-                        disabled={!customName.trim() || !customUrl.trim()}
-                      >
-                        Add
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Existing Links List */}
-                  {(currentProfile.customLinks || []).length > 0 ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '8px' }}>
-                      {(currentProfile.customLinks || []).map((link) => (
-                        <div
-                          key={link.id}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '6px 10px',
-                            background: 'rgba(15, 23, 42, 0.4)',
-                            borderRadius: '6px',
-                            border: '1px solid rgba(255, 255, 255, 0.06)',
-                            fontSize: '0.82rem'
-                          }}
-                        >
-                          <div
-                            style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, cursor: 'pointer' }}
-                            onClick={() => {
-                              onSelectProfile?.(currentProfile.id)
-                              onOpenCustomLink?.(currentProfile.id, link)
-                              onClose()
-                            }}
-                            title={`Open ${link.name}`}
-                          >
-                            <span>🌐</span>
-                            <span style={{ color: '#e2e8f0', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {link.name}
-                            </span>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <button
-                              type="button"
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.75rem', color: link.hiddenInSidebar ? '#64748b' : '#60a5fa' }}
-                              onClick={() => handleToggleLinkVisibility(currentProfile.id, link)}
-                              title={link.hiddenInSidebar ? 'Hidden in sidebar (click to show)' : 'Visible in sidebar (click to hide)'}
-                            >
-                              {link.hiddenInSidebar ? '🚫' : '👁'}
-                            </button>
-                            <button
-                              type="button"
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.85rem', color: '#94a3b8' }}
-                              onClick={() => handleRemoveLink(currentProfile.id, link.id)}
-                              title="Remove link"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: '12px', color: '#64748b', fontStyle: 'italic' }}>
-                      No custom links added for this profile yet.
                     </div>
                   )}
                 </div>

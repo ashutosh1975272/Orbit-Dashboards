@@ -120,11 +120,11 @@ export function isGlobalAccountProfile(profile: Profile): boolean {
 
 /** Strictly check if a profile is an Individual Profile */
 export function isIndividualProfile(profile: Profile): boolean {
-  const scope = profile.accountScope
-  if (scope === 'both') return true
   if (isGlobalAccountProfile(profile)) return false
+  const scope = profile.accountScope
   if (scope === 'observer') return false
-  return scope === 'individual' || profile.hiddenInSidebar === true
+  if (scope === 'individual') return true
+  return profile.hiddenInSidebar === true
 }
 
 export interface ProfileSessionStatusPayload {
