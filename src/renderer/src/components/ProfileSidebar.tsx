@@ -996,117 +996,129 @@ export const ProfileSidebar = memo(function ProfileSidebar({
       </>
       )}
 
-      {/* Observer View Header — shown only when enabled in Settings */}
-      {showObserverViewHeader && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '8px 4px 2px',
-            marginTop: '6px',
-            userSelect: 'none'
-          }}
-          aria-label="Observer View section"
-        >
-          <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
-          <span
+      {/* Permanent Bottom Actions Container — Pinned at the very bottom across all looks */}
+      <div
+        className="sidebar-bottom-actions-pinned"
+        style={{
+          marginTop: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          width: '100%',
+          flexShrink: 0
+        }}
+      >
+        {/* Observer View Header — shown only when enabled in Settings */}
+        {showObserverViewHeader && (
+          <div
             style={{
-              fontSize: '9.5px',
-              fontWeight: 700,
-              color: '#64748b',
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase'
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 4px 2px',
+              marginTop: '6px',
+              userSelect: 'none'
             }}
+            aria-label="Observer View section"
           >
-            Observer View
-          </span>
-          <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
+            <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
+            <span
+              style={{
+                fontSize: '9.5px',
+                fontWeight: 700,
+                color: '#64748b',
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase'
+              }}
+            >
+              Observer View
+            </span>
+            <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
+          </div>
+        )}
+
+        <div className="nav-action-compact-container">
+          {/* Configurable Action: + Website */}
+          {sidebarButtons.addWebsite !== false ? (
+            <button
+              type="button"
+              className="nav-action-compact-btn nav-btn-prominent"
+              onClick={onAddPlatform}
+              title="Add Website or Web Platform"
+              aria-label="Add Website"
+            >
+              <span className="nav-btn-icon" style={{ fontSize: '14px' }}>🌐</span>
+              <span className="nav-btn-text" style={{ fontWeight: 650 }}>+ Website</span>
+            </button>
+          ) : null}
+
+          {/* Configurable Action: + Project */}
+          {sidebarButtons.newProject !== false && onNewProject ? (
+            <button
+              type="button"
+              className="nav-action-compact-btn"
+              onClick={onNewProject}
+              title="Create New Project / Workspace"
+              aria-label="New Project"
+            >
+              <span className="nav-btn-icon">📁</span>
+              <span className="nav-btn-text">+ Project</span>
+            </button>
+          ) : null}
+
+          {/* Configurable Action: + Profile */}
+          {sidebarButtons.newProfile !== false && onNewProfile ? (
+            <button
+              type="button"
+              className="nav-action-compact-btn"
+              onClick={onNewProfile}
+              title="Create New Profile / Account"
+              aria-label="New Profile"
+            >
+              <span className="nav-btn-icon">👤</span>
+              <span className="nav-btn-text">+ Profile</span>
+            </button>
+          ) : null}
+
+          {/* Permanent Action: ⚙️ Settings */}
+          <button
+            type="button"
+            className="nav-action-compact-btn nav-settings-btn"
+            onClick={onOpenAccountsSettings}
+            title="Global Settings Hub"
+            aria-label="Settings"
+          >
+            <span className="nav-btn-icon">⚙️</span>
+            <span className="nav-btn-text">Settings</span>
+          </button>
+
+          {/* Configurable Action: 🔭 Observer */}
+          {sidebarButtons.observer !== false && onObserver ? (
+            <button
+              type="button"
+              className="nav-action-compact-btn"
+              onClick={onObserver}
+              title="Observer Mode &amp; Channels"
+              aria-label="Observer"
+            >
+              <span className="nav-btn-icon">🔭</span>
+              <span className="nav-btn-text">Observer</span>
+            </button>
+          ) : null}
+
+          {/* Configurable Action: 👥 Profiles */}
+          {sidebarButtons.profilesHub !== false ? (
+            <button
+              type="button"
+              className="nav-action-compact-btn"
+              onClick={onOpenProfilesHub || onOpenAccountsSettings}
+              title="Profiles &amp; Accounts Management"
+              aria-label="Profiles"
+            >
+              <span className="nav-btn-icon">👥</span>
+              <span className="nav-btn-text">Profiles</span>
+            </button>
+          ) : null}
         </div>
-      )}
-
-      <div className="nav-action-compact-container">
-        {/* Configurable Action: + Website */}
-        {sidebarButtons.addWebsite !== false ? (
-          <button
-            type="button"
-            className="nav-action-compact-btn nav-btn-prominent"
-            onClick={onAddPlatform}
-            title="Add Website or Web Platform"
-            aria-label="Add Website"
-          >
-            <span className="nav-btn-icon" style={{ fontSize: '14px' }}>🌐</span>
-            <span className="nav-btn-text" style={{ fontWeight: 650 }}>+ Website</span>
-          </button>
-        ) : null}
-
-        {/* Configurable Action: + Project */}
-        {sidebarButtons.newProject !== false && onNewProject ? (
-          <button
-            type="button"
-            className="nav-action-compact-btn"
-            onClick={onNewProject}
-            title="Create New Project / Workspace"
-            aria-label="New Project"
-          >
-            <span className="nav-btn-icon">📁</span>
-            <span className="nav-btn-text">+ Project</span>
-          </button>
-        ) : null}
-
-        {/* Configurable Action: + Profile */}
-        {sidebarButtons.newProfile !== false && onNewProfile ? (
-          <button
-            type="button"
-            className="nav-action-compact-btn"
-            onClick={onNewProfile}
-            title="Create New Profile / Account"
-            aria-label="New Profile"
-          >
-            <span className="nav-btn-icon">👤</span>
-            <span className="nav-btn-text">+ Profile</span>
-          </button>
-        ) : null}
-
-        {/* Permanent Action: ⚙️ Settings */}
-        <button
-          type="button"
-          className="nav-action-compact-btn nav-settings-btn"
-          onClick={onOpenAccountsSettings}
-          title="Global Settings Hub"
-          aria-label="Settings"
-        >
-          <span className="nav-btn-icon">⚙️</span>
-          <span className="nav-btn-text">Settings</span>
-        </button>
-
-        {/* Configurable Action: 🔭 Observer */}
-        {sidebarButtons.observer !== false && onObserver ? (
-          <button
-            type="button"
-            className="nav-action-compact-btn"
-            onClick={onObserver}
-            title="Observer Mode &amp; Channels"
-            aria-label="Observer"
-          >
-            <span className="nav-btn-icon">🔭</span>
-            <span className="nav-btn-text">Observer</span>
-          </button>
-        ) : null}
-
-        {/* Configurable Action: 👥 Profiles */}
-        {sidebarButtons.profilesHub !== false ? (
-          <button
-            type="button"
-            className="nav-action-compact-btn"
-            onClick={onOpenProfilesHub || onOpenAccountsSettings}
-            title="Profiles &amp; Accounts Management"
-            aria-label="Profiles"
-          >
-            <span className="nav-btn-icon">👥</span>
-            <span className="nav-btn-text">Profiles</span>
-          </button>
-        ) : null}
       </div>
     </aside>
   )

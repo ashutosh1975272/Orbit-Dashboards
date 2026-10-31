@@ -962,7 +962,7 @@ function App(): React.JSX.Element {
             </div>
           ) : null}
 
-          {!browserAuthBusy && !showEmbed && !dashboardOpen && !showCosmicCard && !locked ? (
+          {!browserAuthBusy && !showEmbed && !showDashboard && !showCosmicCard && !locked ? (
             <div className="empty-main">
               <img className="empty-main-icon" src={appIcon} alt="" aria-hidden />
               <h1>{emptyCopy.title}</h1>

@@ -95,6 +95,7 @@ export function CosmicSidebarContent({
       style={{
         display: 'flex',
         flexDirection: 'column',
+        flex: 1,
         minHeight: 0,
         gap: '4px'
       }}
