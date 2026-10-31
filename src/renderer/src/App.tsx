@@ -26,7 +26,6 @@ import { NewProjectModal } from './components/dashboard/NewProjectModal'
 import { CardPickerModal } from './components/dashboard/CardPickerModal'
 import { CardAddModal } from './components/dashboard/CardAddModal'
 import type { DashboardProject } from '../../shared/dashboard-contract'
-import { isIndividualProfile } from '../../shared/types'
 import { sidebarToastFor } from './lib/sidebar-toast'
 import { modKey, modShift } from './lib/shortcut-label'
 import { useProfileStore } from './hooks/useProfiles'
@@ -1186,12 +1185,7 @@ function App(): React.JSX.Element {
           onClose={() => setAccountsModalOpen(false)}
           onAddWebsite={() => {
             setAccountsModalOpen(false)
-            const activeProf = profiles.find((p) => p.id === activeProfileId)
-            if (activeProf && isIndividualProfile(activeProf)) {
-              setCardPickerOpen(true)
-            } else {
-              setAddPlatformOpen(true)
-            }
+            setAddPlatformOpen(true)
           }}
           onNewProject={() => {
             setAccountsModalOpen(false)
