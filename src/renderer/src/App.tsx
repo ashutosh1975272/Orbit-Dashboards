@@ -884,6 +884,8 @@ function App(): React.JSX.Element {
               baseAppLayout={settings.baseAppLayout ?? 'standard'}
               showSidebarItemActions={settings.showSidebarItemActions ?? true}
               showSidebarProfileHideButton={settings.showSidebarProfileHideButton ?? false}
+              showSidebarProfileNavButton={settings.showSidebarProfileNavButton ?? settings.showCosmicProfileNavButtons ?? true}
+              showSidebarDashboardNavButton={settings.showSidebarDashboardNavButton ?? settings.showCosmicProfileNavButtons ?? true}
               showCosmicProfileNavButtons={settings.showCosmicProfileNavButtons ?? true}
               sidebarButtons={settings.sidebarButtons}
               onLookChange={(look) => {

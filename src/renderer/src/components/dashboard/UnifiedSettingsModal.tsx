@@ -534,16 +534,36 @@ export function UnifiedSettingsModal({
 
                       <label className="settings-row">
                         <span>
-                          New Cosmic Profile Sidebar Buttons
+                          Show &quot;Profile&quot; Navigation Button
                           <span style={{ display: 'block', fontSize: '11px', color: '#64748b' }}>
-                            Show Profile and Dashboard quick navigation buttons when a profile is selected in Cosmic Look
+                            Show the &quot;All Profiles&quot; (or &quot;Profile&quot;) quick navigation button in the sidebar
                           </span>
                         </span>
                         <input
                           type="checkbox"
-                          checked={settings.showCosmicProfileNavButtons ?? true}
+                          checked={settings.showSidebarProfileNavButton ?? settings.showCosmicProfileNavButtons ?? true}
                           onChange={(e) =>
-                            onChangeSettings({ showCosmicProfileNavButtons: e.target.checked })
+                            onChangeSettings({
+                              showSidebarProfileNavButton: e.target.checked
+                            })
+                          }
+                        />
+                      </label>
+
+                      <label className="settings-row">
+                        <span>
+                          Show &quot;Dashboard&quot; Navigation Button
+                          <span style={{ display: 'block', fontSize: '11px', color: '#64748b' }}>
+                            Show the &quot;Full Dashboard&quot; (or &quot;Dashboard&quot;) quick navigation button in the sidebar
+                          </span>
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={settings.showSidebarDashboardNavButton ?? settings.showCosmicProfileNavButtons ?? true}
+                          onChange={(e) =>
+                            onChangeSettings({
+                              showSidebarDashboardNavButton: e.target.checked
+                            })
                           }
                         />
                       </label>

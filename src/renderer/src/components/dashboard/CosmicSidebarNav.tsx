@@ -6,6 +6,8 @@ import { profileDisplayLabel, Profile } from '../../../../shared/types'
 interface CosmicSidebarContentProps {
   isMinimalLook?: boolean
   profiles?: Profile[]
+  showSidebarProfileNavButton?: boolean
+  showSidebarDashboardNavButton?: boolean
   showCosmicProfileNavButtons?: boolean
   onOpenProfilesHub?: () => void
   onNewProject?: () => void
@@ -14,6 +16,8 @@ interface CosmicSidebarContentProps {
 export function CosmicSidebarContent({
   isMinimalLook = false,
   profiles: propProfiles,
+  showSidebarProfileNavButton: propShowProfileNavButton,
+  showSidebarDashboardNavButton: propShowDashboardNavButton,
   showCosmicProfileNavButtons = true,
   onOpenProfilesHub,
   onNewProject
@@ -25,6 +29,16 @@ export function CosmicSidebarContent({
   const loadSnapshot = useDashboardStore((s) => s.loadSnapshot)
   const storeProfiles = useProfileStore((s) => s.profiles)
   const profiles = propProfiles && propProfiles.length > 0 ? propProfiles : storeProfiles
+
+  const showProfileBtn =
+    propShowProfileNavButton ??
+    showCosmicProfileNavButtons ??
+    true
+  const showDashboardBtn =
+    propShowDashboardNavButton ??
+    showCosmicProfileNavButtons ??
+    true
+  const hasAnyQuickNav = showProfileBtn || showDashboardBtn
 
   // Ensure snapshot and profiles are loaded
   useEffect(() => {
@@ -192,69 +206,73 @@ export function CosmicSidebarContent({
             overflow: 'hidden'
           }}
         >
-          {/* Quick Action Navigation Buttons (controlled via settings: showCosmicProfileNavButtons) */}
-          {showCosmicProfileNavButtons && (
+          {/* Quick Action Navigation Buttons */}
+          {hasAnyQuickNav && (
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
+                gridTemplateColumns: showProfileBtn && showDashboardBtn ? '1fr 1fr' : '1fr',
                 gap: '6px',
                 padding: '6px 10px 4px'
               }}
             >
-              <button
-                type="button"
-                onClick={() => onOpenProfilesHub?.()}
-                title={isAllProjects ? 'Open Profiles Management Hub' : 'Open Profile Accounts Hub'}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  padding: '7px 8px',
-                  borderRadius: '6px',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  color: '#fff',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                <span>{isAllProjects ? '👥' : '👤'}</span>
-                <span>{isAllProjects ? 'All Profiles' : 'Profile'}</span>
-              </button>
+              {showProfileBtn && (
+                <button
+                  type="button"
+                  onClick={() => onOpenProfilesHub?.()}
+                  title={isAllProjects ? 'Open Profiles Management Hub' : 'Open Profile Accounts Hub'}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    padding: '7px 8px',
+                    borderRadius: '6px',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    color: '#fff',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <span>{isAllProjects ? '👥' : '👤'}</span>
+                  <span>{isAllProjects ? 'All Profiles' : 'Profile'}</span>
+                </button>
+              )}
 
-              <button
-                type="button"
-                onClick={() => setCosmicNavigation(cosmicLevel1, null)}
-                title={isAllProjects ? 'View All Projects Dashboard' : 'View Projects Dashboard for this Profile'}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  padding: '7px 8px',
-                  borderRadius: '6px',
-                  background:
-                    cosmicSelectedCardId === null
-                      ? 'color-mix(in srgb, var(--accent, #6366f1) 22%, transparent)'
-                      : 'rgba(255, 255, 255, 0.05)',
-                  border:
-                    cosmicSelectedCardId === null
-                      ? '1px solid var(--accent, #6366f1)'
-                      : '1px solid rgba(255, 255, 255, 0.1)',
-                  color: '#fff',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                <span>▦</span>
-                <span>{isAllProjects ? 'Full Dashboard' : 'Dashboard'}</span>
-              </button>
+              {showDashboardBtn && (
+                <button
+                  type="button"
+                  onClick={() => setCosmicNavigation(cosmicLevel1, null)}
+                  title={isAllProjects ? 'View All Projects Dashboard' : 'View Projects Dashboard for this Profile'}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    padding: '7px 8px',
+                    borderRadius: '6px',
+                    background:
+                      cosmicSelectedCardId === null
+                        ? 'color-mix(in srgb, var(--accent, #6366f1) 22%, transparent)'
+                        : 'rgba(255, 255, 255, 0.05)',
+                    border:
+                      cosmicSelectedCardId === null
+                        ? '1px solid var(--accent, #6366f1)'
+                        : '1px solid rgba(255, 255, 255, 0.1)',
+                    color: '#fff',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <span>▦</span>
+                  <span>{isAllProjects ? 'Full Dashboard' : 'Dashboard'}</span>
+                </button>
+              )}
             </div>
           )}
 

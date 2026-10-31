@@ -81,6 +81,8 @@ interface ProfileSidebarProps {
   baseAppLayout?: 'none' | 'standard' | 'extended' | 'full'
   showSidebarItemActions?: boolean
   showSidebarProfileHideButton?: boolean
+  showSidebarProfileNavButton?: boolean
+  showSidebarDashboardNavButton?: boolean
   showCosmicProfileNavButtons?: boolean
   sidebarButtons?: {
     addWebsite?: boolean
@@ -360,6 +362,8 @@ export const ProfileSidebar = memo(function ProfileSidebar({
   baseAppLayout = 'standard',
   showSidebarItemActions = true,
   showSidebarProfileHideButton = false,
+  showSidebarProfileNavButton,
+  showSidebarDashboardNavButton,
   showCosmicProfileNavButtons = true,
   sidebarButtons = {
     addWebsite: true,
@@ -557,6 +561,8 @@ export const ProfileSidebar = memo(function ProfileSidebar({
       {activeLook === 'new-cosmic' ? (
         <CosmicSidebarContent
           profiles={profiles}
+          showSidebarProfileNavButton={showSidebarProfileNavButton}
+          showSidebarDashboardNavButton={showSidebarDashboardNavButton}
           showCosmicProfileNavButtons={showCosmicProfileNavButtons}
           onOpenProfilesHub={onOpenProfilesHub}
           onNewProject={onNewProject}
@@ -565,6 +571,8 @@ export const ProfileSidebar = memo(function ProfileSidebar({
         <CosmicSidebarContent
           isMinimalLook
           profiles={profiles}
+          showSidebarProfileNavButton={showSidebarProfileNavButton}
+          showSidebarDashboardNavButton={showSidebarDashboardNavButton}
           showCosmicProfileNavButtons={showCosmicProfileNavButtons}
           onOpenProfilesHub={onOpenProfilesHub}
           onNewProject={onNewProject}
