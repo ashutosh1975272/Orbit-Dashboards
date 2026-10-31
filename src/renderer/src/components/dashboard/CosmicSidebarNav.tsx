@@ -8,7 +8,7 @@ import { CardAddModal } from './CardAddModal'
 import { buildCardView } from './card-view'
 import { buildConnectorChannelLists } from './workspace-nav'
 import type { DashboardTeamWorkspace } from '../../../../shared/dashboard-contract'
-import { profileDisplayLabel, isGlobalAccountProfile } from '../../../../shared/types'
+import { profileDisplayLabel, isIndividualProfile } from '../../../../shared/types'
 
 interface CosmicSidebarContentProps {
   onAddPlatform: () => void
@@ -38,12 +38,15 @@ export function CosmicSidebarContent({
   const [teamWorkspace, setTeamWorkspace] = useState<DashboardTeamWorkspace | null>(null)
   const [teamLoading, setTeamLoading] = useState(true)
 
-  // Ensure snapshot is loaded
+  // Ensure snapshot and profiles are loaded
   useEffect(() => {
     if (!snapshot) {
       void loadSnapshot().catch(() => undefined)
     }
-  }, [snapshot, loadSnapshot])
+    if (profiles.length === 0) {
+      void useProfileStore.getState().loadProfiles().catch(() => undefined)
+    }
+  }, [snapshot, loadSnapshot, profiles.length])
 
   // Query team workspace for connector channel listing
   useEffect(() => {
@@ -65,7 +68,8 @@ export function CosmicSidebarContent({
 
   // Filter individual / selectable profiles
   const selectableProfiles = useMemo(() => {
-    return profiles.filter((p) => !isGlobalAccountProfile(p))
+    const individual = profiles.filter(isIndividualProfile)
+    return individual.length > 0 ? individual : profiles
   }, [profiles])
 
   // Active projects for the selected profile in Level 1 (excluding completed & removed)
@@ -222,11 +226,15 @@ export function CosmicSidebarContent({
             <option value="all">▦ All Projects</option>
             <option value="global">🌐 Global Accounts</option>
             <optgroup label="Profiles">
-              {selectableProfiles.map((p) => (
-                <option key={p.id} value={p.id}>
-                  👤 {profileDisplayLabel(p)}
-                </option>
-              ))}
+              {selectableProfiles.map((p) => {
+                const label = profileDisplayLabel(p)
+                const emailSuffix = p.displayName && p.displayName !== label ? ` (${p.displayName})` : ''
+                return (
+                  <option key={p.id} value={p.id}>
+                    👤 {label}{emailSuffix}
+                  </option>
+                )
+              })}
             </optgroup>
           </select>
         </div>
