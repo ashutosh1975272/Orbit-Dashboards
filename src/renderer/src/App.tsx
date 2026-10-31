@@ -869,6 +869,7 @@ function App(): React.JSX.Element {
               showObserverViewHeader={settings.showObserverViewHeader ?? false}
               baseAppLayout={settings.baseAppLayout ?? 'standard'}
               showSidebarItemActions={settings.showSidebarItemActions ?? true}
+              showSidebarProfileHideButton={settings.showSidebarProfileHideButton ?? false}
               sidebarButtons={settings.sidebarButtons}
               onLookChange={(look) => {
                 void window.api.app.setSettings({ sidebarLook: look }).then((next) => {

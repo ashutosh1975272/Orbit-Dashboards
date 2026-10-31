@@ -244,11 +244,14 @@ export interface AppSettings {
   baseAppLayout?: 'none' | 'standard' | 'extended' | 'full'
   /** When true, display quick actions (hide/remove) on sidebar items hover. Default: true. */
   showSidebarItemActions?: boolean
+  /** When true, display the hide (👁) button on profile headers in the main sidebar. Default: false. */
+  showSidebarProfileHideButton?: boolean
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   baseAppLayout: 'standard',
   showSidebarItemActions: true,
+  showSidebarProfileHideButton: false,
   notificationsEnabled: true,
   idleLockMinutes: 15,
   theme: 'dark',

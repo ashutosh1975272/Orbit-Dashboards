@@ -77,6 +77,7 @@ interface ProfileSidebarProps {
   showObserverViewHeader?: boolean
   baseAppLayout?: 'none' | 'standard' | 'extended' | 'full'
   showSidebarItemActions?: boolean
+  showSidebarProfileHideButton?: boolean
   sidebarButtons?: {
     addWebsite?: boolean
     newProject?: boolean
@@ -354,6 +355,7 @@ export const ProfileSidebar = memo(function ProfileSidebar({
   showObserverViewHeader = false,
   baseAppLayout = 'standard',
   showSidebarItemActions = true,
+  showSidebarProfileHideButton = false,
   sidebarButtons = {
     addWebsite: true,
     newProject: true,
@@ -736,7 +738,7 @@ export const ProfileSidebar = memo(function ProfileSidebar({
                       ) : null}
                     </button>
                   )}
-                  {showSidebarItemActions && (
+                  {showSidebarItemActions && showSidebarProfileHideButton && (
                     <button
                       type="button"
                       className="nav-mute"

@@ -548,6 +548,22 @@ export function UnifiedSettingsModal({
                         />
                       </label>
 
+                      <label className="settings-row">
+                        <span>
+                          Show "Hide" Button on Profile Headers in Sidebar
+                          <span style={{ display: 'block', fontSize: '11px', color: '#64748b' }}>
+                            Display the eye hide button (👁) next to profile names in the main sidebar. Disabled by default to prevent accidental profile hiding.
+                          </span>
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={settings.showSidebarProfileHideButton ?? false}
+                          onChange={(e) =>
+                            onChangeSettings({ showSidebarProfileHideButton: e.target.checked })
+                          }
+                        />
+                      </label>
+
                       <div className="settings-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <div>
                           <span>Base Default Apps Layout</span>

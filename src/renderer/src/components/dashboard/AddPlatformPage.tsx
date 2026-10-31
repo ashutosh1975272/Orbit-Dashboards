@@ -705,27 +705,68 @@ export function AddPlatformPage({
                     </p>
                   </div>
 
-                  {/* Target Profile Selector */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '12px', color: '#94a3b8' }}>Target Profile:</span>
-                    <select
-                      value={selectedProfileId}
-                      onChange={(e) => setSelectedProfileId(e.target.value)}
-                      style={{
-                        background: '#0f172a',
-                        color: '#f8fafc',
-                        border: '1px solid rgba(255,255,255,0.15)',
-                        borderRadius: '6px',
-                        padding: '5px 10px',
-                        fontSize: '12px'
-                      }}
-                    >
-                      {profiles.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {profileDisplayLabel(p)} ({p.displayName})
-                        </option>
-                      ))}
-                    </select>
+                  {/* Target Profile Selector & Visibility Toggle */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '12px', color: '#94a3b8' }}>Target Profile:</span>
+                      <select
+                        value={selectedProfileId}
+                        onChange={(e) => setSelectedProfileId(e.target.value)}
+                        style={{
+                          background: '#0f172a',
+                          color: '#f8fafc',
+                          border: '1px solid rgba(255,255,255,0.15)',
+                          borderRadius: '6px',
+                          padding: '5px 10px',
+                          fontSize: '12px'
+                        }}
+                      >
+                        {profiles.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {profileDisplayLabel(p)} ({p.displayName})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {(() => {
+                      const currentProfile = profiles.find((p) => p.id === selectedProfileId)
+                      if (!currentProfile) return null
+                      const isProfileHidden = !!currentProfile.hiddenInSidebar
+                      return (
+                        <button
+                          type="button"
+                          className="btn ghost btn-sm"
+                          style={{
+                            fontSize: '11.5px',
+                            padding: '4px 10px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            background: isProfileHidden ? 'rgba(239, 68, 68, 0.12)' : 'rgba(74, 222, 128, 0.12)',
+                            color: isProfileHidden ? '#f87171' : '#4ade80',
+                            border: `1px solid ${isProfileHidden ? 'rgba(239, 68, 68, 0.3)' : 'rgba(74, 222, 128, 0.3)'}`
+                          }}
+                          title={isProfileHidden ? 'Profile is hidden in sidebar. Click to show.' : 'Profile is shown in sidebar. Click to hide.'}
+                          onClick={async () => {
+                            try {
+                              const updated = await window.api.profiles.setHiddenInSidebar(currentProfile.id, !isProfileHidden)
+                              useProfileStore.setState((prev) => ({
+                                profiles: prev.profiles.map((p) => (p.id === updated.id ? updated : p))
+                              }))
+                              setFeedbackMsg({
+                                text: `Profile ${profileDisplayLabel(currentProfile)} is now ${!isProfileHidden ? 'hidden from' : 'shown in'} sidebar!`,
+                                error: false
+                              })
+                            } catch (err: any) {
+                              setFeedbackMsg({ text: err.message || 'Failed to update profile visibility', error: true })
+                            }
+                          }}
+                        >
+                          {isProfileHidden ? '🚫 Profile Hidden in Sidebar (Click to Show)' : '👁 Profile Visible in Sidebar (Click to Hide)'}
+                        </button>
+                      )
+                    })()}
                   </div>
                 </div>
 

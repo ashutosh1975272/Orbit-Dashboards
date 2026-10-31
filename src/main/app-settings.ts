@@ -108,6 +108,10 @@ export function normalizeAppSettings(parsed: Partial<AppSettings>): AppSettings 
       typeof parsed.showSidebarItemActions === 'boolean'
         ? parsed.showSidebarItemActions
         : DEFAULT_APP_SETTINGS.showSidebarItemActions ?? true,
+    showSidebarProfileHideButton:
+      typeof parsed.showSidebarProfileHideButton === 'boolean'
+        ? parsed.showSidebarProfileHideButton
+        : DEFAULT_APP_SETTINGS.showSidebarProfileHideButton ?? false,
     sidebarButtons:
       parsed.sidebarButtons && typeof parsed.sidebarButtons === 'object'
         ? {
