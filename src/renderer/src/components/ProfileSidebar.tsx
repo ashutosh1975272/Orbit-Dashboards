@@ -5,6 +5,7 @@ import type { AppId, AppSession, AppSessionStatus, CustomLink, Profile } from '.
 import {
   APP_IDS,
   appSupportsWorkspaces,
+  isGlobalAccountProfile,
   profileDisplayLabel,
   sanitizeWorkspaceName,
   sidebarAppLabel
@@ -861,8 +862,8 @@ export const ProfileSidebar = memo(function ProfileSidebar({
                       )
                     })}
 
-                    {/* Custom Links Rows */}
-                    {(profile.customLinks ?? [])
+                    {/* Custom Links Rows - strictly for Global Account Profiles */}
+                    {isGlobalAccountProfile(profile) && (profile.customLinks ?? [])
                       .filter((link) => !link.hiddenInSidebar)
                       .map((link) => {
                         const isLinkActive =

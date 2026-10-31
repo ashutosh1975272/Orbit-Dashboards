@@ -114,6 +114,10 @@ export function NewProjectModal({
     }
   }
 
+  const currentSelectedProfile = useMemo(() => {
+    return individualProfiles.find((p) => p.id === (selectedProfileId || individualProfiles[0]?.id)) || individualProfiles[0] || null
+  }, [individualProfiles, selectedProfileId])
+
   const modalContent = (
     <div
       className={embedded ? 'embedded-panel-card' : 'platform-settings-panel'}
@@ -121,12 +125,13 @@ export function NewProjectModal({
       aria-modal={!embedded}
       aria-label="Create New Project"
       style={{
-        width: embedded ? '100%' : '520px',
-        maxWidth: embedded ? '680px' : '92vw',
-        backgroundColor: '#0f172a',
+        width: embedded ? '100%' : '860px',
+        maxWidth: embedded ? '920px' : '92vw',
+        maxHeight: '90vh',
+        backgroundColor: '#0b1329',
         borderRadius: '14px',
         border: '1px solid rgba(255, 255, 255, 0.12)',
-        boxShadow: embedded ? '0 10px 30px rgba(0, 0, 0, 0.4)' : '0 25px 50px -12px rgba(0, 0, 0, 0.75)',
+        boxShadow: embedded ? '0 10px 30px rgba(0, 0, 0, 0.4)' : '0 25px 50px -12px rgba(0, 0, 0, 0.85)',
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
@@ -136,7 +141,7 @@ export function NewProjectModal({
       {/* Header */}
       <div
         style={{
-          padding: '18px 22px',
+          padding: '16px 24px',
           borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
           display: 'flex',
           alignItems: 'center',
@@ -144,14 +149,32 @@ export function NewProjectModal({
           background: 'rgba(255, 255, 255, 0.02)'
         }}
       >
-        <div>
-          <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 650, color: '#f8fafc' }}>
-            Create New Project
-          </h3>
-          <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#94a3b8' }}>
-            Create a project card inside an individual profile without upfront OAuth blockers.
-          </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div
+            style={{
+              width: '38px',
+              height: '38px',
+              borderRadius: '8px',
+              background: 'rgba(99, 102, 241, 0.18)',
+              border: '1px solid rgba(99, 102, 241, 0.35)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '18px'
+            }}
+          >
+            📁
+          </div>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 650, color: '#f8fafc' }}>
+              Create New Project Card
+            </h3>
+            <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#94a3b8' }}>
+              Create an isolated project card inside an individual client profile with linked accounts.
+            </p>
+          </div>
         </div>
+
         <button
           type="button"
           onClick={onClose}
@@ -170,8 +193,129 @@ export function NewProjectModal({
         </button>
       </div>
 
-      {/* Content */}
-      <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+      {/* Two-Column Structured Body */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '280px 1fr',
+          flex: 1,
+          overflowY: 'auto',
+          minHeight: 0
+        }}
+      >
+        {/* Left Column: Profile Owner & Workspace Context */}
+        <div
+          style={{
+            background: 'rgba(15, 23, 42, 0.65)',
+            borderRight: '1px solid rgba(255, 255, 255, 0.08)',
+            padding: '20px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '18px'
+          }}
+        >
+          <div>
+            <label
+              style={{
+                display: 'block',
+                fontSize: '11px',
+                fontWeight: 650,
+                color: '#94a3b8',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                marginBottom: '8px'
+              }}
+            >
+              Select Profile Owner
+            </label>
+            {individualProfiles.length === 0 ? (
+              <div
+                style={{
+                  padding: '12px',
+                  borderRadius: '8px',
+                  background: 'rgba(245, 158, 11, 0.1)',
+                  border: '1px solid rgba(245, 158, 11, 0.3)',
+                  color: '#fbbf24',
+                  fontSize: '12px'
+                }}
+              >
+                No individual profiles found. Please create an individual profile via <b>+ Profile</b> first.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {individualProfiles.map((p) => {
+                  const isSelected = p.id === (selectedProfileId || individualProfiles[0]?.id)
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setSelectedProfileId(p.id)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        padding: '10px 12px',
+                        borderRadius: '8px',
+                        background: isSelected ? 'rgba(99, 102, 241, 0.2)' : 'rgba(255, 255, 255, 0.03)',
+                        border: isSelected ? '1px solid rgba(99, 102, 241, 0.45)' : '1px solid rgba(255, 255, 255, 0.06)',
+                        color: isSelected ? '#ffffff' : '#cbd5e1',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '50%',
+                          background: p.avatarColor || '#3b82f6',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 700,
+                          fontSize: '12px',
+                          color: '#fff',
+                          flexShrink: 0
+                        }}
+                      >
+                        {p.displayName.charAt(0).toUpperCase()}
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: '13px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {p.customName || p.displayName}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#94a3b8' }}>
+                          {p.displayName}
+                        </div>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {currentSelectedProfile && (
+            <div
+              style={{
+                marginTop: 'auto',
+                padding: '12px',
+                borderRadius: '8px',
+                background: 'rgba(0, 0, 0, 0.25)',
+                border: '1px solid rgba(255, 255, 255, 0.06)',
+                fontSize: '11.5px',
+                color: '#94a3b8',
+                lineHeight: '1.45'
+              }}
+            >
+              🔒 <b>Card Scope Isolation</b>: Project cards created here stay strictly within this individual profile and will not leak loose links into your global workspace sidebar.
+            </div>
+          )}
+        </div>
+
+        {/* Right Column: Project Details & Linked Accounts */}
+        <div style={{ padding: '22px 24px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
           {error && (
             <div
               style={{
@@ -187,7 +331,7 @@ export function NewProjectModal({
             </div>
           )}
 
-          {/* 1. Profile Picker */}
+          {/* Project Name */}
           <div>
             <label
               style={{
@@ -198,70 +342,17 @@ export function NewProjectModal({
                 marginBottom: '6px'
               }}
             >
-              Individual Profile (Owner)
-            </label>
-            {individualProfiles.length === 0 ? (
-              <div
-                style={{
-                  padding: '12px',
-                  borderRadius: '8px',
-                  background: 'rgba(245, 158, 11, 0.1)',
-                  border: '1px solid rgba(245, 158, 11, 0.3)',
-                  color: '#fbbf24',
-                  fontSize: '12.5px'
-                }}
-              >
-                No individual profiles available. Please create one using &quot;+ New Profile&quot; in the sidebar first.
-              </div>
-            ) : (
-              <select
-                value={selectedProfileId || individualProfiles[0]?.id}
-                onChange={(e) => setSelectedProfileId(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '9px 12px',
-                  borderRadius: '8px',
-                  background: '#1e293b',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
-                  color: '#f8fafc',
-                  fontSize: '13.5px',
-                  outline: 'none'
-                }}
-              >
-                {individualProfiles.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    👤 {p.customName || p.displayName}
-                  </option>
-                ))}
-              </select>
-            )}
-            <p style={{ margin: '4px 0 0', fontSize: '11.5px', color: '#64748b' }}>
-              Project cards are owned by individual profiles and hidden from the global sidebar.
-            </p>
-          </div>
-
-          {/* 2. Project Name */}
-          <div>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '12.5px',
-                fontWeight: 600,
-                color: '#cbd5e1',
-                marginBottom: '6px'
-              }}
-            >
-              Project or Workspace Name
+              Project or Workspace Name <span style={{ color: '#f87171' }}>*</span>
             </label>
             <input
               type="text"
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
-              placeholder="e.g. Acme Redesign, Mobile App v2"
+              placeholder="e.g. Acme Redesign, Mobile App v2, Alpha Launch"
               autoFocus
               style={{
                 width: '100%',
-                padding: '9px 12px',
+                padding: '10px 14px',
                 borderRadius: '8px',
                 background: '#1e293b',
                 border: '1px solid rgba(255, 255, 255, 0.12)',
@@ -273,7 +364,7 @@ export function NewProjectModal({
             />
           </div>
 
-          {/* 3. Client Name (Optional) */}
+          {/* Client Name */}
           <div>
             <label
               style={{
@@ -293,7 +384,7 @@ export function NewProjectModal({
               placeholder="e.g. Acme Corp (defaults to project name)"
               style={{
                 width: '100%',
-                padding: '9px 12px',
+                padding: '10px 14px',
                 borderRadius: '8px',
                 background: '#1e293b',
                 border: '1px solid rgba(255, 255, 255, 0.12)',
@@ -305,96 +396,115 @@ export function NewProjectModal({
             />
           </div>
 
-          {/* 4. Optional Linked Accounts (+ Add) */}
+          {/* Linked Workspaces & Accounts (+ Add Accounts) */}
           <div
             style={{
-              padding: '12px 14px',
-              borderRadius: '8px',
+              padding: '16px 18px',
+              borderRadius: '10px',
               background: 'rgba(255, 255, 255, 0.03)',
               border: '1px solid rgba(255, 255, 255, 0.08)',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between'
+              justifyContent: 'space-between',
+              gap: '16px'
             }}
           >
             <div>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: '#e2e8f0' }}>
-                Linked Workspaces &amp; Accounts ({sources.length})
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '13.5px', fontWeight: 600, color: '#e2e8f0' }}>
+                  Linked Accounts &amp; Workspaces
+                </span>
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    padding: '2px 8px',
+                    borderRadius: '10px',
+                    background: sources.length > 0 ? 'rgba(99, 102, 241, 0.2)' : 'rgba(255, 255, 255, 0.07)',
+                    color: sources.length > 0 ? '#a5b4fc' : '#94a3b8'
+                  }}
+                >
+                  {sources.length} Linked
+                </span>
               </div>
-              <div style={{ fontSize: '11.5px', color: '#94a3b8' }}>
+              <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>
                 {sources.length > 0
                   ? sources.map((s) => s.workspaceName).join(', ')
-                  : 'Optionally link Global Accounts or Client links now, or do it inside the card.'}
+                  : 'Link Global accounts (Claude, ChatGPT, Slack) or client links now or manage later.'}
               </div>
             </div>
+
             <button
               type="button"
               className="btn btn-ghost"
               onClick={() => setAddAccountsOpen(true)}
               style={{
-                padding: '5px 12px',
-                fontSize: '12px',
-                background: 'rgba(99, 102, 241, 0.15)',
+                padding: '7px 14px',
+                fontSize: '12.5px',
+                fontWeight: 600,
+                background: 'rgba(99, 102, 241, 0.18)',
                 color: '#a5b4fc',
-                border: '1px solid rgba(99, 102, 241, 0.3)',
-                borderRadius: '6px',
-                cursor: 'pointer'
+                border: '1px solid rgba(99, 102, 241, 0.35)',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
               }}
             >
               + Add Accounts
             </button>
           </div>
         </div>
+      </div>
 
-        {/* Footer Actions */}
-        <div
+      {/* Footer Actions */}
+      <div
+        style={{
+          padding: '14px 24px',
+          borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          gap: '12px',
+          background: 'rgba(255, 255, 255, 0.02)'
+        }}
+      >
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={onClose}
+          disabled={creating}
           style={{
-            padding: '16px 22px',
-            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'flex-end',
-            gap: '10px',
-            background: 'rgba(255, 255, 255, 0.02)'
+            padding: '8px 18px',
+            fontSize: '13px',
+            color: '#94a3b8',
+            background: 'transparent',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '8px',
+            cursor: 'pointer'
           }}
         >
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={onClose}
-            disabled={creating}
-            style={{
-              padding: '8px 16px',
-              fontSize: '13px',
-              color: '#94a3b8',
-              background: 'transparent',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '8px',
-              cursor: 'pointer'
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => void handleCreate()}
-            disabled={creating || individualProfiles.length === 0}
-            style={{
-              padding: '8px 20px',
-              fontSize: '13px',
-              fontWeight: 600,
-              background: '#6366f1',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: individualProfiles.length === 0 ? 'not-allowed' : 'pointer'
-            }}
-          >
-            {creating ? 'Creating...' : 'Create Project'}
-          </button>
-        </div>
+          Cancel
+        </button>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={() => void handleCreate()}
+          disabled={creating || individualProfiles.length === 0}
+          style={{
+            padding: '8px 22px',
+            fontSize: '13px',
+            fontWeight: 600,
+            background: '#6366f1',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: individualProfiles.length === 0 ? 'not-allowed' : 'pointer'
+          }}
+        >
+          {creating ? 'Creating Project...' : 'Create Project'}
+        </button>
       </div>
+    </div>
   )
 
   if (embedded) {

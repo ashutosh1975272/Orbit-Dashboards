@@ -682,44 +682,59 @@ export function AccountsManagementModal({
                       </p>
                     </div>
 
-                    {/* Filter Pills */}
-                    <div
-                      style={{
-                        display: 'flex',
-                        gap: '4px',
-                        background: 'rgba(0,0,0,0.3)',
-                        padding: '3px',
-                        borderRadius: '8px',
-                        border: '1px solid rgba(255,255,255,0.06)'
-                      }}
-                    >
-                      {(
-                        [
-                          ['all', `All (${projectMetrics.all})`],
-                          ['active', `🟢 Active (${projectMetrics.active})`],
-                          ['stopped', `⏸️ Stopped (${projectMetrics.stopped})`],
-                          ['archived', `📦 Archived (${projectMetrics.archived})`]
-                        ] as const
-                      ).map(([key, label]) => (
+                    {/* Filter Pills & Add Project */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {onNewProject && (
                         <button
-                          key={key}
                           type="button"
-                          onClick={() => setProjectStatusFilter(key)}
-                          style={{
-                            padding: '5px 10px',
-                            fontSize: '11.5px',
-                            fontWeight: 600,
-                            borderRadius: '6px',
-                            border: projectStatusFilter === key ? '1px solid var(--accent)' : '1px solid transparent',
-                            background: projectStatusFilter === key ? 'color-mix(in srgb, var(--accent) 22%, transparent)' : 'transparent',
-                            color: projectStatusFilter === key ? '#fff' : '#94a3b8',
-                            cursor: 'pointer',
-                            transition: 'all 0.12s ease'
+                          className="btn primary btn-sm"
+                          onClick={() => {
+                            onClose()
+                            onNewProject()
                           }}
+                          style={{ fontSize: '11.5px', padding: '4px 10px', background: '#6366f1' }}
                         >
-                          {label}
+                          + New Project
                         </button>
-                      ))}
+                      )}
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: '4px',
+                          background: 'rgba(0,0,0,0.3)',
+                          padding: '3px',
+                          borderRadius: '8px',
+                          border: '1px solid rgba(255,255,255,0.06)'
+                        }}
+                      >
+                        {(
+                          [
+                            ['all', `All (${projectMetrics.all})`],
+                            ['active', `🟢 Active (${projectMetrics.active})`],
+                            ['stopped', `⏸️ Stopped (${projectMetrics.stopped})`],
+                            ['archived', `📦 Archived (${projectMetrics.archived})`]
+                          ] as const
+                        ).map(([key, label]) => (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => setProjectStatusFilter(key)}
+                            style={{
+                              padding: '5px 10px',
+                              fontSize: '11.5px',
+                              fontWeight: 600,
+                              borderRadius: '6px',
+                              border: projectStatusFilter === key ? '1px solid var(--accent)' : '1px solid transparent',
+                              background: projectStatusFilter === key ? 'color-mix(in srgb, var(--accent) 22%, transparent)' : 'transparent',
+                              color: projectStatusFilter === key ? '#fff' : '#94a3b8',
+                              cursor: 'pointer',
+                              transition: 'all 0.12s ease'
+                            }}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
@@ -836,10 +851,15 @@ export function AccountsManagementModal({
 
                 {/* Section: Custom Tabs & AI Agents */}
                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                    <h4 style={{ margin: 0, fontSize: '14.5px', fontWeight: 600, color: '#e2e8f0' }}>
-                      Custom Tabs &amp; AI Agents ({currentProfile.customLinks?.length || 0})
-                    </h4>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '14.5px', fontWeight: 600, color: '#e2e8f0' }}>
+                        Custom Tabs &amp; AI Agents ({currentProfile.customLinks?.length || 0})
+                      </h4>
+                      <p style={{ margin: '2px 0 0', fontSize: '11.5px', color: '#64748b' }}>
+                        Scoped to this individual profile and available inside its project cards (isolated from global sidebar).
+                      </p>
+                    </div>
                     <button
                       type="button"
                       className="btn ghost btn-sm"
