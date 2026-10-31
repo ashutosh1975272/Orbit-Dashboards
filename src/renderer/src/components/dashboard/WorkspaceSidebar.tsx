@@ -620,11 +620,14 @@ export default function WorkspaceSidebar({
       <div
         className="ws-nav-footer"
         style={{
-          display: 'grid',
-          gridTemplateColumns: (onOpenAdd && !layout.custom.hideAddButton) ? '1fr 1fr' : '1fr',
+          display: collapsed ? 'flex' : 'grid',
+          flexDirection: collapsed ? 'column' : undefined,
+          gridTemplateColumns: !collapsed ? (onOpenAdd && !layout.custom.hideAddButton ? '1fr 1fr' : '1fr') : undefined,
           gap: 6,
-          padding: '8px 10px',
-          alignItems: 'center'
+          padding: collapsed ? '8px 6px' : '8px 10px',
+          alignItems: 'center',
+          width: '100%',
+          boxSizing: 'border-box'
         }}
       >
         {onOpenAdd && !layout.custom.hideAddButton && (
@@ -641,7 +644,8 @@ export default function WorkspaceSidebar({
               background: 'color-mix(in srgb, var(--accent) 18%, rgba(255, 255, 255, 0.05))',
               border: '1px solid color-mix(in srgb, var(--accent) 55%, transparent)',
               borderRadius: 7,
-              padding: '0 8px',
+              padding: collapsed ? 0 : '0 8px',
+              width: '100%',
               height: 34,
               fontSize: '12px',
               fontWeight: 650,
@@ -654,9 +658,11 @@ export default function WorkspaceSidebar({
             }}
           >
             <span style={{ fontSize: '13px', flexShrink: 0 }}>➕</span>
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              + Add
-            </span>
+            {!collapsed && (
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                + Add
+              </span>
+            )}
           </button>
         )}
         <button
@@ -672,7 +678,8 @@ export default function WorkspaceSidebar({
             background: nav.openGroup === 'settings' ? 'color-mix(in srgb, var(--accent) 25%, transparent)' : 'rgba(255, 255, 255, 0.04)',
             border: nav.openGroup === 'settings' ? '1px solid var(--accent)' : '1px solid rgba(255, 255, 255, 0.08)',
             borderRadius: 7,
-            padding: '0 8px',
+            padding: collapsed ? 0 : '0 8px',
+            width: '100%',
             height: 34,
             fontSize: '12px',
             fontWeight: 600,
@@ -686,9 +693,11 @@ export default function WorkspaceSidebar({
           <span className="ws-nav-glyph" style={{ display: 'inline-flex' }}>
             <NavIcon name="settings" />
           </span>
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            Settings
-          </span>
+          {!collapsed && (
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              Settings
+            </span>
+          )}
         </button>
       </div>
 
