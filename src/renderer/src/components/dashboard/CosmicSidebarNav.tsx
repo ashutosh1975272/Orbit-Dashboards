@@ -91,44 +91,31 @@ export function CosmicSidebarContent({
       <div
         className="cosmic-nav-selectors"
         style={{
-          padding: '8px 10px 10px',
+          padding: '4px 10px 8px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '6px',
           background: 'rgba(255, 255, 255, 0.02)',
           borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
         }}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-          <label
-            htmlFor="cosmic-level1-select"
-            style={{
-              fontSize: '10.5px',
-              fontWeight: 650,
-              textTransform: 'uppercase',
-              letterSpacing: '0.06em',
-              color: 'var(--text-faint, #64748b)'
-            }}
-          >
-            Navigation
-          </label>
-          <select
-            id="cosmic-level1-select"
-            value={cosmicLevel1}
-            onChange={(e) => handleLevel1Change(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '7px 10px',
-              fontSize: '12.5px',
-              fontWeight: 600,
-              borderRadius: '7px',
-              background: 'color-mix(in srgb, var(--surface, #1e293b) 90%, black)',
-              color: '#fff',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              outline: 'none',
-              cursor: 'pointer'
-            }}
-          >
+        <select
+          id="cosmic-level1-select"
+          aria-label="Dashboard"
+          value={cosmicLevel1}
+          onChange={(e) => handleLevel1Change(e.target.value)}
+          style={{
+            width: '100%',
+            padding: '7px 10px',
+            fontSize: '12.5px',
+            fontWeight: 600,
+            borderRadius: '7px',
+            background: 'color-mix(in srgb, var(--surface, #1e293b) 90%, black)',
+            color: '#fff',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            outline: 'none',
+            cursor: 'pointer'
+          }}
+        >
             <option value="all">▦ All Projects</option>
             <option value="global">🌐 Global Accounts</option>
             {selectableProfiles.length > 0 && (
@@ -147,7 +134,6 @@ export function CosmicSidebarContent({
               </optgroup>
             )}
           </select>
-        </div>
       </div>
 
       {/* When a profile is selected: Show Profile & Dashboard buttons + compact projects list */}
