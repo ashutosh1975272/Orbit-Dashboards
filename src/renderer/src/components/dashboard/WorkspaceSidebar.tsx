@@ -177,10 +177,29 @@ export default function WorkspaceSidebar({
 
   // Collect all globally available workspaces and links grouped across profiles
   const globalProfileGroups = useMemo(() => {
+    const activeItems = layout.custom.activeGlobalItems
+    const allowedLinks = layout.custom.allowedGlobalLinks
+
     return profiles.map((p) => {
       const pName = p.customName || p.displayName
-      const slackWorkspaces = p.apps?.slack?.availableWorkspaces ?? []
-      const customLinks = p.customLinks ?? []
+      const rawSlackWorkspaces = p.apps?.slack?.availableWorkspaces ?? []
+      const rawCustomLinks = p.customLinks ?? []
+
+      // Filter Slack workspaces: must be active (if activeGlobalItems is defined) and allowed (if allowedGlobalLinks is defined)
+      const slackWorkspaces = rawSlackWorkspaces.filter((w) => {
+        const key = `ws:${p.id}:${w.teamId}`
+        if (activeItems !== undefined && !activeItems.includes(key)) return false
+        if (allowedLinks !== undefined && !allowedLinks.includes(key)) return false
+        return true
+      })
+
+      // Filter custom links: must be active and allowed
+      const customLinks = rawCustomLinks.filter((l) => {
+        if (activeItems !== undefined && !activeItems.includes(l.id)) return false
+        if (allowedLinks !== undefined && !allowedLinks.includes(l.id)) return false
+        return true
+      })
+
       return {
         profileId: p.id,
         profileName: pName,
@@ -189,7 +208,7 @@ export default function WorkspaceSidebar({
         hasItems: slackWorkspaces.length > 0 || customLinks.length > 0
       }
     }).filter((g) => g.hasItems)
-  }, [profiles])
+  }, [profiles, layout.custom.activeGlobalItems, layout.custom.allowedGlobalLinks])
 
   const totalGlobalItemsCount = useMemo(() => {
     return globalProfileGroups.reduce(
@@ -549,21 +568,27 @@ export default function WorkspaceSidebar({
                                 key={src.id}
                                 type="button"
                                 className="ws-nav-subitem"
-                                title={`${src.workspaceName} (${src.platform})`}
+                                title={src.url ? `${src.workspaceName} (${src.url})` : `${src.workspaceName} (${src.platform})`}
+                                onClick={() => {
+                                  if (src.url) {
+                                    window.open(src.url, '_blank')
+                                  }
+                                }}
                                 style={{
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'space-between',
                                   padding: '4px 12px 4px 28px',
                                   width: '100%',
-                                  textAlign: 'left'
+                                  textAlign: 'left',
+                                  cursor: src.url ? 'pointer' : 'default'
                                 }}
                               >
                                 <span className="ws-nav-label" style={{ fontSize: 12 }}>
-                                  🔌 {src.workspaceName}
+                                  {src.url ? '🌐' : '🔌'} {src.workspaceName}
                                 </span>
                                 <span className="ws-nav-tag" style={{ fontSize: 10, opacity: 0.7, textTransform: 'capitalize' }}>
-                                  {src.platform}
+                                  {src.url ? 'link ↗' : src.platform}
                                 </span>
                               </button>
                             ))}
@@ -592,41 +617,79 @@ export default function WorkspaceSidebar({
         })}
       </nav>
 
-      <div className="ws-nav-footer" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {onOpenAdd && (
+      <div
+        className="ws-nav-footer"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: (onOpenAdd && !layout.custom.hideAddButton) ? '1fr 1fr' : '1fr',
+          gap: 6,
+          padding: '8px 10px',
+          alignItems: 'center'
+        }}
+      >
+        {onOpenAdd && !layout.custom.hideAddButton && (
           <button
             type="button"
-            className="ws-nav-item"
+            className="ws-nav-item ws-nav-add-btn"
             onClick={onOpenAdd}
-            title="Add global workspaces, client channels, or platform links to this project card"
+            title="Add platform, workspace, or link to this card"
             style={{
-              width: '100%',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: 6,
-              background: 'rgba(255, 255, 255, 0.04)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: 8,
-              padding: '6px 12px',
+              background: 'color-mix(in srgb, var(--accent) 18%, rgba(255, 255, 255, 0.05))',
+              border: '1px solid color-mix(in srgb, var(--accent) 55%, transparent)',
+              borderRadius: 7,
+              padding: '0 8px',
+              height: 34,
               fontSize: '12px',
-              fontWeight: 600,
-              color: '#f8fafc',
-              cursor: 'pointer'
+              fontWeight: 650,
+              color: '#fff',
+              cursor: 'pointer',
+              boxShadow: '0 2px 5px rgba(0, 0, 0, 0.2)',
+              transition: 'all 0.15s ease',
+              minWidth: 0,
+              overflow: 'hidden'
             }}
           >
-            <span>➕</span>
-            <span>+ Add</span>
+            <span style={{ fontSize: '13px', flexShrink: 0 }}>➕</span>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              + Add
+            </span>
           </button>
         )}
-        <Row
-          fixed
-          icon="settings"
-          label="Settings"
-          title="Settings"
-          active={nav.openGroup === 'settings'}
+        <button
+          type="button"
+          className={`ws-nav-item ws-nav-fixed${nav.openGroup === 'settings' ? ' is-active' : ''}`}
           onClick={() => onOpenGroup('settings')}
-        />
+          title="Project Card Settings"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            background: nav.openGroup === 'settings' ? 'color-mix(in srgb, var(--accent) 25%, transparent)' : 'rgba(255, 255, 255, 0.04)',
+            border: nav.openGroup === 'settings' ? '1px solid var(--accent)' : '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: 7,
+            padding: '0 8px',
+            height: 34,
+            fontSize: '12px',
+            fontWeight: 600,
+            color: nav.openGroup === 'settings' ? '#fff' : 'var(--text-faint, #94a3b8)',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease',
+            minWidth: 0,
+            overflow: 'hidden'
+          }}
+        >
+          <span className="ws-nav-glyph" style={{ display: 'inline-flex' }}>
+            <NavIcon name="settings" />
+          </span>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            Settings
+          </span>
+        </button>
       </div>
 
       {!collapsed && (

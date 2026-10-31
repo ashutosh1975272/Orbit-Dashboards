@@ -85,6 +85,8 @@ export interface ProjectSource {
   profileId?: string
   workspaceId: string
   workspaceName: string
+  /** Optional direct URL for web-only card sources (non-Slack platforms). */
+  url?: string
   channels: ProjectSourceChannel[]
   role: 'client' | 'ours'
   enabled: boolean

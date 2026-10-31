@@ -225,7 +225,7 @@ export interface AppSettings {
     label: string
     at: string
   }>
-  sidebarLook: 'ancient' | 'new-cosmic'
+  sidebarLook: 'minimal' | 'ancient' | 'new-cosmic'
   showLookSwitcher: boolean
   showRecentSection: boolean
   sidebarButtons: {
@@ -237,9 +237,18 @@ export interface AppSettings {
   }
   showScrapeProgressLine?: boolean
   showGoogleEmailInputInSidebar?: boolean
+  showProfileScopeSelector?: boolean
+  /** When true, show "OBSERVER VIEW" label + divider above the 6 bottom sidebar buttons. Default: false. */
+  showObserverViewHeader?: boolean
+  /** Base layout presets for sidebar apps: none (empty), standard (Slack, Teams, WhatsApp), extended, full */
+  baseAppLayout?: 'none' | 'standard' | 'extended' | 'full'
+  /** When true, display quick actions (hide/remove) on sidebar items hover. Default: true. */
+  showSidebarItemActions?: boolean
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
+  baseAppLayout: 'standard',
+  showSidebarItemActions: true,
   notificationsEnabled: true,
   idleLockMinutes: 15,
   theme: 'dark',
@@ -255,6 +264,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   showRecentSection: true,
   showScrapeProgressLine: true,
   showGoogleEmailInputInSidebar: true,
+  showProfileScopeSelector: false,
+  showObserverViewHeader: false,
   sidebarButtons: {
     addWebsite: true,
     newProject: true,

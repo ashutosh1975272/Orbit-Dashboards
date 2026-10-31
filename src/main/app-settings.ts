@@ -68,7 +68,9 @@ export function normalizeAppSettings(parsed: Partial<AppSettings>): AppSettings 
         : DEFAULT_APP_SETTINGS.notificationSound,
     recentWorkspaces: recent,
     sidebarLook:
-      parsed.sidebarLook === 'ancient' || parsed.sidebarLook === 'new-cosmic'
+      parsed.sidebarLook === 'minimal' ||
+      parsed.sidebarLook === 'ancient' ||
+      parsed.sidebarLook === 'new-cosmic'
         ? parsed.sidebarLook
         : DEFAULT_APP_SETTINGS.sidebarLook,
     showLookSwitcher:
@@ -87,6 +89,25 @@ export function normalizeAppSettings(parsed: Partial<AppSettings>): AppSettings 
       typeof parsed.showGoogleEmailInputInSidebar === 'boolean'
         ? parsed.showGoogleEmailInputInSidebar
         : DEFAULT_APP_SETTINGS.showGoogleEmailInputInSidebar ?? true,
+    showProfileScopeSelector:
+      typeof parsed.showProfileScopeSelector === 'boolean'
+        ? parsed.showProfileScopeSelector
+        : DEFAULT_APP_SETTINGS.showProfileScopeSelector ?? false,
+    showObserverViewHeader:
+      typeof parsed.showObserverViewHeader === 'boolean'
+        ? parsed.showObserverViewHeader
+        : DEFAULT_APP_SETTINGS.showObserverViewHeader ?? false,
+    baseAppLayout:
+      parsed.baseAppLayout === 'none' ||
+      parsed.baseAppLayout === 'standard' ||
+      parsed.baseAppLayout === 'extended' ||
+      parsed.baseAppLayout === 'full'
+        ? parsed.baseAppLayout
+        : 'standard',
+    showSidebarItemActions:
+      typeof parsed.showSidebarItemActions === 'boolean'
+        ? parsed.showSidebarItemActions
+        : DEFAULT_APP_SETTINGS.showSidebarItemActions ?? true,
     sidebarButtons:
       parsed.sidebarButtons && typeof parsed.sidebarButtons === 'object'
         ? {

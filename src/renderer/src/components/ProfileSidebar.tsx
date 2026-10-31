@@ -1,4 +1,5 @@
 import { memo, useMemo, useState } from 'react'
+import { useProfileStore } from '../hooks/useProfiles'
 import { APP_DISPLAY_NAME } from '../../../shared/brand'
 import type { AppId, AppSession, AppSessionStatus, CustomLink, Profile } from '../../../shared/types'
 import {
@@ -69,10 +70,13 @@ interface ProfileSidebarProps {
   /** Optional slot rendered after the Recents strip (dashboard entry point). */
   dashboardSlot?: React.ReactNode
   /** Customization settings for the sidebar */
-  sidebarLook?: 'ancient' | 'new-cosmic'
+  sidebarLook?: 'minimal' | 'ancient' | 'new-cosmic'
   showLookSwitcher?: boolean
   showRecentSection?: boolean
   showGoogleEmailInputInSidebar?: boolean
+  showObserverViewHeader?: boolean
+  baseAppLayout?: 'none' | 'standard' | 'extended' | 'full'
+  showSidebarItemActions?: boolean
   sidebarButtons?: {
     addWebsite?: boolean
     newProject?: boolean
@@ -80,7 +84,7 @@ interface ProfileSidebarProps {
     observer?: boolean
     profilesHub?: boolean
   }
-  onLookChange?: (look: 'ancient' | 'new-cosmic') => void
+  onLookChange?: (look: 'minimal' | 'ancient' | 'new-cosmic') => void
 }
 
 function platformStatusDot(sessionStatus: AppSessionStatus): {
@@ -347,6 +351,9 @@ export const ProfileSidebar = memo(function ProfileSidebar({
   showLookSwitcher = true,
   showRecentSection = true,
   showGoogleEmailInputInSidebar = true,
+  showObserverViewHeader = false,
+  baseAppLayout = 'standard',
+  showSidebarItemActions = true,
   sidebarButtons = {
     addWebsite: true,
     newProject: true,
@@ -363,7 +370,7 @@ export const ProfileSidebar = memo(function ProfileSidebar({
   const [dragId, setDragId] = useState<string | null>(null)
   const activeLook = propSidebarLook ?? 'ancient'
 
-  const handleSetLook = (look: 'ancient' | 'new-cosmic'): void => {
+  const handleSetLook = (look: 'minimal' | 'ancient' | 'new-cosmic'): void => {
     onLookChange?.(look)
   }
   const profileIdSet = useMemo(() => new Set(profiles.map((p) => p.id)), [profiles])
@@ -441,29 +448,55 @@ export const ProfileSidebar = memo(function ProfileSidebar({
           </div>
         </div>
 
-        {/* View Looks Switcher: Ancient Look (default) vs New Cosmic */}
+        {/* View Looks Switcher: Minimal vs Ancient vs Cosmic (Fluid Auto-Responsive Grid) */}
         {showLookSwitcher ? (
           <div
             className="sidebar-looks-switcher"
             role="group"
             aria-label="Sidebar Appearance Look"
             style={{
-              display: 'flex',
-              gap: '4px',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+              gap: '3px',
               marginTop: '10px',
               background: 'rgba(0, 0, 0, 0.28)',
               padding: '3px',
               borderRadius: '8px',
-              border: '1px solid rgba(255, 255, 255, 0.07)'
+              border: '1px solid rgba(255, 255, 255, 0.07)',
+              width: '100%',
+              boxSizing: 'border-box'
             }}
           >
+            <button
+              type="button"
+              onClick={() => handleSetLook('minimal')}
+              aria-pressed={activeLook === 'minimal'}
+              style={{
+                padding: '5px 2px',
+                fontSize: '11px',
+                fontWeight: 600,
+                borderRadius: '6px',
+                border: activeLook === 'minimal' ? '1px solid var(--accent)' : '1px solid transparent',
+                background: activeLook === 'minimal' ? 'color-mix(in srgb, var(--accent) 22%, transparent)' : 'transparent',
+                color: activeLook === 'minimal' ? '#fff' : 'var(--text-faint)',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                textAlign: 'center',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                minWidth: 0
+              }}
+              title="Minimal"
+            >
+              Minimal
+            </button>
             <button
               type="button"
               onClick={() => handleSetLook('ancient')}
               aria-pressed={activeLook === 'ancient'}
               style={{
-                flex: 1,
-                padding: '5px 8px',
+                padding: '5px 2px',
                 fontSize: '11px',
                 fontWeight: 600,
                 borderRadius: '6px',
@@ -472,19 +505,22 @@ export const ProfileSidebar = memo(function ProfileSidebar({
                 color: activeLook === 'ancient' ? '#fff' : 'var(--text-faint)',
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
-                textAlign: 'center'
+                textAlign: 'center',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                minWidth: 0
               }}
-              title="Ancient Look (Default established theme)"
+              title="Ancient"
             >
-              Ancient Look
+              Ancient
             </button>
             <button
               type="button"
               onClick={() => handleSetLook('new-cosmic')}
               aria-pressed={activeLook === 'new-cosmic'}
               style={{
-                flex: 1,
-                padding: '5px 8px',
+                padding: '5px 2px',
                 fontSize: '11px',
                 fontWeight: 600,
                 borderRadius: '6px',
@@ -493,11 +529,15 @@ export const ProfileSidebar = memo(function ProfileSidebar({
                 color: activeLook === 'new-cosmic' ? '#fff' : 'var(--text-faint)',
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
-                textAlign: 'center'
+                textAlign: 'center',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                minWidth: 0
               }}
-              title="New Cosmic Look (Futuristic exploration)"
+              title="Cosmic"
             >
-              New Cosmic
+              Cosmic
             </button>
           </div>
         ) : null}
@@ -696,6 +736,28 @@ export const ProfileSidebar = memo(function ProfileSidebar({
                       ) : null}
                     </button>
                   )}
+                  {showSidebarItemActions && (
+                    <button
+                      type="button"
+                      className="nav-mute"
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        try {
+                          const updated = await window.api.profiles.setHiddenInSidebar(profile.id, true)
+                          useProfileStore.setState((prev) => ({
+                            profiles: prev.profiles.map((p) => (p.id === updated.id ? updated : p))
+                          }))
+                        } catch (err) {
+                          console.error('Failed to hide profile', err)
+                        }
+                      }}
+                      title="Hide profile from sidebar"
+                      aria-label={`Hide ${label} from sidebar`}
+                      style={{ fontSize: '11px', padding: '0 4px', opacity: 0.65 }}
+                    >
+                      👁
+                    </button>
+                  )}
                   <button
                     type="button"
                     className={`nav-mute${profile.muted ? ' is-muted' : ''}`}
@@ -723,7 +785,14 @@ export const ProfileSidebar = memo(function ProfileSidebar({
 
                 {profileOpen ? (
                   <ul className="nav-apps">
-                    {APP_IDS.map((appId) => {
+                    {APP_IDS.filter((appId) => {
+                      if (baseAppLayout === 'none') {
+                        // In Option 0 (None): show only if actively signed in or has workspaces
+                        const session = profile.apps[appId]
+                        return session.sessionStatus === 'signed-in' || (session.availableWorkspaces?.length ?? 0) > 0
+                      }
+                      return true
+                    }).map((appId) => {
                       const session = profile.apps[appId]
                       const appOpen = isAppOpen(profile.id, appId)
                       const appActive = profileActive && activeAppId === appId
@@ -801,8 +870,9 @@ export const ProfileSidebar = memo(function ProfileSidebar({
                           <li
                             key={link.id}
                             className={`nav-app${isLinkActive ? ' is-active' : ''}`}
+                            style={{ position: 'relative' }}
                           >
-                            <div className="nav-app-row">
+                            <div className="nav-app-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: '4px' }}>
                               <button
                                 type="button"
                                 className="nav-app-select"
@@ -811,6 +881,7 @@ export const ProfileSidebar = memo(function ProfileSidebar({
                                   onSelectCustomLink?.(profile.id, link)
                                 }}
                                 title={`Open ${link.name} (${link.url})`}
+                                style={{ flex: 1, minWidth: 0 }}
                               >
                                 <span
                                   style={{
@@ -824,8 +895,71 @@ export const ProfileSidebar = memo(function ProfileSidebar({
                                 >
                                   🌐
                                 </span>
-                                <span className="nav-app-label">{link.name}</span>
+                                <span className="nav-app-label" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {link.name}
+                                </span>
                               </button>
+
+                              {/* Hover / Direct Actions: Hide (👁) and Remove (✕) */}
+                              {showSidebarItemActions && (
+                                <div className="nav-item-actions" style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                                  <button
+                                    type="button"
+                                    onClick={async (e) => {
+                                      e.stopPropagation()
+                                      try {
+                                        const updated = await window.api.profiles.setLinkHiddenInSidebar(profile.id, link.id, true)
+                                        useProfileStore.setState((prev) => ({
+                                          profiles: prev.profiles.map((p) => (p.id === updated.id ? updated : p))
+                                        }))
+                                      } catch (err) {
+                                        console.error('Failed to hide link', err)
+                                      }
+                                    }}
+                                    title="Hide from sidebar"
+                                    aria-label={`Hide ${link.name}`}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      color: '#94a3b8',
+                                      fontSize: '11px',
+                                      padding: '2px 4px',
+                                      borderRadius: '3px'
+                                    }}
+                                  >
+                                    👁
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={async (e) => {
+                                      e.stopPropagation()
+                                      try {
+                                        const updated = await window.api.profiles.removeCustomLink(profile.id, link.id)
+                                        useProfileStore.setState((prev) => ({
+                                          profiles: prev.profiles.map((p) => (p.id === updated.id ? updated : p))
+                                        }))
+                                      } catch (err) {
+                                        console.error('Failed to remove link', err)
+                                      }
+                                    }}
+                                    title="Remove website link"
+                                    aria-label={`Remove ${link.name}`}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      color: '#94a3b8',
+                                      fontSize: '13px',
+                                      lineHeight: 1,
+                                      padding: '2px 4px',
+                                      borderRadius: '3px'
+                                    }}
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           </li>
                         )
@@ -838,18 +972,47 @@ export const ProfileSidebar = memo(function ProfileSidebar({
         )}
       </ul>
 
+      {/* Observer View Header — shown only when enabled in Settings */}
+      {showObserverViewHeader && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 4px 2px',
+            marginTop: '6px',
+            userSelect: 'none'
+          }}
+          aria-label="Observer View section"
+        >
+          <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
+          <span
+            style={{
+              fontSize: '9.5px',
+              fontWeight: 700,
+              color: '#64748b',
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase'
+            }}
+          >
+            Observer View
+          </span>
+          <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
+        </div>
+      )}
+
       <div className="nav-action-compact-container">
         {/* Configurable Action: + Website */}
         {sidebarButtons.addWebsite !== false ? (
           <button
             type="button"
-            className="nav-action-compact-btn"
+            className="nav-action-compact-btn nav-btn-prominent"
             onClick={onAddPlatform}
             title="Add Website or Web Platform"
             aria-label="Add Website"
           >
-            <span className="nav-btn-icon">🌐</span>
-            <span className="nav-btn-text">+ Website</span>
+            <span className="nav-btn-icon" style={{ fontSize: '14px' }}>🌐</span>
+            <span className="nav-btn-text" style={{ fontWeight: 650 }}>+ Website</span>
           </button>
         ) : null}
 

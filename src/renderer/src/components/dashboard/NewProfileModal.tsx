@@ -8,9 +8,16 @@ interface NewProfileModalProps {
   onClose: () => void
   onCreate: (name: string, email: string, mode: ProfileCreationMode) => Promise<void>
   initialEmail?: string
+  showScopeSelector?: boolean
 }
 
-export function NewProfileModal({ open, onClose, onCreate, initialEmail }: NewProfileModalProps): React.JSX.Element | null {
+export function NewProfileModal({
+  open,
+  onClose,
+  onCreate,
+  initialEmail,
+  showScopeSelector = false
+}: NewProfileModalProps): React.JSX.Element | null {
   const profiles = useProfileStore((s) => s.profiles)
   const [mode, setMode] = useState<ProfileCreationMode>('both')
   const [name, setName] = useState('')
@@ -124,83 +131,85 @@ export function NewProfileModal({ open, onClose, onCreate, initialEmail }: NewPr
           )}
 
           {/* Mode Selector: 3 Creation Scopes (Both, Global, Individual) */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <label style={{ fontSize: '13px', fontWeight: 500, color: '#cbd5e1' }}>
-                Account Creation Scope:
-              </label>
-              <span style={{ fontSize: '11px', color: '#64748b' }}>
-                (Observer is managed from sidebar)
-              </span>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-              <button
-                type="button"
-                onClick={() => setMode('both')}
-                style={{
-                  padding: '10px',
-                  borderRadius: '8px',
-                  border: mode === 'both' ? '1.5px solid var(--accent)' : '1px solid rgba(255, 255, 255, 0.12)',
-                  background: mode === 'both' ? 'color-mix(in srgb, var(--accent) 15%, transparent)' : 'rgba(255, 255, 255, 0.03)',
-                  color: mode === 'both' ? '#fff' : '#94a3b8',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                <div style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px', color: mode === 'both' ? '#fff' : '#cbd5e1' }}>
-                  🌟 Both (Recommended)
-                </div>
-                <div style={{ fontSize: '10px', color: '#64748b', lineHeight: 1.3 }}>
-                  Usable in both Global pool & Individual project list.
-                </div>
-              </button>
+          {showScopeSelector && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label style={{ fontSize: '13px', fontWeight: 500, color: '#cbd5e1' }}>
+                  Account Creation Scope:
+                </label>
+                <span style={{ fontSize: '11px', color: '#64748b' }}>
+                  (Observer is managed from sidebar)
+                </span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setMode('both')}
+                  style={{
+                    padding: '10px',
+                    borderRadius: '8px',
+                    border: mode === 'both' ? '1.5px solid var(--accent)' : '1px solid rgba(255, 255, 255, 0.12)',
+                    background: mode === 'both' ? 'color-mix(in srgb, var(--accent) 15%, transparent)' : 'rgba(255, 255, 255, 0.03)',
+                    color: mode === 'both' ? '#fff' : '#94a3b8',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <div style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px', color: mode === 'both' ? '#fff' : '#cbd5e1' }}>
+                    🌟 Both (Recommended)
+                  </div>
+                  <div style={{ fontSize: '10px', color: '#64748b', lineHeight: 1.3 }}>
+                    Usable in both Global pool & Individual project list.
+                  </div>
+                </button>
 
-              <button
-                type="button"
-                onClick={() => setMode('under_global')}
-                style={{
-                  padding: '10px',
-                  borderRadius: '8px',
-                  border: mode === 'under_global' ? '1.5px solid var(--accent)' : '1px solid rgba(255, 255, 255, 0.12)',
-                  background: mode === 'under_global' ? 'color-mix(in srgb, var(--accent) 15%, transparent)' : 'rgba(255, 255, 255, 0.03)',
-                  color: mode === 'under_global' ? '#fff' : '#94a3b8',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                <div style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px', color: mode === 'under_global' ? '#fff' : '#cbd5e1' }}>
-                  🌐 Global Accounts
-                </div>
-                <div style={{ fontSize: '10px', color: '#64748b', lineHeight: 1.3 }}>
-                  Shared company pool for all project cards.
-                </div>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setMode('under_global')}
+                  style={{
+                    padding: '10px',
+                    borderRadius: '8px',
+                    border: mode === 'under_global' ? '1.5px solid var(--accent)' : '1px solid rgba(255, 255, 255, 0.12)',
+                    background: mode === 'under_global' ? 'color-mix(in srgb, var(--accent) 15%, transparent)' : 'rgba(255, 255, 255, 0.03)',
+                    color: mode === 'under_global' ? '#fff' : '#94a3b8',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <div style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px', color: mode === 'under_global' ? '#fff' : '#cbd5e1' }}>
+                    🌐 Global Accounts
+                  </div>
+                  <div style={{ fontSize: '10px', color: '#64748b', lineHeight: 1.3 }}>
+                    Shared company pool for all project cards.
+                  </div>
+                </button>
 
-              <button
-                type="button"
-                onClick={() => setMode('individual')}
-                style={{
-                  padding: '10px',
-                  borderRadius: '8px',
-                  border: mode === 'individual' ? '1.5px solid var(--accent)' : '1px solid rgba(255, 255, 255, 0.12)',
-                  background: mode === 'individual' ? 'color-mix(in srgb, var(--accent) 15%, transparent)' : 'rgba(255, 255, 255, 0.03)',
-                  color: mode === 'individual' ? '#fff' : '#94a3b8',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                <div style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px', color: mode === 'individual' ? '#fff' : '#cbd5e1' }}>
-                  👤 Individual Only
-                </div>
-                <div style={{ fontSize: '10px', color: '#64748b', lineHeight: 1.3 }}>
-                  Dedicated client profile that owns cards.
-                </div>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setMode('individual')}
+                  style={{
+                    padding: '10px',
+                    borderRadius: '8px',
+                    border: mode === 'individual' ? '1.5px solid var(--accent)' : '1px solid rgba(255, 255, 255, 0.12)',
+                    background: mode === 'individual' ? 'color-mix(in srgb, var(--accent) 15%, transparent)' : 'rgba(255, 255, 255, 0.03)',
+                    color: mode === 'individual' ? '#fff' : '#94a3b8',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <div style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px', color: mode === 'individual' ? '#fff' : '#cbd5e1' }}>
+                    👤 Individual Only
+                  </div>
+                  <div style={{ fontSize: '10px', color: '#64748b', lineHeight: 1.3 }}>
+                    Dedicated client profile that owns cards.
+                  </div>
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           <div>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#cbd5e1', marginBottom: '6px' }}>

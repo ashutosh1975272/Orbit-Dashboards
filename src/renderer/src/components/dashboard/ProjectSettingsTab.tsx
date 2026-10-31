@@ -21,6 +21,7 @@ import {
 } from './sources'
 import { useProfileStore } from '../../hooks/useProfiles'
 import type { ProjectSource } from '../../../../shared/dashboard-contract'
+import { CardAddModal } from './CardAddModal'
 
 export type SettingsTabKey = 'general' | 'ai' | 'sources' | 'channels' | 'schedule' | 'sidebar' | 'danger'
 
@@ -53,6 +54,8 @@ export default function ProjectSettingsTab({
   const [sourceNotice, setSourceNotice] = useState<string | null>(null)
   const [scrapingSourceId, setScrapingSourceId] = useState<string | null>(null)
   const [logsOpen, setLogsOpen] = useState(false)
+  const [cardAddModalOpen, setCardAddModalOpen] = useState(false)
+  const [cardAddModalTab, setCardAddModalTab] = useState<'global' | 'my' | 'client'>('my')
 
   // Schedule state
   const [startDate, setStartDate] = useState(project.startDate ?? '')
@@ -104,6 +107,71 @@ export default function ProjectSettingsTab({
 
   const handleResetLayout = (): void => {
     updateLayout(DEFAULT_LAYOUT)
+  }
+
+  const handleToggleActiveGlobalItem = (itemId: string, allItemIds: string[]): void => {
+    // If activeGlobalItems is undefined, currently all items are active
+    const current = layout.custom.activeGlobalItems !== undefined
+      ? [...layout.custom.activeGlobalItems]
+      : [...allItemIds]
+
+    let updatedActive: string[]
+    if (current.includes(itemId)) {
+      // Deactivating: remove from activeGlobalItems AND remove from allowedGlobalLinks (hidden)
+      updatedActive = current.filter((id) => id !== itemId)
+    } else {
+      // Activating: add to activeGlobalItems
+      updatedActive = [...current, itemId]
+    }
+
+    // Keep allowedGlobalLinks consistent: if active items updated, keep allowed in sync
+    const currentAllowed = layout.custom.allowedGlobalLinks !== undefined
+      ? [...layout.custom.allowedGlobalLinks]
+      : [...allItemIds]
+    const updatedAllowed = current.includes(itemId)
+      ? currentAllowed.filter((id) => id !== itemId)
+      : (currentAllowed.includes(itemId) ? currentAllowed : [...currentAllowed, itemId])
+
+    updateLayout({
+      ...layout,
+      custom: {
+        ...layout.custom,
+        activeGlobalItems: updatedActive,
+        allowedGlobalLinks: updatedAllowed
+      }
+    })
+  }
+
+  const handleToggleAllowedGlobalLink = (linkId: string, allGlobalItemIds: string[]): void => {
+    // If allowedGlobalLinks is undefined, currently all active links are shown.
+    const current = layout.custom.allowedGlobalLinks !== undefined
+      ? [...layout.custom.allowedGlobalLinks]
+      : [...allGlobalItemIds]
+
+    let updated: string[]
+    if (current.includes(linkId)) {
+      updated = current.filter((id) => id !== linkId)
+    } else {
+      updated = [...current, linkId]
+    }
+
+    updateLayout({
+      ...layout,
+      custom: {
+        ...layout.custom,
+        allowedGlobalLinks: updated
+      }
+    })
+  }
+
+  const handleToggleHideAddButton = (): void => {
+    updateLayout({
+      ...layout,
+      custom: {
+        ...layout.custom,
+        hideAddButton: !layout.custom.hideAddButton
+      }
+    })
   }
 
   const handleToggleSubItem = (parentKey: string, subItemKey: string): void => {
@@ -756,39 +824,572 @@ export default function ProjectSettingsTab({
                   onReset={handleResetLayout}
                 />
 
-                {/* Granular Section Visibility Toggles for Slack & Accounts */}
+                {/* 1. Card Sidebar Buttons & Footer */}
                 <div style={{ marginTop: '24px', padding: '16px', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border)', borderRadius: '10px' }}>
                   <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 600, color: 'var(--text)' }}>
-                    Detailed Card Sidebar Sections
+                    Card Sidebar Buttons & Footer
                   </h4>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
                       <input
                         type="checkbox"
+                        checked={!layout.custom.hideAddButton}
+                        onChange={handleToggleHideAddButton}
+                      />
+                      <span><b>Show "+ Add" button</b> in this card's sidebar footer (alongside Settings)</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* 2. Global Accounts Section (sidebar-acc-global-accounts) */}
+                <div
+                  id="sidebar-acc-global-accounts"
+                  style={{
+                    marginTop: '16px',
+                    padding: '16px',
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '10px'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <div>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 650, color: 'var(--text)' }}>
+                        🌐 Global Accounts (sidebar-acc-global-accounts)
+                      </h4>
+                      <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
+                        Global workspaces &amp; links. Only <b>Active</b> accounts are accessible to this card &amp; its AI agent.
+                      </p>
+                    </div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: '12.5px' }}>
+                      <input
+                        type="checkbox"
                         checked={!layout.custom.hiddenItems?.['slack']?.includes('global_accounts')}
                         onChange={() => handleToggleSubItem('slack', 'global_accounts')}
                       />
-                      <span><b>Global Accounts</b> (workspaces &amp; links signed-in across all profiles)</span>
-                    </label>
-
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
-                      <input
-                        type="checkbox"
-                        checked={!layout.custom.hiddenItems?.['slack']?.includes('our_slack')}
-                        onChange={() => handleToggleSubItem('slack', 'our_slack')}
-                      />
-                      <span><b>My Accounts</b> (internal channels &amp; connected platforms like Discord, Upwork, Teams)</span>
-                    </label>
-
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
-                      <input
-                        type="checkbox"
-                        checked={!layout.custom.hiddenItems?.['slack']?.includes('client_slack')}
-                        onChange={() => handleToggleSubItem('slack', 'client_slack')}
-                      />
-                      <span><b>Client Accounts</b> (client communication channels &amp; accounts)</span>
+                      <span>Show in sidebar</span>
                     </label>
                   </div>
+
+                  {/* List of profiles, their workspaces & links */}
+                  {profiles.length === 0 ? (
+                    <div style={{ padding: 12, border: '1px dashed var(--border)', borderRadius: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+                      No global profiles configured yet.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                      {profiles.map((p) => {
+                        const pName = p.customName || p.displayName
+                        const customLinks = p.customLinks ?? []
+                        const slackWorkspaces = p.apps?.slack?.availableWorkspaces ?? []
+
+                        // Across all profiles for bulk actions
+                        const allGlobalItemIds = profiles.flatMap((prof) => [
+                          ...(prof.apps?.slack?.availableWorkspaces ?? []).map((w) => `ws:${prof.id}:${w.teamId}`),
+                          ...(prof.customLinks ?? []).map((l) => l.id)
+                        ])
+
+                        const active = layout.custom.activeGlobalItems
+                        const allowed = layout.custom.allowedGlobalLinks
+
+                        return (
+                          <div
+                            key={p.id}
+                            style={{
+                              background: 'rgba(0, 0, 0, 0.25)',
+                              border: '1px solid rgba(255, 255, 255, 0.06)',
+                              borderRadius: 8,
+                              padding: '14px'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>
+                                  👤 {pName}
+                                </span>
+                              </div>
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                <button
+                                  type="button"
+                                  className="dash-subtle"
+                                  style={{ fontSize: 11, padding: '2px 8px' }}
+                                  onClick={() => {
+                                    updateLayout({
+                                      ...layout,
+                                      custom: {
+                                        ...layout.custom,
+                                        activeGlobalItems: allGlobalItemIds,
+                                        allowedGlobalLinks: allGlobalItemIds
+                                      }
+                                    })
+                                  }}
+                                  title="Activate and show all workspaces and links for this card"
+                                >
+                                  Activate All
+                                </button>
+                                <button
+                                  type="button"
+                                  className="dash-subtle"
+                                  style={{ fontSize: 11, padding: '2px 8px' }}
+                                  onClick={() => {
+                                    updateLayout({
+                                      ...layout,
+                                      custom: {
+                                        ...layout.custom,
+                                        allowedGlobalLinks: []
+                                      }
+                                    })
+                                  }}
+                                  title="Hide all global workspaces and links from this card's sidebar"
+                                >
+                                  Hide All
+                                </button>
+                                <button
+                                  type="button"
+                                  className="dash-subtle"
+                                  style={{ fontSize: 11, padding: '2px 8px', color: 'var(--danger)' }}
+                                  onClick={() => {
+                                    updateLayout({
+                                      ...layout,
+                                      custom: {
+                                        ...layout.custom,
+                                        activeGlobalItems: [],
+                                        allowedGlobalLinks: []
+                                      }
+                                    })
+                                  }}
+                                  title="Deactivate all global accounts for this card (No AI / No sidebar access)"
+                                >
+                                  Deactivate All
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Workspaces Section with Active / Deactive & Show / Hide controls */}
+                            {slackWorkspaces.length > 0 && (
+                              <div style={{ marginBottom: 12 }}>
+                                <div style={{ fontSize: 11, fontWeight: 650, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+                                  Slack Workspaces
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 8 }}>
+                                  {slackWorkspaces.map((w) => {
+                                    const wsKey = `ws:${p.id}:${w.teamId}`
+                                    const isActive = active === undefined ? true : active.includes(wsKey)
+                                    const isShown = allowed === undefined ? true : allowed.includes(wsKey)
+
+                                    return (
+                                      <div
+                                        key={w.teamId}
+                                        style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'space-between',
+                                          padding: '8px 10px',
+                                          borderRadius: 6,
+                                          background: !isActive
+                                            ? 'rgba(0, 0, 0, 0.4)'
+                                            : isShown ? 'rgba(99, 102, 241, 0.12)' : 'rgba(255, 255, 255, 0.02)',
+                                          border: `1px solid ${!isActive ? 'rgba(255, 255, 255, 0.04)' : isShown ? 'rgba(99, 102, 241, 0.35)' : 'rgba(255, 255, 255, 0.06)'}`,
+                                          gap: 8,
+                                          opacity: !isActive ? 0.6 : 1
+                                        }}
+                                      >
+                                        <div style={{ minWidth: 0 }}>
+                                          <div style={{ fontSize: 12, fontWeight: 600, color: isActive ? '#fff' : '#64748b' }}>
+                                            🏢 {w.teamName}
+                                          </div>
+                                          <div style={{ fontSize: 10, color: '#64748b' }}>Slack Workspace</div>
+                                        </div>
+
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                                          {/* 1. Active / Deactive Toggle Button */}
+                                          <button
+                                            type="button"
+                                            className="dash-subtle"
+                                            style={{
+                                              fontSize: 10.5,
+                                              padding: '2px 6px',
+                                              color: isActive ? '#22c55e' : '#94a3b8'
+                                            }}
+                                            onClick={() => handleToggleActiveGlobalItem(wsKey, allGlobalItemIds)}
+                                            title={isActive ? 'Click to deactivate for this card and AI' : 'Click to activate for this card'}
+                                          >
+                                            {isActive ? '⚡ Active' : '⏸ Inactive'}
+                                          </button>
+
+                                          {/* 2. Show / Hide (only when Active) */}
+                                          {isActive && (
+                                            <>
+                                              <button
+                                                type="button"
+                                                className="dash-subtle"
+                                                style={{
+                                                  fontSize: 10.5,
+                                                  padding: '2px 6px',
+                                                  color: isShown ? 'var(--accent-btn)' : '#94a3b8'
+                                                }}
+                                                onClick={() => handleToggleAllowedGlobalLink(wsKey, allGlobalItemIds)}
+                                                title={isShown ? 'Hide from this card sidebar' : 'Show in this card sidebar'}
+                                              >
+                                                {isShown ? '👁 Shown' : '👁‍🗨 Hidden'}
+                                              </button>
+                                              {isShown && (
+                                                <button
+                                                  type="button"
+                                                  style={{
+                                                    background: 'none',
+                                                    border: 'none',
+                                                    color: 'var(--danger)',
+                                                    fontSize: 12,
+                                                    cursor: 'pointer',
+                                                    padding: '2px 4px'
+                                                  }}
+                                                  onClick={() => handleToggleAllowedGlobalLink(wsKey, allGlobalItemIds)}
+                                                  title="Remove from sidebar"
+                                                >
+                                                  ✕
+                                                </button>
+                                              )}
+                                            </>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Links list with Active / Deactive & Show / Hide controls */}
+                            <div>
+                              <div style={{ fontSize: 11, fontWeight: 650, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+                                Custom Tabs &amp; AI Agents
+                              </div>
+                              {customLinks.length === 0 ? (
+                                <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                  No custom links added to this profile.
+                                </p>
+                              ) : (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 8 }}>
+                                  {customLinks.map((link) => {
+                                    const isActive = active === undefined ? true : active.includes(link.id)
+                                    const isShown = allowed === undefined ? true : allowed.includes(link.id)
+
+                                    return (
+                                      <div
+                                        key={link.id}
+                                        style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'space-between',
+                                          padding: '8px 10px',
+                                          borderRadius: 6,
+                                          background: !isActive
+                                            ? 'rgba(0, 0, 0, 0.4)'
+                                            : isShown ? 'rgba(99, 102, 241, 0.12)' : 'rgba(255, 255, 255, 0.02)',
+                                          border: `1px solid ${!isActive ? 'rgba(255, 255, 255, 0.04)' : isShown ? 'rgba(99, 102, 241, 0.35)' : 'rgba(255, 255, 255, 0.06)'}`,
+                                          gap: 8,
+                                          opacity: !isActive ? 0.6 : 1
+                                        }}
+                                      >
+                                        <span
+                                          style={{
+                                            fontSize: 12,
+                                            fontWeight: 500,
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            whiteSpace: 'nowrap',
+                                            color: isActive ? (isShown ? 'var(--text)' : 'var(--text-muted)') : '#64748b'
+                                          }}
+                                          title={`${link.name}: ${link.url}`}
+                                        >
+                                          🔗 {link.name}
+                                        </span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                                          {/* 1. Active / Deactive Toggle Button */}
+                                          <button
+                                            type="button"
+                                            className="dash-subtle"
+                                            style={{
+                                              fontSize: 10.5,
+                                              padding: '2px 6px',
+                                              color: isActive ? '#22c55e' : '#94a3b8'
+                                            }}
+                                            onClick={() => handleToggleActiveGlobalItem(link.id, allGlobalItemIds)}
+                                            title={isActive ? 'Click to deactivate for this card and AI' : 'Click to activate for this card'}
+                                          >
+                                            {isActive ? '⚡ Active' : '⏸ Inactive'}
+                                          </button>
+
+                                          {/* 2. Show / Hide (only when Active) */}
+                                          {isActive && (
+                                            <>
+                                              <button
+                                                type="button"
+                                                className="dash-subtle"
+                                                style={{
+                                                  fontSize: 10.5,
+                                                  padding: '2px 6px',
+                                                  color: isShown ? 'var(--accent-btn)' : 'var(--text-muted)'
+                                                }}
+                                                onClick={() => handleToggleAllowedGlobalLink(link.id, allGlobalItemIds)}
+                                                title={isShown ? 'Hide from this card sidebar' : 'Show in this card sidebar'}
+                                              >
+                                                {isShown ? '👁 Shown' : '👁‍🗨 Hidden'}
+                                              </button>
+                                              {isShown && (
+                                                <button
+                                                  type="button"
+                                                  style={{
+                                                    background: 'none',
+                                                    border: 'none',
+                                                    color: 'var(--danger)',
+                                                    fontSize: 12,
+                                                    cursor: 'pointer',
+                                                    padding: '2px 4px'
+                                                  }}
+                                                  onClick={() => handleToggleAllowedGlobalLink(link.id, allGlobalItemIds)}
+                                                  title="Remove from this card sidebar"
+                                                >
+                                                  ✕
+                                                </button>
+                                              )}
+                                            </>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. My Accounts Section (sidebar-acc-my-accounts) */}
+                <div
+                  id="sidebar-acc-my-accounts"
+                  style={{
+                    marginTop: '16px',
+                    padding: '16px',
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '10px'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <div>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 650, color: 'var(--text)' }}>
+                        👤 My Accounts (sidebar-acc-my-accounts)
+                      </h4>
+                      <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
+                        Internal team workspaces, platforms (Discord, Upwork, Teams), and custom links.
+                      </p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: '12.5px' }}>
+                        <input
+                          type="checkbox"
+                          checked={!layout.custom.hiddenItems?.['slack']?.includes('our_slack')}
+                          onChange={() => handleToggleSubItem('slack', 'our_slack')}
+                        />
+                        <span>Show in sidebar</span>
+                      </label>
+                      <button
+                        type="button"
+                        className="dash-primary"
+                        style={{ fontSize: 12, padding: '4px 10px' }}
+                        onClick={() => {
+                          setCardAddModalTab('my')
+                          setCardAddModalOpen(true)
+                        }}
+                      >
+                        + Add Platform / Link
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Sources belonging to 'ours' */}
+                  {(() => {
+                    const mySources = (project.sources ?? []).filter((s) => s.role === 'ours')
+                    if (mySources.length === 0) {
+                      return (
+                        <div style={{ padding: 12, border: '1px dashed var(--border)', borderRadius: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+                          No custom sources added under My Accounts yet. Click "+ Add Platform / Link" to attach one.
+                        </div>
+                      )
+                    }
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {mySources.map((src) => (
+                          <div
+                            key={src.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '8px 12px',
+                              borderRadius: 6,
+                              background: 'rgba(0, 0, 0, 0.25)',
+                              border: '1px solid rgba(255, 255, 255, 0.06)'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <span style={{ fontSize: 14 }}>{src.url ? '🌐' : '🔌'}</span>
+                              <div>
+                                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+                                  {src.workspaceName}
+                                </span>
+                                <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>
+                                  {src.url ? src.url : (src.platform ?? 'channel')}
+                                </span>
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <button
+                                type="button"
+                                className="dash-subtle"
+                                style={{ fontSize: 11, padding: '3px 8px' }}
+                                onClick={() => void handleToggleSourceEnabled(src.id, src.enabled !== false)}
+                              >
+                                {src.enabled !== false ? '👁 Active' : '👁‍🗨 Paused'}
+                              </button>
+                              <button
+                                type="button"
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: 'var(--danger)',
+                                  fontSize: 12,
+                                  cursor: 'pointer',
+                                  padding: '3px 6px'
+                                }}
+                                onClick={() => void handleRemoveSource(src.id)}
+                                title="Remove from this card"
+                              >
+                                ✕ Remove
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  })()}
+                </div>
+
+                {/* 4. Client Accounts Section (sidebar-acc-client-accounts) */}
+                <div
+                  id="sidebar-acc-client-accounts"
+                  style={{
+                    marginTop: '16px',
+                    padding: '16px',
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '10px'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <div>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 650, color: 'var(--text)' }}>
+                        🤝 Client Accounts (sidebar-acc-client-accounts)
+                      </h4>
+                      <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
+                        Client communications, direct workspace tokens, or external client portals.
+                      </p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: '12.5px' }}>
+                        <input
+                          type="checkbox"
+                          checked={!layout.custom.hiddenItems?.['slack']?.includes('client_slack')}
+                          onChange={() => handleToggleSubItem('slack', 'client_slack')}
+                        />
+                        <span>Show in sidebar</span>
+                      </label>
+                      <button
+                        type="button"
+                        className="dash-primary"
+                        style={{ fontSize: 12, padding: '4px 10px' }}
+                        onClick={() => {
+                          setCardAddModalTab('client')
+                          setCardAddModalOpen(true)
+                        }}
+                      >
+                        + Add Platform / Link
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Sources belonging to 'client' */}
+                  {(() => {
+                    const clientSources = (project.sources ?? []).filter((s) => s.role === 'client')
+                    if (clientSources.length === 0) {
+                      return (
+                        <div style={{ padding: 12, border: '1px dashed var(--border)', borderRadius: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+                          No client sources added yet. Click "+ Add Platform / Link" to connect one.
+                        </div>
+                      )
+                    }
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {clientSources.map((src) => (
+                          <div
+                            key={src.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '8px 12px',
+                              borderRadius: 6,
+                              background: 'rgba(0, 0, 0, 0.25)',
+                              border: '1px solid rgba(255, 255, 255, 0.06)'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <span style={{ fontSize: 14 }}>{src.url ? '🌐' : '🔌'}</span>
+                              <div>
+                                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+                                  {src.workspaceName}
+                                </span>
+                                <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>
+                                  {src.url ? src.url : (src.platform ?? 'channel')}
+                                </span>
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <button
+                                type="button"
+                                className="dash-subtle"
+                                style={{ fontSize: 11, padding: '3px 8px' }}
+                                onClick={() => void handleToggleSourceEnabled(src.id, src.enabled !== false)}
+                              >
+                                {src.enabled !== false ? '👁 Active' : '👁‍🗨 Paused'}
+                              </button>
+                              <button
+                                type="button"
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: 'var(--danger)',
+                                  fontSize: 12,
+                                  cursor: 'pointer',
+                                  padding: '3px 6px'
+                                }}
+                                onClick={() => void handleRemoveSource(src.id)}
+                                title="Remove from this card"
+                              >
+                                ✕ Remove
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  })()}
                 </div>
               </section>
             </div>
@@ -894,6 +1495,14 @@ export default function ProjectSettingsTab({
         projectId={project.id}
         projectName={project.name}
         onClose={() => setLogsOpen(false)}
+      />
+
+      <CardAddModal
+        open={cardAddModalOpen}
+        project={project}
+        defaultTab={cardAddModalTab}
+        onClose={() => setCardAddModalOpen(false)}
+        onSuccess={() => setCardAddModalOpen(false)}
       />
     </div>
   )

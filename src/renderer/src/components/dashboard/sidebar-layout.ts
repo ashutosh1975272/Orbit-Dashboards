@@ -34,6 +34,12 @@ export interface SidebarLayout {
     hiddenSections: string[]
     itemOrder: Record<string, string[]>
     hiddenItems: Record<string, string[]>
+    /** Global item IDs (workspaces 'ws:profileId:teamId' and links 'linkId') active for this card and accessible to AI. */
+    activeGlobalItems?: string[]
+    /** Specific global items allowed/visible in this card's sidebar (must also be active). If undefined, all active items show. */
+    allowedGlobalLinks?: string[]
+    /** When true, hide the "+ Add" button from this card's sidebar footer */
+    hideAddButton?: boolean
   }
 }
 
@@ -43,7 +49,10 @@ export const DEFAULT_LAYOUT: SidebarLayout = {
     sectionOrder: [],
     hiddenSections: [],
     itemOrder: {},
-    hiddenItems: {}
+    hiddenItems: {},
+    activeGlobalItems: undefined,
+    allowedGlobalLinks: undefined,
+    hideAddButton: false
   }
 }
 

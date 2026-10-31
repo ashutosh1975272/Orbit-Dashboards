@@ -61,11 +61,13 @@ export class MonitorStore {
 
   async listProjects(): Promise<DashboardProject[]> {
     const data = await this.read()
-    return data.projects.map((p) => ({
-      ...p,
-      sources: Array.isArray(p.sources) ? p.sources : [],
-      sourcePreference: p.sourcePreference ?? 'token_first'
-    }))
+    return data.projects
+      .filter((p) => p.id !== 'draft-project' && !p.id.startsWith('draft-'))
+      .map((p) => ({
+        ...p,
+        sources: Array.isArray(p.sources) ? p.sources : [],
+        sourcePreference: p.sourcePreference ?? 'token_first'
+      }))
   }
 
   async upsertProject(input: {

@@ -23,6 +23,10 @@ import { AccountsManagementModal } from './components/dashboard/AccountsManageme
 import { UnifiedSettingsModal, type SettingsTabKey } from './components/dashboard/UnifiedSettingsModal'
 import { NewProfileModal } from './components/dashboard/NewProfileModal'
 import { NewProjectModal } from './components/dashboard/NewProjectModal'
+import { CardPickerModal } from './components/dashboard/CardPickerModal'
+import { CardAddModal } from './components/dashboard/CardAddModal'
+import type { DashboardProject } from '../../shared/dashboard-contract'
+import { isIndividualProfile } from '../../shared/types'
 import { sidebarToastFor } from './lib/sidebar-toast'
 import { modKey, modShift } from './lib/shortcut-label'
 import { useProfileStore } from './hooks/useProfiles'
@@ -92,6 +96,8 @@ function App(): React.JSX.Element {
   const [initialNewProfileEmail, setInitialNewProfileEmail] = useState<string | null>(null)
   const [newProjectModalOpen, setNewProjectModalOpen] = useState(false)
   const [accountsModalOpen, setAccountsModalOpen] = useState(false)
+  const [cardPickerOpen, setCardPickerOpen] = useState(false)
+  const [cardAddProject, setCardAddProject] = useState<DashboardProject | null>(null)
   const [activeCustomLinkId, setActiveCustomLinkId] = useState<string | null>(null)
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS)
   const [locked, setLocked] = useState(false)
@@ -836,7 +842,9 @@ function App(): React.JSX.Element {
               onPlatformSettings={(profileId, appId) => {
                 setPlatformSettings({ profileId, appId })
               }}
-              onAddPlatform={() => setAddPlatformOpen(true)}
+              onAddPlatform={() => {
+                setAddPlatformOpen(true)
+              }}
               onNewProject={() => {
                 useDashboardStore.getState().openDashboard()
                 setNewProjectModalOpen(true)
@@ -858,6 +866,9 @@ function App(): React.JSX.Element {
               showLookSwitcher={settings.showLookSwitcher ?? true}
               showRecentSection={settings.showRecentSection ?? true}
               showGoogleEmailInputInSidebar={settings.showGoogleEmailInputInSidebar ?? true}
+              showObserverViewHeader={settings.showObserverViewHeader ?? false}
+              baseAppLayout={settings.baseAppLayout ?? 'standard'}
+              showSidebarItemActions={settings.showSidebarItemActions ?? true}
               sidebarButtons={settings.sidebarButtons}
               onLookChange={(look) => {
                 void window.api.app.setSettings({ sidebarLook: look }).then((next) => {
@@ -1109,6 +1120,7 @@ function App(): React.JSX.Element {
         }}
         onCreate={handleCreateAndAuthProfile}
         initialEmail={initialNewProfileEmail || undefined}
+        showScopeSelector={settings.showProfileScopeSelector ?? false}
       />
 
       {platformSettings ? (
@@ -1128,14 +1140,65 @@ function App(): React.JSX.Element {
       ) : null}
 
       {addPlatformOpen ? (
-        <AddPlatformPage open={true} onClose={() => setAddPlatformOpen(false)} />
+        <AddPlatformPage
+          open={true}
+          onClose={() => setAddPlatformOpen(false)}
+          initialProfileId={activeProfileId}
+          onOpenProfilesHub={() => setAccountsModalOpen(true)}
+          onNewProject={() => {
+            useDashboardStore.getState().openDashboard()
+            setNewProjectModalOpen(true)
+          }}
+          onNewProfile={() => setNewProfileModalOpen(true)}
+        />
+      ) : null}
+
+      {/* Card Picker — Step 1 for Individual Profile "+ Website" */}
+      {cardPickerOpen && activeProfileId ? (
+        <CardPickerModal
+          open={cardPickerOpen}
+          profileId={activeProfileId}
+          onClose={() => setCardPickerOpen(false)}
+          onPickCard={(project) => {
+            setCardPickerOpen(false)
+            setCardAddProject(project)
+          }}
+        />
+      ) : null}
+
+      {/* Card Add Modal — Step 2 (isolated to selected project card) */}
+      {cardAddProject ? (
+        <CardAddModal
+          open={true}
+          project={cardAddProject}
+          onClose={() => setCardAddProject(null)}
+          onSuccess={(msg) => {
+            setToast(msg)
+            setCardAddProject(null)
+          }}
+        />
       ) : null}
 
       {accountsModalOpen ? (
         <AccountsManagementModal
           open={true}
           onClose={() => setAccountsModalOpen(false)}
-          onAddGoogleAccount={() => {
+          onAddWebsite={() => {
+            setAccountsModalOpen(false)
+            const activeProf = profiles.find((p) => p.id === activeProfileId)
+            if (activeProf && isIndividualProfile(activeProf)) {
+              setCardPickerOpen(true)
+            } else {
+              setAddPlatformOpen(true)
+            }
+          }}
+          onNewProject={() => {
+            setAccountsModalOpen(false)
+            useDashboardStore.getState().openDashboard()
+            setNewProjectModalOpen(true)
+          }}
+          onNewProfile={() => {
+            setAccountsModalOpen(false)
             setNewProfileModalOpen(true)
           }}
           onSelectProfile={(id) => void handleSelectProfile(id)}

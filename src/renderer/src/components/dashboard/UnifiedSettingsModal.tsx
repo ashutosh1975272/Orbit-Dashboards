@@ -427,12 +427,13 @@ export function UnifiedSettingsModal({
                           value={settings.sidebarLook ?? 'ancient'}
                           onChange={(e) =>
                             onChangeSettings({
-                              sidebarLook: e.target.value as 'ancient' | 'new-cosmic'
+                              sidebarLook: e.target.value as 'minimal' | 'ancient' | 'new-cosmic'
                             })
                           }
                         >
-                          <option value="ancient">Ancient Look (Default)</option>
-                          <option value="new-cosmic">New Cosmic (Futuristic)</option>
+                          <option value="minimal">Minimal Look (Clean &amp; compact)</option>
+                          <option value="ancient">Ancient Look (Default established theme)</option>
+                          <option value="new-cosmic">New Cosmic (Futuristic exploration)</option>
                         </select>
                       </label>
 
@@ -498,6 +499,85 @@ export function UnifiedSettingsModal({
                           }
                         />
                       </label>
+
+                      <label className="settings-row">
+                        <span>
+                          Show Account Scope Selector in Profile Modal
+                          <span style={{ display: 'block', fontSize: '11px', color: '#64748b' }}>
+                            Display Both / Global / Individual scope chips in the Add Profile dialog (defaults to Both when off)
+                          </span>
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={settings.showProfileScopeSelector ?? false}
+                          onChange={(e) =>
+                            onChangeSettings({ showProfileScopeSelector: e.target.checked })
+                          }
+                        />
+                      </label>
+
+                      <label className="settings-row">
+                        <span>
+                          Show "Observer View" Header in Sidebar
+                          <span style={{ display: 'block', fontSize: '11px', color: '#64748b' }}>
+                            Display a subtle "OBSERVER VIEW" divider label above the bottom 6 sidebar action buttons
+                          </span>
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={settings.showObserverViewHeader ?? false}
+                          onChange={(e) =>
+                            onChangeSettings({ showObserverViewHeader: e.target.checked })
+                          }
+                        />
+                      </label>
+
+                      <label className="settings-row">
+                        <span>
+                          Show Quick Actions on Sidebar Items
+                          <span style={{ display: 'block', fontSize: '11px', color: '#64748b' }}>
+                            Show hide (👁) and remove (×) action buttons when hovering over custom links in the sidebar
+                          </span>
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={settings.showSidebarItemActions ?? true}
+                          onChange={(e) =>
+                            onChangeSettings({ showSidebarItemActions: e.target.checked })
+                          }
+                        />
+                      </label>
+
+                      <div className="settings-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div>
+                          <span>Base Default Apps Layout</span>
+                          <span style={{ display: 'block', fontSize: '11px', color: '#64748b' }}>
+                            Choose the default messaging apps and tools shown when creating accounts
+                          </span>
+                        </div>
+                        <select
+                          value={settings.baseAppLayout ?? 'standard'}
+                          onChange={(e) =>
+                            onChangeSettings({
+                              baseAppLayout: e.target.value as 'none' | 'standard' | 'extended' | 'full'
+                            })
+                          }
+                          style={{
+                            background: '#0f172a',
+                            color: '#f8fafc',
+                            border: '1px solid rgba(255,255,255,0.15)',
+                            borderRadius: '6px',
+                            padding: '6px 12px',
+                            fontSize: '12px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <option value="none">Option 0: Minimal (No default apps — show only added websites)</option>
+                          <option value="standard">Option 1 (Default): Standard 3 apps (Slack, Teams, WhatsApp)</option>
+                          <option value="extended">Option 2: Extended (Slack, Teams, WhatsApp + Claude, ChatGPT)</option>
+                          <option value="full">Option 3: All-in-One (Slack, Teams, WhatsApp + 6 top tools)</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
 

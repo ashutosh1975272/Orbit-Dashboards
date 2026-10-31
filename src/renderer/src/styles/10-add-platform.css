@@ -773,7 +773,7 @@
   padding: 8px 0 2px 0;
   border-top: 1px solid var(--border);
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
   gap: 6px;
   width: 100%;
 }
@@ -781,14 +781,15 @@
 .nav-action-compact-btn {
   display: flex;
   align-items: center;
-  justifyContent: center;
-  gap: 5px;
-  padding: 7px 4px;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 6px;
+  min-height: 34px;
   border-radius: 7px;
   border: 1px solid var(--border);
   background: var(--bg-page);
   color: var(--text);
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   font-weight: 550;
   cursor: pointer;
   white-space: nowrap;
@@ -802,6 +803,20 @@
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
   color: #fff;
+}
+
+.nav-action-compact-btn.nav-btn-prominent {
+  background: color-mix(in srgb, var(--accent) 16%, rgba(255, 255, 255, 0.04));
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+.nav-action-compact-btn.nav-btn-prominent:hover {
+  background: color-mix(in srgb, var(--accent) 26%, rgba(255, 255, 255, 0.08));
+  border-color: var(--accent);
+  box-shadow: 0 2px 10px rgba(99, 102, 241, 0.35);
 }
 
 .nav-action-compact-btn.nav-btn-primary {

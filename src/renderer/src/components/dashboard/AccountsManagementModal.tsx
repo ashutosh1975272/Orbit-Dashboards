@@ -16,6 +16,9 @@ export type HubNavSection = 'observer' | 'global' | 'individual'
 interface AccountsManagementModalProps {
   open: boolean
   onClose: () => void
+  onAddWebsite?: () => void
+  onNewProject?: () => void
+  onNewProfile?: () => void
   onAddGoogleAccount?: () => void
   onSelectProfile?: (profileId: string) => void
   onOpenCustomLink?: (profileId: string, link: CustomLink) => void
@@ -24,6 +27,9 @@ interface AccountsManagementModalProps {
 export function AccountsManagementModal({
   open,
   onClose,
+  onAddWebsite,
+  onNewProject,
+  onNewProfile,
   onAddGoogleAccount,
   onSelectProfile,
   onOpenCustomLink
@@ -219,8 +225,47 @@ export function AccountsManagementModal({
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {onAddGoogleAccount && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {onAddWebsite && (
+              <button
+                type="button"
+                className="btn ghost btn-sm"
+                onClick={() => {
+                  onClose()
+                  onAddWebsite()
+                }}
+                style={{ fontSize: '12px', padding: '6px 12px' }}
+              >
+                🌐 + Website
+              </button>
+            )}
+            {onNewProject && (
+              <button
+                type="button"
+                className="btn ghost btn-sm"
+                onClick={() => {
+                  onClose()
+                  onNewProject()
+                }}
+                style={{ fontSize: '12px', padding: '6px 12px' }}
+              >
+                📁 + Project
+              </button>
+            )}
+            {onNewProfile && (
+              <button
+                type="button"
+                className="btn primary btn-sm"
+                onClick={() => {
+                  onClose()
+                  onNewProfile()
+                }}
+                style={{ fontSize: '12px', padding: '6px 12px' }}
+              >
+                👤 + Profile
+              </button>
+            )}
+            {!onNewProfile && onAddGoogleAccount && (
               <button
                 type="button"
                 className="btn primary btn-sm"

@@ -119,8 +119,8 @@ export function SidebarLayoutView({
     },
     {
       key: 'custom',
-      title: 'Custom',
-      subtitle: 'Tailored arrangement',
+      title: 'Manual',
+      subtitle: 'Handpick sections and accounts',
       badge: 'Personalized',
       svgPath: (
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
