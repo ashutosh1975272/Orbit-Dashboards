@@ -255,8 +255,8 @@ export function NewProfileModal({
               }}
             />
             {existingProfile ? (
-              <span style={{ fontSize: '12px', color: '#38bdf8', marginTop: '4px', display: 'block' }}>
-                ℹ️ This email is already connected as &ldquo;{existingProfile.customName || existingProfile.displayName}&rdquo;. Submitting will update its scope and profile name.
+              <span style={{ fontSize: '12px', color: '#38bdf8', marginTop: '4px', display: 'block', lineHeight: 1.4 }}>
+                ℹ️ <b>Existing Account Found</b>: <code>{existingProfile.displayName}</code> is already authenticated (labeled as &ldquo;{existingProfile.customName || existingProfile.displayName}&rdquo;). Submitting will link this account with your selected scope.
               </span>
             ) : (
               <span style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', display: 'block' }}>
