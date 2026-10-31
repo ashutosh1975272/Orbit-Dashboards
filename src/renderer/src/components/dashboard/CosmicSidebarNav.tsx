@@ -39,9 +39,19 @@ export function CosmicSidebarContent({
     return profiles.filter((p) => p.id !== 'global-account-profile')
   }, [profiles])
 
-  // Active projects for the selected profile in Level 1 (excluding completed & removed)
-  const activeProfileProjects = useMemo(() => {
-    if (!snapshot || !cosmicLevel1 || cosmicLevel1 === 'all' || cosmicLevel1 === 'global') {
+  // Active projects to display:
+  // For 'all': all active projects across all profiles
+  // For a specific profile: all active projects for that profile
+  const displayedProjects = useMemo(() => {
+    if (!snapshot) return []
+    if (cosmicLevel1 === 'all') {
+      return snapshot.projects.filter(
+        (p) =>
+          p.project.workflowStatus !== 'completed' &&
+          p.project.workflowStatus !== 'removed'
+      )
+    }
+    if (cosmicLevel1 === 'global') {
       return []
     }
     return snapshot.projects.filter(
@@ -73,9 +83,11 @@ export function CosmicSidebarContent({
     [snapshot, setCosmicNavigation]
   )
 
+  const isAllProjects = cosmicLevel1 === 'all'
   const isProfileSelected = Boolean(
     cosmicLevel1 && cosmicLevel1 !== 'all' && cosmicLevel1 !== 'global'
   )
+  const showCardsSection = isAllProjects || isProfileSelected
 
   return (
     <div
@@ -136,8 +148,8 @@ export function CosmicSidebarContent({
           </select>
       </div>
 
-      {/* When a profile is selected: Show Profile & Dashboard buttons + compact projects list */}
-      {isProfileSelected && (
+      {/* When All Projects or a Profile is selected: Show Profile & Dashboard buttons + compact projects list */}
+      {showCardsSection && (
         <div
           className="cosmic-profile-section"
           style={{
@@ -161,7 +173,7 @@ export function CosmicSidebarContent({
               <button
                 type="button"
                 onClick={() => onOpenProfilesHub?.()}
-                title="Open Profile Accounts Hub"
+                title={isAllProjects ? 'Open Profiles Management Hub' : 'Open Profile Accounts Hub'}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -178,14 +190,14 @@ export function CosmicSidebarContent({
                   transition: 'all 0.15s ease'
                 }}
               >
-                <span>👤</span>
-                <span>Profile</span>
+                <span>{isAllProjects ? '👥' : '👤'}</span>
+                <span>{isAllProjects ? 'All Profiles' : 'Profile'}</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setCosmicNavigation(cosmicLevel1, null)}
-                title="View All Projects for this Profile"
+                title={isAllProjects ? 'View All Projects Dashboard' : 'View Projects Dashboard for this Profile'}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -209,7 +221,7 @@ export function CosmicSidebarContent({
                 }}
               >
                 <span>▦</span>
-                <span>Dashboard</span>
+                <span>{isAllProjects ? 'Full Dashboard' : 'Dashboard'}</span>
               </button>
             </div>
           )}
@@ -243,7 +255,7 @@ export function CosmicSidebarContent({
                   color: 'var(--text-faint, #64748b)'
                 }}
               >
-                Projects ({activeProfileProjects.length})
+                Projects ({displayedProjects.length})
               </span>
               {onNewProject && (
                 <button
@@ -265,7 +277,7 @@ export function CosmicSidebarContent({
               )}
             </div>
 
-            {activeProfileProjects.length === 0 ? (
+            {displayedProjects.length === 0 ? (
               <div
                 style={{
                   padding: '16px 8px',
@@ -275,16 +287,24 @@ export function CosmicSidebarContent({
                   lineHeight: 1.5
                 }}
               >
-                <p>No active project cards found for this profile.</p>
+                <p>No active project cards found.</p>
                 <p style={{ marginTop: '4px', fontSize: '11.5px' }}>
                   Click <b>+ Project</b> below to create one.
                 </p>
               </div>
             ) : (
-              activeProfileProjects.map((entry) => {
+              displayedProjects.map((entry) => {
                 const isSelected = cosmicSelectedCardId === entry.project.id
                 const projName = entry.project.name || entry.project.teamName || 'Project'
                 const clientName = entry.project.clientName
+                const profileObj = isAllProjects
+                  ? profiles.find((p) => p.id === entry.project.profileId)
+                  : null
+                const profileLabel = profileObj ? profileDisplayLabel(profileObj) : null
+                const subtitle = isAllProjects
+                  ? profileLabel || (clientName ? `Client: ${clientName}` : null)
+                  : (clientName ? `Client: ${clientName}` : null)
+
                 return (
                   <button
                     key={entry.project.id}
@@ -334,7 +354,7 @@ export function CosmicSidebarContent({
                       >
                         {projName}
                       </span>
-                      {clientName && (
+                      {subtitle && (
                         <span
                           style={{
                             fontSize: '10.5px',
@@ -344,7 +364,7 @@ export function CosmicSidebarContent({
                             whiteSpace: 'nowrap'
                           }}
                         >
-                          Client: {clientName}
+                          {subtitle}
                         </span>
                       )}
                     </div>

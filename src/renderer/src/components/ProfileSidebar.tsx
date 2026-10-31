@@ -372,8 +372,8 @@ export const ProfileSidebar = memo(function ProfileSidebar({
 }: ProfileSidebarProps): React.JSX.Element {
   const activeLook = propSidebarLook ?? 'ancient'
   const cosmicLevel1 = useDashboardStore((s) => s.cosmicLevel1)
-  const isCosmicProfileSelected =
-    activeLook === 'new-cosmic' && Boolean(cosmicLevel1 && cosmicLevel1 !== 'all' && cosmicLevel1 !== 'global')
+  const isCosmicManagedMiddle =
+    activeLook === 'new-cosmic' && cosmicLevel1 !== 'global'
   const [profileExpanded, setProfileExpanded] = useState<Record<string, boolean>>({})
   const [appExpanded, setAppExpanded] = useState<Record<string, boolean>>({})
   const [renamingId, setRenamingId] = useState<string | null>(null)
@@ -564,8 +564,8 @@ export const ProfileSidebar = memo(function ProfileSidebar({
         dashboardSlot
       )}
 
-      {/* When NOT viewing a specific profile in Cosmic Look, render the full global sidebar rules (Recent, Google email, profile tree) */}
-      {!isCosmicProfileSelected && (
+      {/* When NOT in Cosmic managed middle (All Projects or Profile selected), render the full global sidebar rules (Recent, Google email, profile tree) */}
+      {!isCosmicManagedMiddle && (
         <>
           {showRecentSection && visibleRecents.length > 0 ? (
         <div className="recent-strip" aria-label="Recent workspaces">
