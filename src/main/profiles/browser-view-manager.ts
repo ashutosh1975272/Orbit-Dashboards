@@ -939,10 +939,20 @@ export class BrowserViewManager {
     profileId: string,
     teamId: string,
     mainWindow: BrowserWindow,
-    bounds: Rectangle
+    bounds: Rectangle,
+    appId: AppId = 'slack'
   ): Promise<void> {
-    const key = viewKey(profileId, 'slack')
-    const view = this.getOrCreate(profileId, 'slack')
+    const key = viewKey(profileId, appId)
+    const view = this.getOrCreate(profileId, appId)
+
+    // If switching card views, detach the previously embedded view first
+    if (this.cardEmbedKey && this.cardEmbedKey !== key) {
+      const prevView = this.views.get(this.cardEmbedKey)
+      if (prevView && mainWindow.contentView.children.includes(prevView)) {
+        mainWindow.contentView.removeChildView(prevView)
+      }
+    }
+
     this.cardEmbedKey = key
     this.cardEmbedBounds = bounds
 
@@ -951,18 +961,33 @@ export class BrowserViewManager {
     }
     view.setBounds(bounds)
 
-    // Ensure we are navigated to this team workspace if not already there
-    const currentUrl = view.webContents.getURL()
-    if (!currentUrl || !currentUrl.includes(teamId)) {
-      try {
-        await this.navigateToWorkspace(profileId, 'slack', { teamId })
-      } catch (err) {
-        log.warn('Card live slack navigate failed or partially loaded', { profileId, teamId, err: String(err) })
+    // Ensure we are navigated appropriately
+    if (appId === 'slack' && teamId) {
+      const currentUrl = view.webContents.getURL()
+      if (!currentUrl || !currentUrl.includes(teamId)) {
+        try {
+          await this.navigateToWorkspace(profileId, 'slack', { teamId })
+        } catch (err) {
+          log.warn('Card live slack navigate failed or partially loaded', { profileId, teamId, err: String(err) })
+        }
+      }
+    } else if (appId === 'whatsapp') {
+      const currentUrl = view.webContents.getURL()
+      if (!currentUrl || !currentUrl.includes('web.whatsapp.com')) {
+        void view.webContents.loadURL(WHATSAPP_WEB_URL)
+      }
+    } else if (appId === 'teams') {
+      const currentUrl = view.webContents.getURL()
+      if (
+        !currentUrl ||
+        (!currentUrl.includes('teams.microsoft.com') && !currentUrl.includes('login.microsoftonline.com'))
+      ) {
+        void view.webContents.loadURL(TEAMS_HOME_URL)
       }
     }
 
     this.noteActivity()
-    log.info('card live slack embed activated', { profileId, teamId, bounds })
+    log.info('card live embed activated', { profileId, appId, teamId, bounds })
   }
 
   updateCardSlackEmbedBounds(mainWindow: BrowserWindow, bounds: Rectangle): void {

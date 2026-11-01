@@ -336,7 +336,7 @@ export interface IpcApi {
     ) => Promise<void>
     updateBounds: (bounds: ViewportBounds) => Promise<void>
     setEmbedVisible: (visible: boolean) => Promise<void>
-    activateCardSlackEmbed: (payload: { profileId: string; teamId: string; bounds: ViewportBounds }) => Promise<void>
+    activateCardSlackEmbed: (payload: { profileId: string; teamId?: string; appId?: AppId; bounds: ViewportBounds }) => Promise<void>
     updateCardSlackEmbedBounds: (bounds: ViewportBounds) => Promise<void>
     clearCardSlackEmbed: () => Promise<void>
     startGoogleAuth: (profileId: string, bounds?: ViewportBounds) => Promise<Profile>

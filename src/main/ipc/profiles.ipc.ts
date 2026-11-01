@@ -610,16 +610,17 @@ export function registerProfileIpc(deps: ProfileIpcDeps): void {
 
   handleInvoke(
     IpcChannels.ProfileActivateCardSlackEmbed,
-    async (payload: { profileId: string; teamId: string; bounds: ViewportBounds }) => {
+    async (payload: { profileId: string; teamId?: string; appId?: AppId; bounds: ViewportBounds }) => {
       const mainWindow = deps.getMainWindow()
       if (!mainWindow) {
         return
       }
       await deps.browserViewManager.activateCardSlackEmbed(
         payload.profileId,
-        payload.teamId,
+        payload.teamId ?? '',
         mainWindow,
-        payload.bounds
+        payload.bounds,
+        payload.appId ?? 'slack'
       )
     }
   )

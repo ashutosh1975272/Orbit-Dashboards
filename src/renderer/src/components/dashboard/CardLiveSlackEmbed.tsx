@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 
 interface CardLiveSlackEmbedProps {
   profileId: string
-  teamId: string
+  teamId?: string
+  appId?: 'slack' | 'teams' | 'whatsapp'
 }
 
 interface ScrapeEventState {
@@ -20,7 +21,8 @@ interface ScrapeEventState {
  */
 export default function CardLiveSlackEmbed({
   profileId,
-  teamId
+  teamId,
+  appId = 'slack'
 }: CardLiveSlackEmbedProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const embedRef = useRef<HTMLDivElement>(null)
@@ -101,7 +103,8 @@ export default function CardLiveSlackEmbed({
     void window.api.profiles
       .activateCardSlackEmbed({
         profileId,
-        teamId,
+        teamId: teamId ?? '',
+        appId,
         bounds: initialBounds
       })
       .then(() => {
@@ -128,9 +131,9 @@ export default function CardLiveSlackEmbed({
       window.removeEventListener('scroll', sendBounds, true)
       void window.api.profiles.clearCardSlackEmbed()
     }
-  }, [profileId, teamId])
+  }, [profileId, teamId, appId])
 
-  const isScrapingActive = scrapeEvent.status === 'reading' && lineVisible
+  const isScrapingActive = appId === 'slack' && scrapeEvent.status === 'reading' && lineVisible
 
   return (
     <div
@@ -233,7 +236,13 @@ export default function CardLiveSlackEmbed({
                 animation: 'spin 1s linear infinite'
               }}
             />
-            <span>Connecting Live Slack...</span>
+            <span>
+              {appId === 'teams'
+                ? 'Connecting Microsoft Teams...'
+                : appId === 'whatsapp'
+                  ? 'Loading WhatsApp Web...'
+                  : 'Connecting Live Slack...'}
+            </span>
           </div>
         )}
       </div>
