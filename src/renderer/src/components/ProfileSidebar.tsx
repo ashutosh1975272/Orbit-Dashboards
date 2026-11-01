@@ -469,7 +469,7 @@ export const ProfileSidebar = memo(function ProfileSidebar({
           </div>
         </div>
 
-        {/* View Looks Switcher: Minimal vs Cosmic vs Ancient vs Basic (Fluid Auto-Responsive Grid) */}
+        {/* View Looks Switcher: Basic vs Minimal vs Cosmic vs Ancient (Fluid Auto-Responsive Grid) */}
         {showLookSwitcher ? (
           <div
             className="sidebar-looks-switcher"
@@ -488,6 +488,30 @@ export const ProfileSidebar = memo(function ProfileSidebar({
               boxSizing: 'border-box'
             }}
           >
+            <button
+              type="button"
+              onClick={() => handleSetLook('basic')}
+              aria-pressed={activeLook === 'basic'}
+              style={{
+                padding: '5px 2px',
+                fontSize: '11px',
+                fontWeight: 600,
+                borderRadius: '6px',
+                border: activeLook === 'basic' ? '1px solid var(--accent)' : '1px solid transparent',
+                background: activeLook === 'basic' ? 'color-mix(in srgb, var(--accent) 22%, transparent)' : 'transparent',
+                color: activeLook === 'basic' ? '#fff' : 'var(--text-faint)',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                textAlign: 'center',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                minWidth: 0
+              }}
+              title="Basic"
+            >
+              Basic
+            </button>
             <button
               type="button"
               onClick={() => handleSetLook('minimal')}
@@ -560,30 +584,6 @@ export const ProfileSidebar = memo(function ProfileSidebar({
             >
               Ancient
             </button>
-            <button
-              type="button"
-              onClick={() => handleSetLook('basic')}
-              aria-pressed={activeLook === 'basic'}
-              style={{
-                padding: '5px 2px',
-                fontSize: '11px',
-                fontWeight: 600,
-                borderRadius: '6px',
-                border: activeLook === 'basic' ? '1px solid var(--accent)' : '1px solid transparent',
-                background: activeLook === 'basic' ? 'color-mix(in srgb, var(--accent) 22%, transparent)' : 'transparent',
-                color: activeLook === 'basic' ? '#fff' : 'var(--text-faint)',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-                textAlign: 'center',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                minWidth: 0
-              }}
-              title="Basic"
-            >
-              Basic
-            </button>
           </div>
         ) : null}
       </div>
@@ -632,19 +632,9 @@ export const ProfileSidebar = memo(function ProfileSidebar({
           onOpenProfilesHub={onOpenProfilesHub}
           onNewProject={onNewProject}
         />
-      ) : activeLook === 'minimal' ? (
+      ) : activeLook === 'minimal' || activeLook === 'basic' ? (
         <CosmicSidebarContent
           isMinimalLook
-          profiles={profiles}
-          showSidebarProfileNavButton={showSidebarProfileNavButton}
-          showSidebarDashboardNavButton={showSidebarDashboardNavButton}
-          showCosmicProfileNavButtons={showCosmicProfileNavButtons}
-          onOpenProfilesHub={onOpenProfilesHub}
-          onNewProject={onNewProject}
-        />
-      ) : activeLook === 'basic' ? (
-        <CosmicSidebarContent
-          isBasicLook
           profiles={profiles}
           showSidebarProfileNavButton={showSidebarProfileNavButton}
           showSidebarDashboardNavButton={showSidebarDashboardNavButton}

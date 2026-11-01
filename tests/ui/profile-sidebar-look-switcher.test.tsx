@@ -35,7 +35,7 @@ describe('ProfileSidebar Look Switcher Button Arrangement', () => {
     showLookSwitcher: true
   }
 
-  it('renders look buttons in the order: Minimal, Cosmic, Ancient, Basic', () => {
+  it('renders look buttons in the order: Basic, Minimal, Cosmic, Ancient', () => {
     const onLookChange = vi.fn()
     const { container } = render(
       <ProfileSidebar
@@ -51,21 +51,21 @@ describe('ProfileSidebar Look Switcher Button Arrangement', () => {
     const buttons = switcher?.querySelectorAll('button')
     expect(buttons?.length).toBe(4)
 
-    // Button 0: Minimal
-    expect(buttons?.[0]?.textContent?.trim()).toBe('Minimal')
-    expect(buttons?.[0]?.getAttribute('title')).toBe('Minimal')
+    // Button 0: Basic
+    expect(buttons?.[0]?.textContent?.trim()).toBe('Basic')
+    expect(buttons?.[0]?.getAttribute('title')).toBe('Basic')
 
-    // Button 1: Cosmic
-    expect(buttons?.[1]?.textContent?.trim()).toBe('Cosmic')
-    expect(buttons?.[1]?.getAttribute('title')).toBe('Cosmic')
+    // Button 1: Minimal
+    expect(buttons?.[1]?.textContent?.trim()).toBe('Minimal')
+    expect(buttons?.[1]?.getAttribute('title')).toBe('Minimal')
 
-    // Button 2: Ancient
-    expect(buttons?.[2]?.textContent?.trim()).toBe('Ancient')
-    expect(buttons?.[2]?.getAttribute('title')).toBe('Ancient')
+    // Button 2: Cosmic
+    expect(buttons?.[2]?.textContent?.trim()).toBe('Cosmic')
+    expect(buttons?.[2]?.getAttribute('title')).toBe('Cosmic')
 
-    // Button 3: Basic
-    expect(buttons?.[3]?.textContent?.trim()).toBe('Basic')
-    expect(buttons?.[3]?.getAttribute('title')).toBe('Basic')
+    // Button 3: Ancient
+    expect(buttons?.[3]?.textContent?.trim()).toBe('Ancient')
+    expect(buttons?.[3]?.getAttribute('title')).toBe('Ancient')
   })
 
   it('invokes onLookChange with the correct look identifier on button click', () => {
@@ -81,21 +81,21 @@ describe('ProfileSidebar Look Switcher Button Arrangement', () => {
     const buttons = container.querySelectorAll('.sidebar-looks-switcher button')
     expect(buttons.length).toBe(4)
 
-    // Click Minimal
+    // Click Basic
     fireEvent.click(buttons[0])
+    expect(onLookChange).toHaveBeenCalledWith('basic')
+
+    // Click Minimal
+    fireEvent.click(buttons[1])
     expect(onLookChange).toHaveBeenCalledWith('minimal')
 
     // Click Cosmic
-    fireEvent.click(buttons[1])
+    fireEvent.click(buttons[2])
     expect(onLookChange).toHaveBeenCalledWith('new-cosmic')
 
     // Click Ancient
-    fireEvent.click(buttons[2])
-    expect(onLookChange).toHaveBeenCalledWith('ancient')
-
-    // Click Basic
     fireEvent.click(buttons[3])
-    expect(onLookChange).toHaveBeenCalledWith('basic')
+    expect(onLookChange).toHaveBeenCalledWith('ancient')
   })
 
   it('renders Google email input when showGoogleEmailInputInSidebar is true in Minimal look', () => {
@@ -114,11 +114,27 @@ describe('ProfileSidebar Look Switcher Button Arrangement', () => {
     expect(submitBtn).not.toBeNull()
   })
 
-  it('hides Google email input when showGoogleEmailInputInSidebar is false in Minimal look', () => {
+  it('renders Google email input when showGoogleEmailInputInSidebar is true in Basic look', () => {
     const { container } = render(
       <ProfileSidebar
         {...defaultProps}
-        sidebarLook="minimal"
+        sidebarLook="basic"
+        showGoogleEmailInputInSidebar={true}
+      />
+    )
+
+    const emailInput = container.querySelector('#google-email')
+    expect(emailInput).not.toBeNull()
+
+    const submitBtn = container.querySelector('button[aria-label="Continue with Google"]')
+    expect(submitBtn).not.toBeNull()
+  })
+
+  it('hides Google email input when showGoogleEmailInputInSidebar is false in Basic look', () => {
+    const { container } = render(
+      <ProfileSidebar
+        {...defaultProps}
+        sidebarLook="basic"
         showGoogleEmailInputInSidebar={false}
       />
     )
@@ -132,6 +148,25 @@ describe('ProfileSidebar Look Switcher Button Arrangement', () => {
       <ProfileSidebar
         {...defaultProps}
         sidebarLook="minimal"
+        showSidebarProfileNavButton={true}
+        showSidebarDashboardNavButton={true}
+      />
+    )
+
+    // The All Projects / level-1 dropdown container is hidden
+    const dropdown = container.querySelector('.cosmic-nav-selectors')
+    expect(dropdown).toBeNull()
+
+    // Quick nav buttons (All Profiles / Full Dashboard) are hidden
+    const quickNav = container.querySelector('.cosmic-quick-nav-buttons')
+    expect(quickNav).toBeNull()
+  })
+
+  it('hides cosmic-nav-selectors dropdown and quick nav buttons in Basic look', () => {
+    const { container } = render(
+      <ProfileSidebar
+        {...defaultProps}
+        sidebarLook="basic"
         showSidebarProfileNavButton={true}
         showSidebarDashboardNavButton={true}
       />

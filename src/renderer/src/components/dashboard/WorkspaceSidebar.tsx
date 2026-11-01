@@ -228,7 +228,12 @@ export default function WorkspaceSidebar({
 
   const baseItems = useMemo(() => getBaseLayoutItems(baseAppLayout), [baseAppLayout])
 
-  const isMinimal = layout.mode === 'minimal' || propSidebarLook === 'minimal' || appLook === 'minimal'
+  const isMinimal =
+    layout.mode === 'minimal' ||
+    propSidebarLook === 'minimal' ||
+    propSidebarLook === 'basic' ||
+    appLook === 'minimal' ||
+    appLook === 'basic'
   const isAddHidden = layout.custom.hideAddButton ?? true
   const [globalAccountsOpen, setGlobalAccountsOpen] = useState(true)
 
