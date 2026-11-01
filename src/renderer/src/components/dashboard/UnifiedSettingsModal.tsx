@@ -5,7 +5,7 @@ import { CustomLink, Profile } from '../../../../shared/types'
 import { useProfileStore } from '../../hooks/useProfiles'
 import { modKey } from '../../lib/shortcut-label'
 import AiSettingsForm from './AiSettingsForm'
-export type SettingsTabKey = 'general' | 'sidebar' | 'ai' | 'accounts' | 'maintenance'
+export type SettingsTabKey = 'general' | 'sidebar' | 'ai' | 'accounts' | 'maintenance' | 'advance'
 
 interface UnifiedSettingsModalProps {
   open: boolean
@@ -38,6 +38,13 @@ export function UnifiedSettingsModal({
 }: UnifiedSettingsModalProps): React.JSX.Element | null {
   const [activeTab, setActiveTab] = useState<SettingsTabKey>(initialTab)
   const [globalConfig, setGlobalConfig] = useState<DashboardGlobalConfig | null>(null)
+  const [isAdvanceMode, setIsAdvanceMode] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('orbit:settings-advance-mode') === 'true'
+    } catch {
+      return false
+    }
+  })
 
   // Accounts state
   const profiles = useProfileStore((s) => s.profiles)
@@ -48,6 +55,9 @@ export function UnifiedSettingsModal({
 
   useEffect(() => {
     if (open) {
+      if (initialTab !== 'general' && initialTab !== 'advance') {
+        setIsAdvanceMode(true)
+      }
       setActiveTab(initialTab)
     }
   }, [open, initialTab])
@@ -138,13 +148,18 @@ export function UnifiedSettingsModal({
         : 'Not configured'
     : 'Checking…'
 
-  const navItems = [
-    { key: 'general' as const, label: 'Preferences & Appearance', icon: '🎨' },
-    { key: 'sidebar' as const, label: 'Sidebar & Navigation', icon: '📑' },
-    { key: 'ai' as const, label: 'Global AI & NVIDIA NIM', icon: '🤖' },
-    { key: 'accounts' as const, label: 'Accounts & Workspaces', icon: '👥' },
-    { key: 'maintenance' as const, label: 'System & Maintenance', icon: '🛡️' }
+  const allNavItems: Array<{ key: SettingsTabKey; label: string; icon: string }> = [
+    { key: 'general', label: 'Preferences & Appearance', icon: '🎨' },
+    { key: 'advance', label: 'Advance Control', icon: '🎛️' },
+    { key: 'sidebar', label: 'Sidebar & Navigation', icon: '📑' },
+    { key: 'ai', label: 'Global AI & NVIDIA NIM', icon: '🤖' },
+    { key: 'accounts', label: 'Accounts & Workspaces', icon: '👥' },
+    { key: 'maintenance', label: 'System & Maintenance', icon: '🛡️' }
   ]
+
+  const visibleNavItems = isAdvanceMode
+    ? allNavItems
+    : allNavItems.filter((item) => item.key === 'general' || item.key === 'advance')
 
   return (
     <div
@@ -161,9 +176,9 @@ export function UnifiedSettingsModal({
         aria-modal="true"
         aria-label="Global Settings Hub"
         style={{
-          width: '94vw',
-          maxWidth: '1240px',
-          height: '86vh',
+          width: 'min(1440px, 98vw)',
+          height: 'min(92vh, 920px)',
+          maxHeight: 'min(92vh, 920px)',
           display: 'flex',
           flexDirection: 'column',
           backgroundColor: '#090d16',
@@ -219,7 +234,82 @@ export function UnifiedSettingsModal({
               gap: '6px'
             }}
           >
-            {navItems.map((item) => {
+            {/* Advance Settings Mode Switch at top of sidebar */}
+            <div
+              style={{
+                padding: '10px 12px',
+                marginBottom: '8px',
+                borderRadius: '8px',
+                background: isAdvanceMode ? 'rgba(59, 130, 246, 0.12)' : 'rgba(255, 255, 255, 0.03)',
+                border: isAdvanceMode ? '1px solid rgba(59, 130, 246, 0.35)' : '1px solid rgba(255, 255, 255, 0.08)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px'
+              }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: '#f1f5f9' }}>
+                  ⚡ Advanced Settings
+                </span>
+                <span style={{ fontSize: '10.5px', color: '#64748b' }}>
+                  {isAdvanceMode ? 'All 6 tabs visible' : 'Basic view (2 tabs)'}
+                </span>
+              </div>
+              <label
+                style={{
+                  position: 'relative',
+                  display: 'inline-block',
+                  width: '34px',
+                  height: '18px',
+                  cursor: 'pointer',
+                  margin: 0
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={isAdvanceMode}
+                  onChange={(e) => {
+                    const next = e.target.checked
+                    setIsAdvanceMode(next)
+                    try {
+                      localStorage.setItem('orbit:settings-advance-mode', String(next))
+                    } catch {
+                      // ignore localStorage errors
+                    }
+                    if (!next && activeTab !== 'general' && activeTab !== 'advance') {
+                      setActiveTab('general')
+                    }
+                  }}
+                  style={{ opacity: 0, width: 0, height: 0 }}
+                />
+                <span
+                  style={{
+                    position: 'absolute',
+                    cursor: 'pointer',
+                    inset: 0,
+                    backgroundColor: isAdvanceMode ? '#3b82f6' : 'rgba(255, 255, 255, 0.2)',
+                    transition: '0.2s',
+                    borderRadius: '18px'
+                  }}
+                >
+                  <span
+                    style={{
+                      position: 'absolute',
+                      height: '14px',
+                      width: '14px',
+                      left: isAdvanceMode ? '18px' : '2px',
+                      bottom: '2px',
+                      backgroundColor: 'white',
+                      transition: '0.2s',
+                      borderRadius: '50%'
+                    }}
+                  />
+                </span>
+              </label>
+            </div>
+
+            {visibleNavItems.map((item) => {
               const active = activeTab === item.key
               return (
                 <button
@@ -532,15 +622,15 @@ export function UnifiedSettingsModal({
               </div>
             )}
 
-            {/* TAB: SIDEBAR & NAVIGATION */}
-            {activeTab === 'sidebar' && (
+            {/* TAB: ADVANCE CONTROL */}
+            {activeTab === 'advance' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 <header>
                   <h3 style={{ margin: 0, fontSize: '16px', color: '#f8fafc' }}>
-                    Sidebar &amp; Navigation
+                    🎛️ Advance Control
                   </h3>
                   <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#94a3b8' }}>
-                    Customize which sections, looks, and buttons appear in the sidebar navigation rail.
+                    Fine-grained appearance look and profile default app preset configurations.
                   </p>
                 </header>
 
@@ -614,7 +704,91 @@ export function UnifiedSettingsModal({
                     </label>
                   </div>
 
-                  {/* Card 2: Left Sidebar Navigation Rail */}
+                  {/* Card 2: Default App Presets */}
+                  <div
+                    style={{
+                      background: 'rgba(15, 23, 42, 0.4)',
+                      padding: '18px 20px',
+                      borderRadius: '10px',
+                      border: '1px solid rgba(255, 255, 255, 0.07)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div>
+                        <h4 style={{ margin: 0, fontSize: '14px', color: '#e2e8f0', fontWeight: 600 }}>
+                          🧩 Default App Presets
+                        </h4>
+                        <span style={{ fontSize: '11px', color: '#64748b', display: 'block', marginTop: '2px' }}>
+                          Initial apps and web platforms preloaded into new profiles
+                        </span>
+                      </div>
+                      <span
+                        style={{
+                          fontSize: '10.5px',
+                          fontWeight: 600,
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          background: 'rgba(20, 184, 166, 0.15)',
+                          color: '#99f6e4',
+                          border: '1px solid rgba(20, 184, 166, 0.3)'
+                        }}
+                      >
+                        Profile Presets
+                      </span>
+                    </div>
+
+                    <div className="settings-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div>
+                        <span>Base Default Apps Layout</span>
+                        <span style={{ display: 'block', fontSize: '11px', color: '#64748b' }}>
+                          Choose the default messaging apps and tools shown when creating accounts
+                        </span>
+                      </div>
+                      <select
+                        value={settings.baseAppLayout ?? 'standard'}
+                        onChange={(e) =>
+                          onChangeSettings({
+                            baseAppLayout: e.target.value as 'none' | 'standard' | 'extended' | 'full'
+                          })
+                        }
+                        style={{
+                          background: '#0f172a',
+                          color: '#f8fafc',
+                          border: '1px solid rgba(255,255,255,0.15)',
+                          borderRadius: '6px',
+                          padding: '6px 12px',
+                          fontSize: '12px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <option value="none">Option 0: Minimal (No default apps — show only added websites)</option>
+                        <option value="standard">Option 1 (Default): Standard 3 apps (Slack, Teams, WhatsApp)</option>
+                        <option value="extended">Option 2: Extended (Slack, Teams, WhatsApp + Claude, ChatGPT)</option>
+                        <option value="full">Option 3: All-in-One (Slack, Teams, WhatsApp + 6 top tools)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB: SIDEBAR & NAVIGATION */}
+            {activeTab === 'sidebar' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <header>
+                  <h3 style={{ margin: 0, fontSize: '16px', color: '#f8fafc' }}>
+                    Sidebar &amp; Navigation
+                  </h3>
+                  <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#94a3b8' }}>
+                    Customize which sections, looks, and buttons appear in the sidebar navigation rail.
+                  </p>
+                </header>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {/* Card 1: Left Sidebar Navigation Rail */}
                   <div
                     style={{
                       background: 'rgba(15, 23, 42, 0.4)',
@@ -777,7 +951,7 @@ export function UnifiedSettingsModal({
                     </label>
                   </div>
 
-                  {/* Card 3: Modals & Creation Dialogs */}
+                  {/* Card 2: Modals & Creation Dialogs */}
                   <div
                     style={{
                       background: 'rgba(15, 23, 42, 0.4)',
@@ -846,75 +1020,7 @@ export function UnifiedSettingsModal({
                     </label>
                   </div>
 
-                  {/* Card 4: Default App Presets */}
-                  <div
-                    style={{
-                      background: 'rgba(15, 23, 42, 0.4)',
-                      padding: '18px 20px',
-                      borderRadius: '10px',
-                      border: '1px solid rgba(255, 255, 255, 0.07)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '12px'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div>
-                        <h4 style={{ margin: 0, fontSize: '14px', color: '#e2e8f0', fontWeight: 600 }}>
-                          🧩 Default App Presets
-                        </h4>
-                        <span style={{ fontSize: '11px', color: '#64748b', display: 'block', marginTop: '2px' }}>
-                          Initial apps and web platforms preloaded into new profiles
-                        </span>
-                      </div>
-                      <span
-                        style={{
-                          fontSize: '10.5px',
-                          fontWeight: 600,
-                          padding: '2px 8px',
-                          borderRadius: '6px',
-                          background: 'rgba(20, 184, 166, 0.15)',
-                          color: '#99f6e4',
-                          border: '1px solid rgba(20, 184, 166, 0.3)'
-                        }}
-                      >
-                        Profile Presets
-                      </span>
-                    </div>
-
-                    <div className="settings-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div>
-                        <span>Base Default Apps Layout</span>
-                        <span style={{ display: 'block', fontSize: '11px', color: '#64748b' }}>
-                          Choose the default messaging apps and tools shown when creating accounts
-                        </span>
-                      </div>
-                      <select
-                        value={settings.baseAppLayout ?? 'standard'}
-                        onChange={(e) =>
-                          onChangeSettings({
-                            baseAppLayout: e.target.value as 'none' | 'standard' | 'extended' | 'full'
-                          })
-                        }
-                        style={{
-                          background: '#0f172a',
-                          color: '#f8fafc',
-                          border: '1px solid rgba(255,255,255,0.15)',
-                          borderRadius: '6px',
-                          padding: '6px 12px',
-                          fontSize: '12px',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <option value="none">Option 0: Minimal (No default apps — show only added websites)</option>
-                        <option value="standard">Option 1 (Default): Standard 3 apps (Slack, Teams, WhatsApp)</option>
-                        <option value="extended">Option 2: Extended (Slack, Teams, WhatsApp + Claude, ChatGPT)</option>
-                        <option value="full">Option 3: All-in-One (Slack, Teams, WhatsApp + 6 top tools)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Card 5: Sidebar Bottom Action Buttons */}
+                  {/* Card 3: Sidebar Bottom Action Buttons */}
                   <div
                     style={{
                       background: 'rgba(15, 23, 42, 0.4)',
