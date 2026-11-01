@@ -128,6 +128,10 @@ export function normalizeAppSettings(parsed: Partial<AppSettings>): AppSettings 
       typeof parsed.showCosmicProfileNavButtons === 'boolean'
         ? parsed.showCosmicProfileNavButtons
         : DEFAULT_APP_SETTINGS.showCosmicProfileNavButtons ?? true,
+    showNewProjectLinkedAccounts:
+      typeof parsed.showNewProjectLinkedAccounts === 'boolean'
+        ? parsed.showNewProjectLinkedAccounts
+        : DEFAULT_APP_SETTINGS.showNewProjectLinkedAccounts ?? true,
     sidebarButtons:
       parsed.sidebarButtons && typeof parsed.sidebarButtons === 'object'
         ? {

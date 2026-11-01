@@ -1159,6 +1159,7 @@ function App(): React.JSX.Element {
         <NewProjectModal
           open={true}
           onClose={() => setNewProjectModalOpen(false)}
+          showLinkedAccounts={settings.showNewProjectLinkedAccounts ?? true}
         />
       ) : null}
 

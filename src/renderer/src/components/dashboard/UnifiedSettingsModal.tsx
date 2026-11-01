@@ -518,6 +518,22 @@ export function UnifiedSettingsModal({
 
                       <label className="settings-row">
                         <span>
+                          Show &quot;Linked Accounts &amp; Workspaces&quot; in New Project Modal
+                          <span style={{ display: 'block', fontSize: '11px', color: '#64748b' }}>
+                            Display the &quot;+ Add Accounts&quot; linking section when creating a new project card
+                          </span>
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={settings.showNewProjectLinkedAccounts ?? true}
+                          onChange={(e) =>
+                            onChangeSettings({ showNewProjectLinkedAccounts: e.target.checked })
+                          }
+                        />
+                      </label>
+
+                      <label className="settings-row">
+                        <span>
                           Show "Observer View" Header in Sidebar
                           <span style={{ display: 'block', fontSize: '11px', color: '#64748b' }}>
                             Display a subtle "OBSERVER VIEW" divider label above the bottom 6 sidebar action buttons
