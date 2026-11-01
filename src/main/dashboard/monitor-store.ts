@@ -165,6 +165,38 @@ export class MonitorStore {
     await this.write(data)
   }
 
+  async unassignProjectsForProfile(profileId: string): Promise<void> {
+    const data = await this.read()
+    let changed = false
+    for (const project of data.projects) {
+      if (project.profileId === profileId) {
+        project.profileId = ''
+        changed = true
+      }
+    }
+    if (changed) {
+      await this.write(data)
+    }
+  }
+
+  async deleteProjectsForProfile(profileId: string): Promise<string[]> {
+    const data = await this.read()
+    const deletedIds: string[] = []
+    data.projects = data.projects.filter((p) => {
+      if (p.profileId === profileId) {
+        deletedIds.push(p.id)
+        return false
+      }
+      return true
+    })
+    if (deletedIds.length > 0) {
+      const deletedSet = new Set(deletedIds)
+      data.pinnedOrder = (data.pinnedOrder ?? []).filter((id) => !deletedSet.has(id))
+      await this.write(data)
+    }
+    return deletedIds
+  }
+
   /** Pinned order survives restarts; unknown/deleted ids are ignored on read. */
   async readPinnedOrder(): Promise<string[]> {
     const data = await this.read()

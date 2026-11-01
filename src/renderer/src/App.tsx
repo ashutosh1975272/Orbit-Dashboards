@@ -21,6 +21,7 @@ import { SlackViewport } from './components/SlackViewport'
 import { PlatformSettingsPanel } from './components/dashboard/PlatformSettingsPanel'
 import { AddPlatformPage } from './components/dashboard/AddPlatformPage'
 import { AccountsManagementModal } from './components/dashboard/AccountsManagementModal'
+import { DeleteConfirmNoticeModal, type ProfileDeleteTarget } from './components/dashboard/DeleteConfirmNoticeModal'
 import { UnifiedSettingsModal, type SettingsTabKey } from './components/dashboard/UnifiedSettingsModal'
 import { NewProfileModal } from './components/dashboard/NewProfileModal'
 import { NewProjectModal } from './components/dashboard/NewProjectModal'
@@ -85,6 +86,7 @@ function App(): React.JSX.Element {
   )
   const [cmdkOpen, setCmdkOpen] = useState(false)
   const [showObserverView, setShowObserverView] = useState(false)
+  const [sidebarDeleteTarget, setSidebarDeleteTarget] = useState<ProfileDeleteTarget | null>(null)
   const [unifiedSettingsOpen, setUnifiedSettingsOpen] = useState(false)
   const [unifiedSettingsTab, setUnifiedSettingsTab] = useState<SettingsTabKey>('general')
   const [platformSettings, setPlatformSettings] = useState<{
@@ -869,9 +871,19 @@ function App(): React.JSX.Element {
               onSelect={(id) => void handleSelectProfile(id)}
               onSelectApp={handleSidebarSelectApp}
               onDelete={(id) => {
-                void deleteProfile(id).then(async () => {
-                  const s = await window.api.app.getSettings()
-                  setSettings(s)
+                const p = profiles.find((x) => x.id === id)
+                if (!p) return
+                const linked = (snapshot?.projects ?? [])
+                  .filter((proj) => proj.project.profileId === id)
+                  .map((proj) => ({
+                    id: proj.project.id,
+                    name: proj.project.name || proj.project.teamName || 'Card'
+                  }))
+                setSidebarDeleteTarget({
+                  id,
+                  name: p.customName || p.displayName,
+                  email: p.displayName,
+                  cards: linked
                 })
               }}
               onRename={(id, name) => {
@@ -1148,10 +1160,11 @@ function App(): React.JSX.Element {
           setUnifiedSettingsOpen(false)
           setNewProfileModalOpen(true)
         }}
-        onDeleteProfile={(id) => {
-          void deleteProfile(id).then(async () => {
+        onDeleteProfile={(id, deleteCards) => {
+          void deleteProfile(id, deleteCards).then(async () => {
             const s = await window.api.app.getSettings()
             setSettings(s)
+            await useDashboardStore.getState().loadSnapshot()
           })
         }}
         onSelectProfile={(id) => {
@@ -1261,6 +1274,19 @@ function App(): React.JSX.Element {
           onOpenObserver={() => setShowObserverView(true)}
         />
       ) : null}
+
+      <DeleteConfirmNoticeModal
+        open={Boolean(sidebarDeleteTarget)}
+        onClose={() => setSidebarDeleteTarget(null)}
+        target={sidebarDeleteTarget ? { type: 'profile', profile: sidebarDeleteTarget } : null}
+        onConfirmProfileDelete={async (profileId, deleteCards) => {
+          await deleteProfile(profileId, deleteCards)
+          const s = await window.api.app.getSettings()
+          setSettings(s)
+          await useDashboardStore.getState().loadSnapshot()
+          setSidebarDeleteTarget(null)
+        }}
+      />
 
       {showOnboarding && !locked ? (
         <div className="onboarding-backdrop">

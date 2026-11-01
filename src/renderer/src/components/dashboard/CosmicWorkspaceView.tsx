@@ -8,6 +8,7 @@ import WorkspaceContent from './WorkspaceContent'
 import CardHead, { type CardHeadFlag } from './CardHead'
 import { CardAddModal } from './CardAddModal'
 import { RunLogsModal } from './RunLogsModal'
+import { DeleteConfirmNoticeModal } from './DeleteConfirmNoticeModal'
 import { buildCardView, buildCardSummary } from './card-view'
 import { buildConnectorChannelLists } from './workspace-nav'
 import type { DashboardTeamWorkspace } from '../../../../shared/dashboard-contract'
@@ -32,9 +33,17 @@ export function CosmicWorkspaceView(): React.JSX.Element | null {
 
   const [cardAddOpen, setCardAddOpen] = useState(false)
   const [logsOpen, setLogsOpen] = useState(false)
+  const [deleteCardOpen, setDeleteCardOpen] = useState(false)
   const [teamWorkspace, setTeamWorkspace] = useState<DashboardTeamWorkspace | null>(null)
   const [teamLoading, setTeamLoading] = useState(true)
   const [scraping, setScraping] = useState(false)
+
+  const handleConfirmDeleteCard = async (cardId: string): Promise<void> => {
+    await useDashboardStore.getState().deleteProject(cardId)
+    const currentLevel1 = useDashboardStore.getState().cosmicLevel1
+    useDashboardStore.getState().setCosmicNavigation(currentLevel1, null)
+    useDashboardStore.getState().openDashboard()
+  }
 
   // Ensure snapshot is loaded
   useEffect(() => {
@@ -206,7 +215,7 @@ export function CosmicWorkspaceView(): React.JSX.Element | null {
             onLogs={() => setLogsOpen(true)}
             onSettings={() => openGroup('settings')}
             onEdit={() => openWizard(project.id)}
-            onRemove={() => undefined}
+            onRemove={() => setDeleteCardOpen(true)}
             onToggle={() => undefined}
             pinned={false}
           />
@@ -256,6 +265,21 @@ export function CosmicWorkspaceView(): React.JSX.Element | null {
               projectId={project.id}
               projectName={project.name}
               onClose={() => setLogsOpen(false)}
+            />
+            <DeleteConfirmNoticeModal
+              open={deleteCardOpen}
+              onClose={() => setDeleteCardOpen(false)}
+              target={{
+                type: 'card',
+                card: {
+                  id: project.id,
+                  name: project.name || project.teamName || 'Card',
+                  clientName: project.clientName,
+                  teamName: project.teamName,
+                  channelCount: project.monitors?.length ?? 0
+                }
+              }}
+              onConfirmCardDelete={handleConfirmDeleteCard}
             />
           </div>
         </article>

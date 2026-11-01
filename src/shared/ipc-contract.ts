@@ -311,7 +311,7 @@ export interface IpcApi {
   profiles: {
     list: () => Promise<Profile[]>
     create: (displayName: string) => Promise<Profile>
-    delete: (profileId: string) => Promise<void>
+    delete: (profileId: string, deleteCards?: boolean) => Promise<void>
     deleteUnsignedDuplicates: () => Promise<Profile[]>
     clearStuckAuth: () => Promise<Profile[]>
     cancelAuthBusy: (profileId?: string) => Promise<Profile[]>

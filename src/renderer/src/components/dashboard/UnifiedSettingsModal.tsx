@@ -3,6 +3,8 @@ import type { AppSettings } from '../../../../shared/ipc-contract'
 import type { DashboardGlobalConfig } from '../../../../shared/dashboard-contract'
 import { CustomLink, Profile } from '../../../../shared/types'
 import { useProfileStore } from '../../hooks/useProfiles'
+import { useDashboardStore } from '../../hooks/useDashboard'
+import { DeleteConfirmNoticeModal, type ProfileDeleteTarget } from './DeleteConfirmNoticeModal'
 import { modKey } from '../../lib/shortcut-label'
 import AiSettingsForm from './AiSettingsForm'
 import { LogsObservabilityTab } from './LogsObservabilityTab'
@@ -26,7 +28,7 @@ interface UnifiedSettingsModalProps {
   onImportProfiles: () => void
   onAdminLogout: () => void
   onAddGoogleAccount?: () => void
-  onDeleteProfile?: (profileId: string) => void
+  onDeleteProfile?: (profileId: string, deleteCards?: boolean) => void
   onSelectProfile?: (profileId: string) => void
   onOpenCustomLink?: (profileId: string, link: CustomLink) => void
 }
@@ -58,6 +60,8 @@ export function UnifiedSettingsModal({
 
   // Accounts state
   const profiles = useProfileStore((s) => s.profiles)
+  const snapshot = useDashboardStore((s) => s.snapshot)
+  const [deleteProfileTarget, setDeleteProfileTarget] = useState<ProfileDeleteTarget | null>(null)
   const [addingLinkForProfileId, setAddingLinkForProfileId] = useState<string | null>(null)
   const [customName, setCustomName] = useState('')
   const [customUrl, setCustomUrl] = useState('')
@@ -1330,9 +1334,18 @@ export function UnifiedSettingsModal({
                               type="button"
                               className="btn ghost"
                               onClick={() => {
-                                if (window.confirm(`Permanently delete account "${profile.customName || profile.displayName}"?`)) {
-                                  onDeleteProfile(profile.id)
-                                }
+                                const linked = (snapshot?.projects ?? [])
+                                  .filter((p) => p.project.profileId === profile.id)
+                                  .map((p) => ({
+                                    id: p.project.id,
+                                    name: p.project.name || p.project.teamName || 'Card'
+                                  }))
+                                setDeleteProfileTarget({
+                                  id: profile.id,
+                                  name: profile.customName || profile.displayName,
+                                  email: profile.displayName,
+                                  cards: linked
+                                })
                               }}
                               style={{ fontSize: '12px', padding: '4px 10px', color: '#f87171' }}
                               title="Permanently remove account"
@@ -1516,6 +1529,18 @@ export function UnifiedSettingsModal({
           </main>
         </div>
       </div>
+
+      <DeleteConfirmNoticeModal
+        open={Boolean(deleteProfileTarget)}
+        onClose={() => setDeleteProfileTarget(null)}
+        target={deleteProfileTarget ? { type: 'profile', profile: deleteProfileTarget } : null}
+        onConfirmProfileDelete={async (profileId, deleteCards) => {
+          if (onDeleteProfile) {
+            onDeleteProfile(profileId, deleteCards)
+          }
+          setDeleteProfileTarget(null)
+        }}
+      />
     </div>
   )
 }

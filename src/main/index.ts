@@ -562,6 +562,23 @@ if (!gotSingleInstanceLock) {
       browserViewManager,
       tokenStore,
       getMainWindow: () => mainWindow,
+      monitorStore: dashboardMonitorStore,
+      aiSettings,
+      broadcastSnapshot: async () => {
+        const win = mainWindow
+        if (win && !win.isDestroyed()) {
+          const projects = await dashboardEngine.buildSnapshot()
+          const manualTokens = (await dashboardMonitorStore.listManualTokens()).map((t) => ({
+            key: t.key,
+            validated: t.persisted
+          }))
+          win.webContents.send(IpcChannels.DashboardSnapshotChanged, {
+            projects,
+            manualTokens,
+            globalConfig: await configService.publicGlobalConfig()
+          })
+        }
+      },
       onProfilesRemoved: async (ids) => {
         await settingsStore.removeRecentsForProfiles(ids)
         const win = mainWindow

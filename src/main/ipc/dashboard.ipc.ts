@@ -217,6 +217,9 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
   handleInvoke(IpcChannels.DashboardDeleteProject, async (payload: ProjectDeletePayload) => {
     await deps.monitorStore.deleteProject(payload.projectId)
     await deps.aiSettings?.clearProject(payload.projectId)
+    try {
+      await session.fromPartition(partitionForCard(payload.projectId, 'slack')).clearStorageData()
+    } catch {}
     return broadcastSnapshot()
   })
 

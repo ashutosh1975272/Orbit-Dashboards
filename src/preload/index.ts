@@ -44,7 +44,8 @@ const api: IpcApi = {
   profiles: {
     list: () => ipcRenderer.invoke(IpcChannels.ProfileList),
     create: (displayName: string) => ipcRenderer.invoke(IpcChannels.ProfileCreate, { displayName }),
-    delete: (profileId: string) => ipcRenderer.invoke(IpcChannels.ProfileDelete, { profileId }),
+    delete: (profileId: string, deleteCards?: boolean) =>
+      ipcRenderer.invoke(IpcChannels.ProfileDelete, { profileId, deleteCards }),
     deleteUnsignedDuplicates: () => ipcRenderer.invoke(IpcChannels.ProfileDeleteUnsignedDuplicates),
     clearStuckAuth: () => ipcRenderer.invoke(IpcChannels.ProfileClearStuckAuth),
     cancelAuthBusy: (profileId?: string) =>

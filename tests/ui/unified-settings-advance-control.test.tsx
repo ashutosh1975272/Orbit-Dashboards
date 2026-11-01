@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest'
-import { render, fireEvent, cleanup } from '@testing-library/react'
+import { render, fireEvent, screen, cleanup } from '@testing-library/react'
 import { UnifiedSettingsModal } from '../../src/renderer/src/components/dashboard/UnifiedSettingsModal'
 import { useProfileStore } from '../../src/renderer/src/hooks/useProfiles'
 import { DEFAULT_APP_SETTINGS } from '../../src/shared/ipc-contract'
@@ -179,7 +179,10 @@ describe('UnifiedSettingsModal Advance Control and Modal Dimensions', () => {
     expect(delBtn).toBeDefined()
     fireEvent.click(delBtn)
 
-    expect(window.confirm).toHaveBeenCalled()
-    expect(onDeleteProfile).toHaveBeenCalledWith('test-del-1')
+    const modalDeleteBtn = screen.getByRole('button', { name: 'Delete Profile' })
+    expect(modalDeleteBtn).toBeDefined()
+    fireEvent.click(modalDeleteBtn)
+
+    expect(onDeleteProfile).toHaveBeenCalledWith('test-del-1', true)
   })
 })

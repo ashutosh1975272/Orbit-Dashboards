@@ -33,6 +33,8 @@ import {
 import { runTeamsLoginForProfile } from '../profiles/teams-first-login-flow'
 import { waitForWhatsAppSignedIn } from '../profiles/whatsapp-login-flow'
 import type { TokenStore } from '../slack/token-store'
+import type { MonitorStore } from '../dashboard/monitor-store'
+import type { AiSettingsService } from '../dashboard/ai-settings'
 import { handleInvoke } from './handle'
 
 export interface ProfileIpcDeps {
@@ -42,6 +44,9 @@ export interface ProfileIpcDeps {
   getMainWindow: () => BrowserWindow | null
   /** Called after profiles are removed so settings (e.g. recents) can be pruned. */
   onProfilesRemoved?: (profileIds: string[]) => Promise<void>
+  monitorStore?: MonitorStore
+  aiSettings?: AiSettingsService
+  broadcastSnapshot?: () => Promise<void>
 }
 
 const inFlightLogin = new Set<string>()
@@ -549,7 +554,21 @@ export function registerProfileIpc(deps: ProfileIpcDeps): void {
   })
 
   handleInvoke(IpcChannels.ProfileDelete, async (payload: ProfileIdPayload) => {
+    if (payload.deleteCards && deps.monitorStore) {
+      const deletedIds = await deps.monitorStore.deleteProjectsForProfile(payload.profileId)
+      for (const pId of deletedIds) {
+        await deps.aiSettings?.clearProject(pId)
+        try {
+          await session.fromPartition(partitionForCard(pId, 'slack')).clearStorageData()
+        } catch {}
+      }
+    } else if (deps.monitorStore) {
+      await deps.monitorStore.unassignProjectsForProfile(payload.profileId)
+    }
     await destroyProfileFully(deps, payload.profileId)
+    if (deps.broadcastSnapshot) {
+      await deps.broadcastSnapshot()
+    }
   })
 
   handleInvoke(IpcChannels.ProfileActivate, async (payload: ActivateProfilePayload) => {
