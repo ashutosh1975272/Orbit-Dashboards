@@ -49,7 +49,7 @@ interface WorkspaceSidebarProps {
   onToggleCollapse: () => void
   onResize: (width: number) => void
   onOpenAdd?: () => void
-  sidebarLook?: 'minimal' | 'ancient' | 'new-cosmic'
+  sidebarLook?: 'minimal' | 'ancient' | 'new-cosmic' | 'basic'
   baseAppLayout?: BaseAppLayoutKey
 }
 
@@ -180,7 +180,7 @@ export default function WorkspaceSidebar({
   const asideRef = useRef<HTMLElement>(null)
   const { layout } = useSidebarLayout(projectId)
   const profiles = useProfileStore((s) => s.profiles)
-  const [appLook, setAppLook] = useState<'minimal' | 'ancient' | 'new-cosmic'>('ancient')
+  const [appLook, setAppLook] = useState<'minimal' | 'ancient' | 'new-cosmic' | 'basic'>('ancient')
   const [baseAppLayout, setBaseAppLayout] = useState<BaseAppLayoutKey>(propBaseAppLayout ?? 'standard')
   const [cardSlackAuth, setCardSlackAuth] = useState<boolean>(false)
 

@@ -74,7 +74,7 @@ interface ProfileSidebarProps {
   /** Optional slot rendered after the Recents strip (dashboard entry point). */
   dashboardSlot?: React.ReactNode
   /** Customization settings for the sidebar */
-  sidebarLook?: 'minimal' | 'ancient' | 'new-cosmic'
+  sidebarLook?: 'minimal' | 'ancient' | 'new-cosmic' | 'basic'
   showLookSwitcher?: boolean
   showRecentSection?: boolean
   showGoogleEmailInputInSidebar?: boolean
@@ -92,7 +92,7 @@ interface ProfileSidebarProps {
     observer?: boolean
     profilesHub?: boolean
   }
-  onLookChange?: (look: 'minimal' | 'ancient' | 'new-cosmic') => void
+  onLookChange?: (look: 'minimal' | 'ancient' | 'new-cosmic' | 'basic') => void
 }
 
 function platformStatusDot(sessionStatus: AppSessionStatus): {
@@ -379,6 +379,7 @@ export const ProfileSidebar = memo(function ProfileSidebar({
   const cosmicLevel1 = useDashboardStore((s) => s.cosmicLevel1)
   const isCosmicManagedMiddle =
     activeLook === 'minimal' ||
+    activeLook === 'basic' ||
     (activeLook === 'new-cosmic' && cosmicLevel1 !== 'global')
   const [profileExpanded, setProfileExpanded] = useState<Record<string, boolean>>({})
   const [appExpanded, setAppExpanded] = useState<Record<string, boolean>>({})
@@ -386,7 +387,7 @@ export const ProfileSidebar = memo(function ProfileSidebar({
   const [renameValue, setRenameValue] = useState('')
   const [dragId, setDragId] = useState<string | null>(null)
 
-  const handleSetLook = (look: 'minimal' | 'ancient' | 'new-cosmic'): void => {
+  const handleSetLook = (look: 'minimal' | 'ancient' | 'new-cosmic' | 'basic'): void => {
     onLookChange?.(look)
   }
   const presetToolLinks = useMemo(
@@ -468,7 +469,7 @@ export const ProfileSidebar = memo(function ProfileSidebar({
           </div>
         </div>
 
-        {/* View Looks Switcher: Minimal vs Ancient vs Cosmic (Fluid Auto-Responsive Grid) */}
+        {/* View Looks Switcher: Minimal vs Cosmic vs Ancient vs Basic (Fluid Auto-Responsive Grid) */}
         {showLookSwitcher ? (
           <div
             className="sidebar-looks-switcher"
@@ -476,7 +477,7 @@ export const ProfileSidebar = memo(function ProfileSidebar({
             aria-label="Sidebar Appearance Look"
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+              gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
               gap: '3px',
               marginTop: '10px',
               background: 'rgba(0, 0, 0, 0.28)',
@@ -559,6 +560,30 @@ export const ProfileSidebar = memo(function ProfileSidebar({
             >
               Ancient
             </button>
+            <button
+              type="button"
+              onClick={() => handleSetLook('basic')}
+              aria-pressed={activeLook === 'basic'}
+              style={{
+                padding: '5px 2px',
+                fontSize: '11px',
+                fontWeight: 600,
+                borderRadius: '6px',
+                border: activeLook === 'basic' ? '1px solid var(--accent)' : '1px solid transparent',
+                background: activeLook === 'basic' ? 'color-mix(in srgb, var(--accent) 22%, transparent)' : 'transparent',
+                color: activeLook === 'basic' ? '#fff' : 'var(--text-faint)',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                textAlign: 'center',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                minWidth: 0
+              }}
+              title="Basic"
+            >
+              Basic
+            </button>
           </div>
         ) : null}
       </div>
@@ -610,6 +635,16 @@ export const ProfileSidebar = memo(function ProfileSidebar({
       ) : activeLook === 'minimal' ? (
         <CosmicSidebarContent
           isMinimalLook
+          profiles={profiles}
+          showSidebarProfileNavButton={showSidebarProfileNavButton}
+          showSidebarDashboardNavButton={showSidebarDashboardNavButton}
+          showCosmicProfileNavButtons={showCosmicProfileNavButtons}
+          onOpenProfilesHub={onOpenProfilesHub}
+          onNewProject={onNewProject}
+        />
+      ) : activeLook === 'basic' ? (
+        <CosmicSidebarContent
+          isBasicLook
           profiles={profiles}
           showSidebarProfileNavButton={showSidebarProfileNavButton}
           showSidebarDashboardNavButton={showSidebarDashboardNavButton}

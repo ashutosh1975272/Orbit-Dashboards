@@ -35,7 +35,7 @@ describe('ProfileSidebar Look Switcher Button Arrangement', () => {
     showLookSwitcher: true
   }
 
-  it('renders look buttons in the order: Minimal, Cosmic, Ancient', () => {
+  it('renders look buttons in the order: Minimal, Cosmic, Ancient, Basic', () => {
     const onLookChange = vi.fn()
     const { container } = render(
       <ProfileSidebar
@@ -49,7 +49,7 @@ describe('ProfileSidebar Look Switcher Button Arrangement', () => {
     expect(switcher).not.toBeNull()
 
     const buttons = switcher?.querySelectorAll('button')
-    expect(buttons?.length).toBe(3)
+    expect(buttons?.length).toBe(4)
 
     // Button 0: Minimal
     expect(buttons?.[0]?.textContent?.trim()).toBe('Minimal')
@@ -62,6 +62,10 @@ describe('ProfileSidebar Look Switcher Button Arrangement', () => {
     // Button 2: Ancient
     expect(buttons?.[2]?.textContent?.trim()).toBe('Ancient')
     expect(buttons?.[2]?.getAttribute('title')).toBe('Ancient')
+
+    // Button 3: Basic
+    expect(buttons?.[3]?.textContent?.trim()).toBe('Basic')
+    expect(buttons?.[3]?.getAttribute('title')).toBe('Basic')
   })
 
   it('invokes onLookChange with the correct look identifier on button click', () => {
@@ -75,7 +79,7 @@ describe('ProfileSidebar Look Switcher Button Arrangement', () => {
     )
 
     const buttons = container.querySelectorAll('.sidebar-looks-switcher button')
-    expect(buttons.length).toBe(3)
+    expect(buttons.length).toBe(4)
 
     // Click Minimal
     fireEvent.click(buttons[0])
@@ -88,6 +92,10 @@ describe('ProfileSidebar Look Switcher Button Arrangement', () => {
     // Click Ancient
     fireEvent.click(buttons[2])
     expect(onLookChange).toHaveBeenCalledWith('ancient')
+
+    // Click Basic
+    fireEvent.click(buttons[3])
+    expect(onLookChange).toHaveBeenCalledWith('basic')
   })
 
   it('renders Google email input when showGoogleEmailInputInSidebar is true in Minimal look', () => {

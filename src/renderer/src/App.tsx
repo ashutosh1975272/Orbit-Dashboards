@@ -367,7 +367,8 @@ function App(): React.JSX.Element {
   }, [snapshot])
   const isCosmicActive = settings.sidebarLook === 'new-cosmic'
   const isMinimalActive = settings.sidebarLook === 'minimal'
-  const isCosmicOrMinimal = isCosmicActive || isMinimalActive
+  const isBasicActive = settings.sidebarLook === 'basic'
+  const isCosmicOrMinimal = isCosmicActive || isMinimalActive || isBasicActive
   const showCosmicCard = Boolean(isCosmicOrMinimal && cosmicSelectedCardId && !browserAuthBusy)
   const dashboardOpen = useDashboardStore((s) => s.dashboardOpen)
   const closeDashboard = useDashboardStore((s) => s.closeDashboard)
@@ -376,6 +377,7 @@ function App(): React.JSX.Element {
   )
   const showDashboard =
     !isMinimalActive &&
+    !isBasicActive &&
     (dashboardOpen ||
       (isCosmicActive && (cosmicLevel1 === 'all' || (isCosmicProfileActive && !cosmicSelectedCardId)))) &&
     !browserAuthBusy &&

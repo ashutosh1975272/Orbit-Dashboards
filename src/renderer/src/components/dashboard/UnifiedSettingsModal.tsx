@@ -691,13 +691,14 @@ export function UnifiedSettingsModal({
                         value={settings.sidebarLook ?? 'ancient'}
                         onChange={(e) =>
                           onChangeSettings({
-                            sidebarLook: e.target.value as 'minimal' | 'ancient' | 'new-cosmic'
+                            sidebarLook: e.target.value as 'minimal' | 'ancient' | 'new-cosmic' | 'basic'
                           })
                         }
                       >
                         <option value="minimal">Minimal Look (Clean &amp; compact)</option>
                         <option value="new-cosmic">New Cosmic (Futuristic exploration)</option>
                         <option value="ancient">Ancient Look (Default established theme)</option>
+                        <option value="basic">Basic Look (Simple foundation)</option>
                       </select>
                     </label>
 
@@ -705,7 +706,7 @@ export function UnifiedSettingsModal({
                       <span>
                         Show Look Switcher in Sidebar Header
                         <span style={{ display: 'block', fontSize: '11px', color: '#64748b' }}>
-                          Displays the [ Minimal ] [ Cosmic ] [ Ancient ] toggle row at the top of the sidebar
+                          Displays the [ Minimal ] [ Cosmic ] [ Ancient ] [ Basic ] toggle row at the top of the sidebar
                         </span>
                       </span>
                       <input

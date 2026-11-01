@@ -234,7 +234,7 @@ export interface AppSettings {
     label: string
     at: string
   }>
-  sidebarLook: 'minimal' | 'ancient' | 'new-cosmic'
+  sidebarLook: 'minimal' | 'ancient' | 'new-cosmic' | 'basic'
   showLookSwitcher: boolean
   showRecentSection: boolean
   sidebarButtons: {

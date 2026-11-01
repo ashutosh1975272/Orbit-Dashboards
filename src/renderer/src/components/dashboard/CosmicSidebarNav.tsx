@@ -5,6 +5,7 @@ import { profileDisplayLabel, Profile } from '../../../../shared/types'
 
 interface CosmicSidebarContentProps {
   isMinimalLook?: boolean
+  isBasicLook?: boolean
   profiles?: Profile[]
   showSidebarProfileNavButton?: boolean
   showSidebarDashboardNavButton?: boolean
@@ -15,6 +16,7 @@ interface CosmicSidebarContentProps {
 
 export function CosmicSidebarContent({
   isMinimalLook = false,
+  isBasicLook = false,
   profiles: propProfiles,
   showSidebarProfileNavButton: propShowProfileNavButton,
   showSidebarDashboardNavButton: propShowDashboardNavButton,
@@ -38,7 +40,8 @@ export function CosmicSidebarContent({
     propShowDashboardNavButton ??
     showCosmicProfileNavButtons ??
     true
-  const hasAnyQuickNav = !isMinimalLook && (showProfileBtn || showDashboardBtn)
+  const isFlatNav = isMinimalLook || isBasicLook
+  const hasAnyQuickNav = !isFlatNav && (showProfileBtn || showDashboardBtn)
 
   // Ensure snapshot and profiles are loaded
   useEffect(() => {
@@ -56,11 +59,11 @@ export function CosmicSidebarContent({
   }, [profiles])
 
   // Active projects to display:
-  // For 'all' (or minimal): all active projects across all profiles
+  // For 'all' (or minimal/basic): all active projects across all profiles
   // For a specific profile: all active projects for that profile
   const displayedProjects = useMemo(() => {
     if (!snapshot) return []
-    if (isMinimalLook || cosmicLevel1 === 'all') {
+    if (isFlatNav || cosmicLevel1 === 'all') {
       return snapshot.projects.filter(
         (p) =>
           p.project.workflowStatus !== 'completed' &&
@@ -76,12 +79,12 @@ export function CosmicSidebarContent({
         p.project.workflowStatus !== 'completed' &&
         p.project.workflowStatus !== 'removed'
     )
-  }, [snapshot, cosmicLevel1, isMinimalLook])
+  }, [snapshot, cosmicLevel1, isFlatNav])
 
-  // In Minimal look, always enforce 'all' navigation if currently set to something else,
+  // In Minimal/Basic look, always enforce 'all' navigation if currently set to something else,
   // and auto-select the first available project card if none is selected.
   useEffect(() => {
-    if (isMinimalLook) {
+    if (isFlatNav) {
       if (cosmicLevel1 !== 'all') {
         setCosmicNavigation('all', cosmicSelectedCardId)
       }
@@ -89,7 +92,7 @@ export function CosmicSidebarContent({
         setCosmicNavigation('all', displayedProjects[0].project.id)
       }
     }
-  }, [isMinimalLook, cosmicLevel1, cosmicSelectedCardId, displayedProjects, setCosmicNavigation])
+  }, [isFlatNav, cosmicLevel1, cosmicSelectedCardId, displayedProjects, setCosmicNavigation])
 
   const handleLevel1Change = useCallback(
     (val: string) => {
@@ -112,9 +115,9 @@ export function CosmicSidebarContent({
     [snapshot, setCosmicNavigation]
   )
 
-  const isAllProjects = isMinimalLook || cosmicLevel1 === 'all'
+  const isAllProjects = isFlatNav || cosmicLevel1 === 'all'
   const isProfileSelected = Boolean(
-    !isMinimalLook && cosmicLevel1 && cosmicLevel1 !== 'all' && cosmicLevel1 !== 'global'
+    !isFlatNav && cosmicLevel1 && cosmicLevel1 !== 'all' && cosmicLevel1 !== 'global'
   )
   const showCardsSection = isAllProjects || isProfileSelected
 
@@ -129,8 +132,8 @@ export function CosmicSidebarContent({
         gap: '4px'
       }}
     >
-      {/* Dropdown Navigation Container (Hidden in Minimal Look) */}
-      {!isMinimalLook && (
+      {/* Dropdown Navigation Container (Hidden in Minimal / Basic Look) */}
+      {!isFlatNav && (
         <div
           className="cosmic-nav-selectors"
           style={{

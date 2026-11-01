@@ -70,7 +70,8 @@ export function normalizeAppSettings(parsed: Partial<AppSettings>): AppSettings 
     sidebarLook:
       parsed.sidebarLook === 'minimal' ||
       parsed.sidebarLook === 'ancient' ||
-      parsed.sidebarLook === 'new-cosmic'
+      parsed.sidebarLook === 'new-cosmic' ||
+      parsed.sidebarLook === 'basic'
         ? parsed.sidebarLook
         : DEFAULT_APP_SETTINGS.sidebarLook,
     showLookSwitcher:
