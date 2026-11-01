@@ -59,7 +59,7 @@ if (loadedEnvPath) {
   // Logging module is safe here; avoids printing secret values.
   log.info('loaded env file', { path: loadedEnvPath })
 } else {
-  log.warn('no .env found — admin login will be unconfigured until you add one')
+  log.info('running in zero-.env mode — using in-app settings & default admin credentials')
 }
 
 /** One process / one tray — second launches focus the existing window. */
