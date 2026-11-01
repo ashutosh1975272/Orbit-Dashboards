@@ -174,12 +174,18 @@ function App(): React.JSX.Element {
   }, [])
 
   useEffect(() => {
-    void window.api.app.adminStatus().then((status) => {
-      setAdminConfigured(status.configured)
-      setAdminAuthenticated(status.authenticated)
-      if (status.envPathHint) setAdminEnvPathHint(status.envPathHint)
-      setAdminReady(true)
-    })
+    void window.api.app
+      .adminStatus()
+      .then((status) => {
+        setAdminConfigured(status.configured)
+        setAdminAuthenticated(status.authenticated)
+        if (status.envPathHint) setAdminEnvPathHint(status.envPathHint)
+        setAdminReady(true)
+      })
+      .catch((err) => {
+        console.error('Failed to get admin status', err)
+        setAdminReady(true)
+      })
   }, [])
 
   useEffect(() => {
@@ -336,7 +342,21 @@ function App(): React.JSX.Element {
   const browserAuthBusy = authPhase === 'google' || authPhase === 'slack'
   const cosmicLevel1 = useDashboardStore((s) => s.cosmicLevel1)
   const cosmicSelectedCardId = useDashboardStore((s) => s.cosmicSelectedCardId)
-  const dashboardProjects = useDashboardStore((s) => s.snapshot?.projects ?? [])
+  const snapshot = useDashboardStore((s) => s.snapshot)
+  const commandPaletteProjects = useMemo(() => {
+    if (!snapshot?.projects) return []
+    return snapshot.projects
+      .map((p) => {
+        const proj = (p as any).project ?? p
+        if (!proj || !proj.id) return null
+        return {
+          id: String(proj.id),
+          name: String(proj.name || 'Untitled Project'),
+          clientName: proj.clientName ? String(proj.clientName) : undefined
+        }
+      })
+      .filter(Boolean) as Array<{ id: string; name: string; clientName?: string }>
+  }, [snapshot])
   const isCosmicActive = settings.sidebarLook === 'new-cosmic'
   const isMinimalActive = settings.sidebarLook === 'minimal'
   const isCosmicOrMinimal = isCosmicActive || isMinimalActive
@@ -988,11 +1008,7 @@ function App(): React.JSX.Element {
       <CommandPalette
         open={cmdkOpen && !locked}
         profiles={profiles}
-        projects={dashboardProjects.map((p) => ({
-          id: p.project.id,
-          name: p.project.name,
-          clientName: p.project.clientName
-        }))}
+        projects={commandPaletteProjects}
         onClose={() => setCmdkOpen(false)}
         onSelectProfile={(id) => {
           setShowObserverView(false)
