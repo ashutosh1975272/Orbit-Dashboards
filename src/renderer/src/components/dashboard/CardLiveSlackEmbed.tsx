@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 interface CardLiveSlackEmbedProps {
+  projectId?: string
   profileId: string
   teamId?: string
   appId?: 'slack' | 'teams' | 'whatsapp'
@@ -20,6 +21,7 @@ interface ScrapeEventState {
  * sync pixel-exact bounding box with Electron main process on every resize/movement.
  */
 export default function CardLiveSlackEmbed({
+  projectId,
   profileId,
   teamId,
   appId = 'slack'
@@ -128,6 +130,7 @@ export default function CardLiveSlackEmbed({
 
     void window.api.profiles
       .activateCardSlackEmbed({
+        projectId,
         profileId,
         teamId: teamId ?? '',
         appId,
@@ -182,7 +185,7 @@ export default function CardLiveSlackEmbed({
       document.removeEventListener('animationend', onTransitionEnd)
       void window.api.profiles.clearCardSlackEmbed()
     }
-  }, [profileId, teamId, appId])
+  }, [projectId, profileId, teamId, appId])
 
   const isScrapingActive = appId === 'slack' && scrapeEvent.status === 'reading' && lineVisible
 

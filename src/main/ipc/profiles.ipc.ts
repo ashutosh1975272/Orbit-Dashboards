@@ -21,7 +21,7 @@ import { slackClientUrlForTeam } from '../../shared/slack-url'
 import { log } from '../logging'
 import type { BrowserViewManager } from '../profiles/browser-view-manager'
 import type { ProfileStore } from '../profiles/profile-store'
-import { partitionForProfile } from '../profiles/session-partition'
+import { partitionForProfile, partitionForCard } from '../profiles/session-partition'
 import {
   cancelChromeBrowserAuth,
   closeChromeStayEmbed,
@@ -612,7 +612,7 @@ export function registerProfileIpc(deps: ProfileIpcDeps): void {
 
   handleInvoke(
     IpcChannels.ProfileActivateCardSlackEmbed,
-    async (payload: { profileId: string; teamId?: string; appId?: AppId; bounds: ViewportBounds }) => {
+    async (payload: { projectId?: string; profileId: string; teamId?: string; appId?: AppId; bounds: ViewportBounds }) => {
       const mainWindow = deps.getMainWindow()
       if (!mainWindow) {
         return
@@ -622,8 +622,24 @@ export function registerProfileIpc(deps: ProfileIpcDeps): void {
         payload.teamId ?? '',
         mainWindow,
         payload.bounds,
-        payload.appId ?? 'slack'
+        payload.appId ?? 'slack',
+        payload.projectId
       )
+    }
+  )
+
+  handleInvoke(
+    IpcChannels.ProfileStartCardAppLogin,
+    async (payload: { projectId: string; profileId: string; appId: AppId; bounds?: ViewportBounds }) => {
+      notifyAuthProgress(deps.getMainWindow, 'Waiting for Slack sign-in for card…')
+      await runSlackChromeBrowserLogin(payload.profileId, {
+        parentWindow: deps.getMainWindow(),
+        contentBounds: payload.bounds,
+        targetPartition: partitionForCard(payload.projectId, payload.appId),
+        chromeKey: `card-${payload.projectId}`
+      })
+      const profile = await deps.profileStore.get(payload.profileId)
+      return profile || ({} as Profile)
     }
   )
 

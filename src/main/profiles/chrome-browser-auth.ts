@@ -27,6 +27,8 @@ export interface ChromeBrowserAuthOptions {
   loginHint?: string
   /** Renderer dock rect relative to the window content area. */
   contentBounds?: { x: number; y: number; width: number; height: number }
+  targetPartition?: string
+  chromeKey?: string
 }
 
 type PendingController = {
@@ -370,8 +372,8 @@ async function runChromeBrowserPhase(
 
   const contentBounds = pending.contentBounds ?? options.contentBounds
   const screenAnchor = toScreenAnchor(parent, contentBounds)
-  const partition = partitionForProfile(profileId, 'slack')
-  const profileDir = chromeLoginProfileDir(profileId)
+  const partition = options.targetPartition || partitionForProfile(profileId, 'slack')
+  const profileDir = chromeLoginProfileDir(options.chromeKey || profileId)
 
   // Google: continue=https://www.google.com/ (NOT 127.0.0.1 — that causes Error 400).
   // Auto-close is driven by Cookies DB poll (SID/HSID), not loopback.
@@ -401,7 +403,7 @@ async function runChromeBrowserPhase(
   try {
     const result = await runChromeSystemLogin({
       partition,
-      chromeProfileKey: profileId,
+      chromeProfileKey: options.chromeKey || profileId,
       startUrl,
       loginHint: options.loginHint,
       abortPromise,

@@ -1,4 +1,5 @@
-import { BrowserWindow } from 'electron'
+import { BrowserWindow, session } from 'electron'
+import { partitionForCard } from '../profiles/session-partition'
 import { IpcChannels } from '../../shared/ipc-contract'
 import type {
   DashboardAiModelsQueryPayload,
@@ -679,6 +680,21 @@ export function registerDashboardIpc(deps: DashboardIpcDeps): DashboardIpcRegist
         teamId: p.teamId,
         profileId: p.profileId
       }))
+    }
+  )
+
+  handleInvoke(
+    IpcChannels.DashboardCardCheckAuth,
+    async (payload: { projectId: string; appId?: string }): Promise<boolean> => {
+      if (!payload?.projectId) return false
+      try {
+        const partition = partitionForCard(payload.projectId, (payload.appId as any) || 'slack')
+        const sess = session.fromPartition(partition)
+        const cookies = await sess.cookies.get({ domain: '.slack.com' })
+        return cookies.some((c) => (c.name === 'd' || c.name === 'd-s') && Boolean(c.value))
+      } catch {
+        return false
+      }
     }
   )
 

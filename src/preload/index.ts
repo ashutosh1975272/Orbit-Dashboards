@@ -87,8 +87,10 @@ const api: IpcApi = {
       ipcRenderer.invoke(IpcChannels.ProfileUpdateBounds, bounds),
     setEmbedVisible: (visible: boolean) =>
       ipcRenderer.invoke(IpcChannels.ProfileSetEmbedVisible, { visible }),
-    activateCardSlackEmbed: (payload: { profileId: string; teamId?: string; appId?: AppId; bounds: ViewportBounds }) =>
+    activateCardSlackEmbed: (payload: { projectId?: string; profileId: string; teamId?: string; appId?: AppId; bounds: ViewportBounds }) =>
       ipcRenderer.invoke(IpcChannels.ProfileActivateCardSlackEmbed, payload),
+    startCardAppLogin: (payload: { projectId: string; profileId: string; appId: AppId; bounds?: ViewportBounds }) =>
+      ipcRenderer.invoke(IpcChannels.ProfileStartCardAppLogin, payload),
     updateCardSlackEmbedBounds: (bounds: ViewportBounds) =>
       ipcRenderer.invoke(IpcChannels.ProfileUpdateCardSlackEmbedBounds, { bounds }),
     clearCardSlackEmbed: () => ipcRenderer.invoke(IpcChannels.ProfileClearCardSlackEmbed),
@@ -407,6 +409,8 @@ const api: IpcApi = {
         teamId: string
         profileId: string
       }>>,
+    checkCardAuth: (payload: { projectId: string; appId?: AppId }) =>
+      ipcRenderer.invoke(IpcChannels.DashboardCardCheckAuth, payload) as Promise<boolean>,
     syncSource: (payload: { projectId: string; sourceId?: string }) =>
       ipcRenderer.invoke(IpcChannels.DashboardSyncSource, payload) as Promise<{
         channelsRead: number

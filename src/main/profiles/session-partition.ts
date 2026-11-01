@@ -132,6 +132,14 @@ export function partitionForProfile(profileId: string, appId: AppId = 'slack'): 
   return `persist:profile-${profileId}-${appId}`
 }
 
+/**
+ * Dedicated session isolation per project card + app.
+ * Ensures complete independence between dashboard project cards.
+ */
+export function partitionForCard(projectId: string, appId: AppId = 'slack'): string {
+  return `persist:card-${projectId}-${appId}`
+}
+
 /** @deprecated Prefer partitionForProfile(profileId, appId). */
 export function partitionForProfileLegacy(profileId: string): string {
   return `persist:profile-${profileId}`
@@ -143,6 +151,20 @@ export function profileSessionWebPreferences(
 ): Pick<WebPreferences, 'partition' | 'sandbox' | 'contextIsolation' | 'nodeIntegration'> {
   const partition = partitionForProfile(profileId, appId)
   // Apply before any BrowserWindow/WebContentsView is created on this partition.
+  applyChromeSessionTweaks(partition)
+  return {
+    partition,
+    sandbox: true,
+    contextIsolation: true,
+    nodeIntegration: false
+  }
+}
+
+export function cardSessionWebPreferences(
+  projectId: string,
+  appId: AppId = 'slack'
+): Pick<WebPreferences, 'partition' | 'sandbox' | 'contextIsolation' | 'nodeIntegration'> {
+  const partition = partitionForCard(projectId, appId)
   applyChromeSessionTweaks(partition)
   return {
     partition,

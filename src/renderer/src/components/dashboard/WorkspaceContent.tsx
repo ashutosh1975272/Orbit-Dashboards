@@ -120,8 +120,24 @@ export default function WorkspaceContent({
   const [authBusyApp, setAuthBusyApp] = useState<'slack' | 'teams' | 'whatsapp' | null>(null)
   const [authError, setAuthError] = useState<string | null>(null)
   const [slackViewMode, setSlackViewMode] = useState<'messages' | 'live'>('live')
+  const [cardAuthenticated, setCardAuthenticated] = useState<boolean | null>(null)
 
-  // Resolve genuine Slack team ID, avoiding glitch placeholders like team-xxx or T-PENDING
+  useEffect(() => {
+    let cancelled = false
+    if (!project?.id) return
+    window.api?.dashboard?.checkCardAuth?.({ projectId: project.id, appId: 'slack' })
+      .then((isAuth) => {
+        if (!cancelled) setCardAuthenticated(Boolean(isAuth))
+      })
+      .catch(() => {
+        if (!cancelled) setCardAuthenticated(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [project?.id, authBusyApp])
+
+  // Resolve genuine Slack team ID strictly for THIS card / profile, without cross-profile leakage
   const effectiveSlackTeamId = useMemo(() => {
     if (project?.teamId && /^T[A-Z0-9]+$/i.test(project.teamId)) {
       return project.teamId
@@ -132,14 +148,8 @@ export default function WorkspaceContent({
     if (realWs?.teamId) {
       return realWs.teamId
     }
-    for (const p of profiles) {
-      const w = p.apps?.slack?.availableWorkspaces?.find(
-        (ws) => ws.teamId && /^T[A-Z0-9]+$/i.test(ws.teamId)
-      )
-      if (w?.teamId) return w.teamId
-    }
     return ''
-  }, [project?.teamId, targetProfile, profiles])
+  }, [project?.teamId, targetProfile])
 
   // Auto-heal project teamId if placeholder
   useEffect(() => {
@@ -160,6 +170,34 @@ export default function WorkspaceContent({
       }).catch(() => undefined)
     }
   }, [project?.id, project?.teamId, effectiveSlackTeamId, targetProfile])
+
+  const handleStartCardAppLogin = async (
+    projectId?: string,
+    profileId?: string,
+    appId?: 'slack' | 'teams' | 'whatsapp'
+  ) => {
+    if (!projectId || !profileId || !appId) return
+    setAuthBusyApp(appId)
+    setAuthError(null)
+    try {
+      if (appId === 'slack' && window.api?.profiles?.startCardAppLogin) {
+        await window.api.profiles.startCardAppLogin({
+          projectId,
+          profileId,
+          appId: 'slack'
+        })
+        const isAuth = await window.api.dashboard.checkCardAuth({ projectId, appId: 'slack' })
+        setCardAuthenticated(Boolean(isAuth))
+      } else {
+        await startAppLogin(profileId, appId)
+      }
+    } catch (err) {
+      console.error('Card app login error', err)
+      setAuthError(String(err))
+    } finally {
+      setAuthBusyApp(null)
+    }
+  }
 
   const handleStartAppLogin = async (profileId?: string, appId?: 'slack' | 'teams' | 'whatsapp') => {
     if (!profileId || !appId) return
@@ -569,8 +607,8 @@ export default function WorkspaceContent({
         )
       }
     } else if (
-      (slackSourceOf(nav) === 'team' && !channels.teamConnected && targetProfile?.apps?.slack?.sessionStatus !== 'signed-in') ||
-      targetProfile?.apps?.slack?.sessionStatus === 'not-signed-in'
+      cardAuthenticated === false ||
+      (cardAuthenticated === null && !channels.teamConnected && targetProfile?.apps?.slack?.sessionStatus === 'not-signed-in')
     ) {
       body = (
         <div className="ws-agent" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
@@ -591,7 +629,7 @@ export default function WorkspaceContent({
               <button
                 type="button"
                 disabled={authBusyApp === 'slack'}
-                onClick={() => void handleStartAppLogin(targetProfile?.id, 'slack')}
+                onClick={() => void handleStartCardAppLogin(project.id, targetProfile?.id, 'slack')}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -629,7 +667,7 @@ export default function WorkspaceContent({
       const listed = channels[connectorOfSelection(sel) === 'team' ? 'team' : 'client']
       const isWholeWorkspace = sel === 's:team' || sel === 's:client' || !isChannelId(sel)
 
-      if (isWholeWorkspace && slackViewMode === 'live' && (effectiveSlackTeamId || project.teamId || channels.teamConnected)) {
+      if (isWholeWorkspace && slackViewMode === 'live' && (cardAuthenticated === true || effectiveSlackTeamId || project.teamId || channels.teamConnected)) {
         body = (
           <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', background: '#111318' }}>
             <div style={{
@@ -646,20 +684,22 @@ export default function WorkspaceContent({
                 <AppIcon appId="slack" size={15} />
                 <span style={{ fontWeight: 650, color: '#f8fafc' }}>Slack Workspace</span>
                 <span style={{ color: 'var(--text-faint)', fontSize: 11 }}>· {project.teamName || targetProfile?.displayName}</span>
-                <span style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  fontSize: 11,
-                  color: '#4ade80',
-                  background: 'rgba(74, 222, 128, 0.1)',
-                  padding: '2px 7px',
-                  borderRadius: 12,
-                  fontWeight: 600
-                }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ade80' }} />
-                  Connected
-                </span>
+                {cardAuthenticated === true && (
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    fontSize: 11,
+                    color: '#4ade80',
+                    background: 'rgba(74, 222, 128, 0.1)',
+                    padding: '2px 7px',
+                    borderRadius: 12,
+                    fontWeight: 600
+                  }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ade80' }} />
+                    Connected
+                  </span>
+                )}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', borderRadius: 6, padding: 2 }}>
@@ -699,7 +739,12 @@ export default function WorkspaceContent({
               </div>
             </div>
             <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
-              <CardLiveSlackEmbed appId="slack" profileId={targetProfile?.id} teamId={effectiveSlackTeamId || project.teamId} />
+              <CardLiveSlackEmbed
+                projectId={project.id}
+                appId="slack"
+                profileId={targetProfile?.id}
+                teamId={effectiveSlackTeamId || (project.teamId && !project.teamId.startsWith('team-') && project.teamId !== 'team' ? project.teamId : undefined)}
+              />
             </div>
           </div>
         )

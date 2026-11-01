@@ -182,6 +182,22 @@ export default function WorkspaceSidebar({
   const profiles = useProfileStore((s) => s.profiles)
   const [appLook, setAppLook] = useState<'minimal' | 'ancient' | 'new-cosmic'>('ancient')
   const [baseAppLayout, setBaseAppLayout] = useState<BaseAppLayoutKey>(propBaseAppLayout ?? 'standard')
+  const [cardSlackAuth, setCardSlackAuth] = useState<boolean>(false)
+
+  useEffect(() => {
+    let cancelled = false
+    if (!projectId) return
+    window.api?.dashboard?.checkCardAuth?.({ projectId, appId: 'slack' })
+      .then((isAuth) => {
+        if (!cancelled) setCardSlackAuth(Boolean(isAuth))
+      })
+      .catch(() => {
+        if (!cancelled) setCardSlackAuth(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [projectId])
 
   useEffect(() => {
     if (propBaseAppLayout) {
@@ -213,7 +229,7 @@ export default function WorkspaceSidebar({
   const baseItems = useMemo(() => getBaseLayoutItems(baseAppLayout), [baseAppLayout])
 
   const isMinimal = layout.mode === 'minimal' || propSidebarLook === 'minimal' || appLook === 'minimal'
-  const isAddHidden = isMinimal ? (layout.custom.hideAddButton ?? true) : Boolean(layout.custom.hideAddButton)
+  const isAddHidden = layout.custom.hideAddButton ?? true
   const [globalAccountsOpen, setGlobalAccountsOpen] = useState(true)
 
   // Collect all globally available workspaces and links grouped across profiles
@@ -626,9 +642,11 @@ export default function WorkspaceSidebar({
                                       <span className="ws-nav-tag" style={{ fontSize: 10, opacity: 0.7, flexShrink: 0 }}>
                                         {item.id === 'slack' && entries.length > 0
                                           ? `${entries.length} ch`
-                                          : item.type === 'app'
-                                            ? 'Active'
-                                            : 'Web'}
+                                          : item.id === 'slack'
+                                            ? (cardSlackAuth ? 'Active' : 'Ready')
+                                            : item.type === 'app'
+                                              ? 'Active'
+                                              : 'Web'}
                                       </span>
                                     </button>
                                   )

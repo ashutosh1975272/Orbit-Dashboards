@@ -83,6 +83,7 @@ export const IpcChannels = {
   ProfileUpdateBounds: 'profile:update-bounds',
   ProfileSetEmbedVisible: 'profile:set-embed-visible',
   ProfileActivateCardSlackEmbed: 'profile:activate-card-slack-embed',
+  ProfileStartCardAppLogin: 'profile:start-card-app-login',
   ProfileUpdateCardSlackEmbedBounds: 'profile:update-card-slack-embed-bounds',
   ProfileClearCardSlackEmbed: 'profile:clear-card-slack-embed',
   ProfileStartFirstLogin: 'profile:start-first-login',
@@ -201,6 +202,7 @@ export const IpcChannels = {
   DashboardWorkspaceMappingSave: 'dashboard:workspace-mapping-save',
   DashboardWorkspaceMappingDelete: 'dashboard:workspace-mapping-delete',
   DashboardGetProjects: 'dashboard:get-projects',
+  DashboardCardCheckAuth: 'dashboard:card-check-auth',
   DashboardSyncSource: 'dashboard:sync-source',
   DashboardGetRunLogs: 'dashboard:get-run-logs',
   DashboardStartWatchLive: 'dashboard:start-watch-live',
@@ -346,7 +348,8 @@ export interface IpcApi {
     ) => Promise<void>
     updateBounds: (bounds: ViewportBounds) => Promise<void>
     setEmbedVisible: (visible: boolean) => Promise<void>
-    activateCardSlackEmbed: (payload: { profileId: string; teamId?: string; appId?: AppId; bounds: ViewportBounds }) => Promise<void>
+    activateCardSlackEmbed: (payload: { projectId?: string; profileId: string; teamId?: string; appId?: AppId; bounds: ViewportBounds }) => Promise<void>
+    startCardAppLogin: (payload: { projectId: string; profileId: string; appId: AppId; bounds?: ViewportBounds }) => Promise<Profile>
     updateCardSlackEmbedBounds: (bounds: ViewportBounds) => Promise<void>
     clearCardSlackEmbed: () => Promise<void>
     startGoogleAuth: (profileId: string, bounds?: ViewportBounds) => Promise<Profile>
@@ -472,6 +475,7 @@ export interface IpcApi {
     }) => Promise<void>
     deleteWorkspaceMapping: (workspaceId: string) => Promise<boolean>
     getProjects: () => Promise<{ id: string; name: string; clientName: string; teamId: string; profileId: string }[]>
+    checkCardAuth: (payload: { projectId: string; appId?: AppId }) => Promise<boolean>
     syncSource: (payload: { projectId: string; sourceId?: string }) => Promise<{
       channelsRead: number
       newMessages: number
