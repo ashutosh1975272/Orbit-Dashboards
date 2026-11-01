@@ -89,4 +89,52 @@ describe('ProfileSidebar Look Switcher Button Arrangement', () => {
     fireEvent.click(buttons[2])
     expect(onLookChange).toHaveBeenCalledWith('ancient')
   })
+
+  it('renders Google email input when showGoogleEmailInputInSidebar is true in Minimal look', () => {
+    const { container } = render(
+      <ProfileSidebar
+        {...defaultProps}
+        sidebarLook="minimal"
+        showGoogleEmailInputInSidebar={true}
+      />
+    )
+
+    const emailInput = container.querySelector('#google-email')
+    expect(emailInput).not.toBeNull()
+
+    const submitBtn = container.querySelector('button[aria-label="Continue with Google"]')
+    expect(submitBtn).not.toBeNull()
+  })
+
+  it('hides Google email input when showGoogleEmailInputInSidebar is false in Minimal look', () => {
+    const { container } = render(
+      <ProfileSidebar
+        {...defaultProps}
+        sidebarLook="minimal"
+        showGoogleEmailInputInSidebar={false}
+      />
+    )
+
+    const emailInput = container.querySelector('#google-email')
+    expect(emailInput).toBeNull()
+  })
+
+  it('hides cosmic-nav-selectors dropdown and quick nav buttons in Minimal look', () => {
+    const { container } = render(
+      <ProfileSidebar
+        {...defaultProps}
+        sidebarLook="minimal"
+        showSidebarProfileNavButton={true}
+        showSidebarDashboardNavButton={true}
+      />
+    )
+
+    // The All Projects / level-1 dropdown container is hidden
+    const dropdown = container.querySelector('.cosmic-nav-selectors')
+    expect(dropdown).toBeNull()
+
+    // Quick nav buttons (All Profiles / Full Dashboard) are hidden
+    const quickNav = container.querySelector('.cosmic-quick-nav-buttons')
+    expect(quickNav).toBeNull()
+  })
 })

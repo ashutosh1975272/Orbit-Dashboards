@@ -346,8 +346,9 @@ function App(): React.JSX.Element {
     isCosmicActive && cosmicLevel1 && cosmicLevel1 !== 'all' && cosmicLevel1 !== 'global'
   )
   const showDashboard =
+    !isMinimalActive &&
     (dashboardOpen ||
-      (isCosmicOrMinimal && (cosmicLevel1 === 'all' || isMinimalActive || (isCosmicProfileActive && !cosmicSelectedCardId)))) &&
+      (isCosmicActive && (cosmicLevel1 === 'all' || (isCosmicProfileActive && !cosmicSelectedCardId)))) &&
     !browserAuthBusy &&
     !showCosmicCard
   const wizardOpen = useDashboardStore((s) => s.wizardOpenFor) != null

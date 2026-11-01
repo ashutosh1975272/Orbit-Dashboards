@@ -38,7 +38,7 @@ export function CosmicSidebarContent({
     propShowDashboardNavButton ??
     showCosmicProfileNavButtons ??
     true
-  const hasAnyQuickNav = showProfileBtn || showDashboardBtn
+  const hasAnyQuickNav = !isMinimalLook && (showProfileBtn || showDashboardBtn)
 
   // Ensure snapshot and profiles are loaded
   useEffect(() => {
@@ -49,13 +49,6 @@ export function CosmicSidebarContent({
       void useProfileStore.getState().loadProfiles().catch(() => undefined)
     }
   }, [snapshot, loadSnapshot, profiles.length])
-
-  // In Minimal look, always enforce 'all' navigation if currently set to something else
-  useEffect(() => {
-    if (isMinimalLook && cosmicLevel1 !== 'all') {
-      setCosmicNavigation('all', cosmicSelectedCardId)
-    }
-  }, [isMinimalLook, cosmicLevel1, cosmicSelectedCardId, setCosmicNavigation])
 
   // All selectable user profiles (exclude special global-account-profile singleton)
   const selectableProfiles = useMemo(() => {
@@ -84,6 +77,19 @@ export function CosmicSidebarContent({
         p.project.workflowStatus !== 'removed'
     )
   }, [snapshot, cosmicLevel1, isMinimalLook])
+
+  // In Minimal look, always enforce 'all' navigation if currently set to something else,
+  // and auto-select the first available project card if none is selected.
+  useEffect(() => {
+    if (isMinimalLook) {
+      if (cosmicLevel1 !== 'all') {
+        setCosmicNavigation('all', cosmicSelectedCardId)
+      }
+      if (!cosmicSelectedCardId && displayedProjects.length > 0) {
+        setCosmicNavigation('all', displayedProjects[0].project.id)
+      }
+    }
+  }, [isMinimalLook, cosmicLevel1, cosmicSelectedCardId, displayedProjects, setCosmicNavigation])
 
   const handleLevel1Change = useCallback(
     (val: string) => {
@@ -123,38 +129,18 @@ export function CosmicSidebarContent({
         gap: '4px'
       }}
     >
-      {/* Dropdown Navigation Container */}
-      <div
-        className="cosmic-nav-selectors"
-        style={{
-          padding: showCardsSection ? '4px 10px 8px' : '0 0 2px',
-          display: 'flex',
-          flexDirection: 'column',
-          background: showCardsSection ? 'rgba(255, 255, 255, 0.02)' : 'transparent',
-          borderBottom: showCardsSection ? '1px solid rgba(255, 255, 255, 0.06)' : 'none'
-        }}
-      >
-        {isMinimalLook ? (
-          <div
-            style={{
-              width: '100%',
-              padding: '7px 10px',
-              fontSize: '12.5px',
-              fontWeight: 600,
-              borderRadius: '7px',
-              background: 'color-mix(in srgb, var(--surface, #1e293b) 90%, black)',
-              color: '#fff',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              boxSizing: 'border-box'
-            }}
-          >
-            <span>▦</span>
-            <span>All Projects</span>
-          </div>
-        ) : (
+      {/* Dropdown Navigation Container (Hidden in Minimal Look) */}
+      {!isMinimalLook && (
+        <div
+          className="cosmic-nav-selectors"
+          style={{
+            padding: showCardsSection ? '4px 10px 8px' : '0 0 2px',
+            display: 'flex',
+            flexDirection: 'column',
+            background: showCardsSection ? 'rgba(255, 255, 255, 0.02)' : 'transparent',
+            borderBottom: showCardsSection ? '1px solid rgba(255, 255, 255, 0.06)' : 'none'
+          }}
+        >
           <select
             id="cosmic-level1-select"
             aria-label="Dashboard"
@@ -191,8 +177,8 @@ export function CosmicSidebarContent({
               </optgroup>
             )}
           </select>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* When All Projects or a Profile is selected: Show Profile & Dashboard buttons + compact projects list */}
       {showCardsSection && (
@@ -209,6 +195,7 @@ export function CosmicSidebarContent({
           {/* Quick Action Navigation Buttons */}
           {hasAnyQuickNav && (
             <div
+              className="cosmic-quick-nav-buttons"
               style={{
                 display: 'grid',
                 gridTemplateColumns: showProfileBtn && showDashboardBtn ? '1fr 1fr' : '1fr',
