@@ -26,6 +26,7 @@ interface UnifiedSettingsModalProps {
   onImportProfiles: () => void
   onAdminLogout: () => void
   onAddGoogleAccount?: () => void
+  onDeleteProfile?: (profileId: string) => void
   onSelectProfile?: (profileId: string) => void
   onOpenCustomLink?: (profileId: string, link: CustomLink) => void
 }
@@ -41,6 +42,7 @@ export function UnifiedSettingsModal({
   onImportProfiles,
   onAdminLogout,
   onAddGoogleAccount,
+  onDeleteProfile,
   onSelectProfile: _onSelectProfile,
   onOpenCustomLink: _onOpenCustomLink
 }: UnifiedSettingsModalProps): React.JSX.Element | null {
@@ -1283,21 +1285,61 @@ export function UnifiedSettingsModal({
                         border: '1px solid rgba(255, 255, 255, 0.08)'
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                           <span style={{ fontSize: '16px' }}>👤</span>
                           <span style={{ fontWeight: 600, color: '#f8fafc', fontSize: '14px' }}>
                             {profile.displayName || profile.id}
                           </span>
+                          {profile.customName && profile.customName !== profile.displayName && (
+                            <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+                              ({profile.customName})
+                            </span>
+                          )}
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              backgroundColor:
+                                profile.googleAuthStatus === 'signed-in'
+                                  ? 'rgba(34, 197, 94, 0.15)'
+                                  : 'rgba(239, 68, 68, 0.15)',
+                              color:
+                                profile.googleAuthStatus === 'signed-in'
+                                  ? '#4ade80'
+                                  : '#f87171',
+                              fontWeight: 500
+                            }}
+                          >
+                            {profile.googleAuthStatus === 'signed-in' ? '● Verified' : '○ Not Signed In'}
+                          </span>
                         </div>
-                        <button
-                          type="button"
-                          className="btn ghost"
-                          onClick={() => void handleToggleSidebarVisibility(profile)}
-                          style={{ fontSize: '12px', padding: '4px 10px', color: profile.hiddenInSidebar ? '#94a3b8' : '#60a5fa' }}
-                        >
-                          {profile.hiddenInSidebar ? '👁️ Show in Sidebar' : '👁️‍🗨️ Hide from Sidebar'}
-                        </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <button
+                            type="button"
+                            className="btn ghost"
+                            onClick={() => void handleToggleSidebarVisibility(profile)}
+                            style={{ fontSize: '12px', padding: '4px 10px', color: profile.hiddenInSidebar ? '#94a3b8' : '#60a5fa' }}
+                          >
+                            {profile.hiddenInSidebar ? '👁️ Show in Sidebar' : '👁️‍🗨️ Hide from Sidebar'}
+                          </button>
+                          {onDeleteProfile && (
+                            <button
+                              type="button"
+                              className="btn ghost"
+                              onClick={() => {
+                                if (window.confirm(`Permanently delete account "${profile.customName || profile.displayName}"?`)) {
+                                  onDeleteProfile(profile.id)
+                                }
+                              }}
+                              style={{ fontSize: '12px', padding: '4px 10px', color: '#f87171' }}
+                              title="Permanently remove account"
+                            >
+                              🗑️ Delete
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       {/* Custom Links for this profile */}

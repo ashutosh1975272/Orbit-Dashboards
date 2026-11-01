@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest'
 import { render, fireEvent, cleanup } from '@testing-library/react'
 import { UnifiedSettingsModal } from '../../src/renderer/src/components/dashboard/UnifiedSettingsModal'
+import { useProfileStore } from '../../src/renderer/src/hooks/useProfiles'
 import { DEFAULT_APP_SETTINGS } from '../../src/shared/ipc-contract'
 
 beforeAll(() => {
@@ -134,5 +135,51 @@ describe('UnifiedSettingsModal Advance Control and Modal Dimensions', () => {
     const aside = container.querySelector('aside')
     expect(aside?.textContent).not.toContain('Sidebar & Navigation')
     expect(main?.textContent).toContain('Configure visual appearance, notifications, workspace layout, and system idle behaviors.')
+  })
+
+  it('renders Delete button in Accounts tab and calls onDeleteProfile on confirmation', () => {
+    const onDeleteProfile = vi.fn()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    useProfileStore.setState({
+      profiles: [
+        {
+          id: 'test-del-1',
+          displayName: 'test@account.com',
+          customName: 'Delete Me',
+          createdAt: new Date().toISOString(),
+          avatarColor: '#2BAC76',
+          googleAuthStatus: 'signed-in',
+          muted: false,
+          hiddenInSidebar: false,
+          apps: {
+            slack: { sessionStatus: 'not-signed-in', availableWorkspaces: [], pinnedWorkspaces: [] },
+            teams: { sessionStatus: 'not-signed-in', availableWorkspaces: [], pinnedWorkspaces: [] },
+            whatsapp: { sessionStatus: 'not-signed-in', availableWorkspaces: [], pinnedWorkspaces: [] }
+          }
+        }
+      ]
+    })
+
+    const { container } = render(
+      <UnifiedSettingsModal
+        {...dummyProps}
+        initialTab="accounts"
+        onDeleteProfile={onDeleteProfile}
+      />
+    )
+
+    const main = container.querySelector('main')
+    expect(main?.textContent).toContain('test@account.com')
+    expect(main?.textContent).toContain('Delete Me')
+
+    const delBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Delete')
+    ) as HTMLButtonElement
+    expect(delBtn).toBeDefined()
+    fireEvent.click(delBtn)
+
+    expect(window.confirm).toHaveBeenCalled()
+    expect(onDeleteProfile).toHaveBeenCalledWith('test-del-1')
   })
 })

@@ -595,7 +595,12 @@ function App(): React.JSX.Element {
   }, [email])
 
   const handleCreateAndAuthProfile = useCallback(
-    async (displayName: string, targetEmail: string, mode?: 'under_global' | 'individual' | 'both') => {
+    async (
+      displayName: string,
+      targetEmail: string,
+      mode?: 'under_global' | 'individual' | 'both',
+      forceReauth?: boolean
+    ) => {
       const hint = targetEmail.trim()
       if (!hint) return
       setLocalAuthPhase('google')
@@ -614,7 +619,7 @@ function App(): React.JSX.Element {
         const latest = useProfileStore.getState().profiles.find((p) => p.id === targetProfileId)
         const googleOk = latest?.googleAuthStatus === 'signed-in'
 
-        if (googleOk) {
+        if (googleOk && !forceReauth) {
           await activateProfile(targetProfileId, viewportBounds())
           setToast(
             mode === 'both'
@@ -1129,6 +1134,12 @@ function App(): React.JSX.Element {
         onAddGoogleAccount={() => {
           setUnifiedSettingsOpen(false)
           setNewProfileModalOpen(true)
+        }}
+        onDeleteProfile={(id) => {
+          void deleteProfile(id).then(async () => {
+            const s = await window.api.app.getSettings()
+            setSettings(s)
+          })
         }}
         onSelectProfile={(id) => {
           setUnifiedSettingsOpen(false)

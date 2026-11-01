@@ -791,7 +791,7 @@ export default function DashboardView(): React.ReactElement | null {
         <NewProfileModal
           open={newProfileModalOpen}
           onClose={() => setNewProfileModalOpen(false)}
-          onCreate={async (name, email, mode) => {
+          onCreate={async (name, email, mode, forceReauth) => {
             const profile = await useProfileStore.getState().createProfile(email.trim())
             const targetProfileId = profile.id
             const finalDisplayName = name.trim() || email.trim()
@@ -800,6 +800,11 @@ export default function DashboardView(): React.ReactElement | null {
             const scope = mode === 'under_global' ? 'global' : mode === 'both' ? 'both' : 'individual'
             await window.api.profiles.setAccountScope(targetProfileId, scope)
             await useProfileStore.getState().loadProfiles()
+
+            const latest = useProfileStore.getState().profiles.find((p) => p.id === targetProfileId)
+            if (latest?.googleAuthStatus === 'signed-in' && !forceReauth) {
+              return
+            }
 
             // Initiate Google Authentication in Chrome
             try {
