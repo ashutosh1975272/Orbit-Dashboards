@@ -15,7 +15,7 @@ import DashboardView from './components/dashboard/DashboardView'
 import DashboardRail from './components/dashboard/DashboardRail'
 import { CosmicWorkspaceView } from './components/dashboard/CosmicWorkspaceView'
 import { useDashboardStore } from './hooks/useDashboard'
-import { SettingsPanel } from './components/SettingsPanel'
+import ObserverView from './components/dashboard/ObserverView'
 import { SidebarPanelIcon } from './components/SidebarPanelIcon'
 import { SlackViewport } from './components/SlackViewport'
 import { PlatformSettingsPanel } from './components/dashboard/PlatformSettingsPanel'
@@ -84,7 +84,7 @@ function App(): React.JSX.Element {
     'Enter Google email → Continue. Slack / Teams / WhatsApp open from the sidebar.'
   )
   const [cmdkOpen, setCmdkOpen] = useState(false)
-  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [showObserverView, setShowObserverView] = useState(false)
   const [unifiedSettingsOpen, setUnifiedSettingsOpen] = useState(false)
   const [unifiedSettingsTab, setUnifiedSettingsTab] = useState<SettingsTabKey>('general')
   const [platformSettings, setPlatformSettings] = useState<{
@@ -336,6 +336,7 @@ function App(): React.JSX.Element {
   const browserAuthBusy = authPhase === 'google' || authPhase === 'slack'
   const cosmicLevel1 = useDashboardStore((s) => s.cosmicLevel1)
   const cosmicSelectedCardId = useDashboardStore((s) => s.cosmicSelectedCardId)
+  const dashboardProjects = useDashboardStore((s) => s.snapshot?.projects ?? [])
   const isCosmicActive = settings.sidebarLook === 'new-cosmic'
   const isMinimalActive = settings.sidebarLook === 'minimal'
   const isCosmicOrMinimal = isCosmicActive || isMinimalActive
@@ -363,10 +364,10 @@ function App(): React.JSX.Element {
     (activeAppId || activeCustomLinkId) &&
     !showDashboard &&
     !showCosmicCard &&
+    !showObserverView &&
     !wizardOpen &&
     !browserAuthBusy &&
     !locked &&
-    !settingsOpen &&
     !unifiedSettingsOpen &&
     !cmdkOpen &&
     !platformSettings &&
@@ -718,8 +719,8 @@ function App(): React.JSX.Element {
           setUnifiedSettingsOpen(false)
           return
         }
-        if (settingsOpen) {
-          setSettingsOpen(false)
+        if (showObserverView) {
+          setShowObserverView(false)
           return
         }
         if (cmdkOpen) {
@@ -764,7 +765,7 @@ function App(): React.JSX.Element {
     browserAuthBusy,
     localAuthPhase,
     cmdkOpen,
-    settingsOpen,
+    showObserverView,
     settings.sidebarCollapsed,
     locked,
     handleSelectProfile,
@@ -867,7 +868,7 @@ function App(): React.JSX.Element {
               }}
               onNewProfile={() => setNewProfileModalOpen(true)}
               onObserver={() => {
-                setToast('Observer Mode enabled. Observer channel streams active.')
+                setShowObserverView(true)
               }}
               onOpenAccountsSettings={() => {
                 setUnifiedSettingsTab('general')
@@ -953,7 +954,9 @@ function App(): React.JSX.Element {
             </div>
           ) : null}
 
-          {showCosmicCard ? (
+          {showObserverView ? (
+            <ObserverView onBack={() => setShowObserverView(false)} />
+          ) : showCosmicCard ? (
             <CosmicWorkspaceView />
           ) : showDashboard ? (
             <DashboardView />
@@ -968,7 +971,7 @@ function App(): React.JSX.Element {
             </div>
           ) : null}
 
-          {!browserAuthBusy && !showEmbed && !showDashboard && !showCosmicCard && !locked ? (
+          {!browserAuthBusy && !showEmbed && !showDashboard && !showCosmicCard && !showObserverView && !locked ? (
             <div className="empty-main">
               <img className="empty-main-icon" src={appIcon} alt="" aria-hidden />
               <h1>{emptyCopy.title}</h1>
@@ -985,79 +988,50 @@ function App(): React.JSX.Element {
       <CommandPalette
         open={cmdkOpen && !locked}
         profiles={profiles}
+        projects={dashboardProjects.map((p) => ({
+          id: p.project.id,
+          name: p.project.name,
+          clientName: p.project.clientName
+        }))}
         onClose={() => setCmdkOpen(false)}
-        onSelectProfile={(id) => void handleSelectProfile(id)}
-        onSelectApp={handleSidebarSelectApp}
-        onOpenWorkspace={handleOpenWorkspace}
+        onSelectProfile={(id) => {
+          setShowObserverView(false)
+          void handleSelectProfile(id)
+        }}
+        onSelectApp={(profileId, appId) => {
+          setShowObserverView(false)
+          handleSidebarSelectApp(profileId, appId)
+        }}
+        onOpenWorkspace={(profileId, appId, teamId) => {
+          setShowObserverView(false)
+          handleOpenWorkspace(profileId, appId, teamId)
+        }}
         onOpenInSplit={(profileId, appId) => {
           if (!settings.splitViewEnabled) {
             setToast('Enable Split view in Settings first.')
             return
           }
+          setShowObserverView(false)
           setSplitSecondary({ profileId, appId })
         }}
-      />
-
-      <SettingsPanel
-        open={settingsOpen && !locked}
-        settings={settings}
-        onClose={() => setSettingsOpen(false)}
-        onChange={(patch) => {
-          void window.api.app.setSettings(patch).then((s) => {
-            setSettings(s)
-            applyDocumentTheme(s.theme)
-            applySidebarDensity(s.sidebarDensity)
-            applySidebarWidth(s.sidebarWidth)
-            if (!s.splitViewEnabled) setSplitSecondary(null)
-          })
+        onSelectProject={(projectId) => {
+          setShowObserverView(false)
+          useDashboardStore.getState().setCosmicNavigation('all', projectId)
+          useDashboardStore.getState().openDashboard()
         }}
-        onClearAllProfiles={() => {
-          void window.api.profiles.clearAll().then(async () => {
-            useProfileStore.setState({
-              profiles: [],
-              activeProfileId: null,
-              activeAppId: null
-            })
-            const s = await window.api.app.getSettings()
-            setSettings(s)
-            setStatusLine('All profiles removed.')
-            setSettingsOpen(false)
-          })
+        onOpenSettings={() => {
+          setUnifiedSettingsTab('general')
+          setUnifiedSettingsOpen(true)
         }}
-        onExportProfiles={() => {
-          void window.api.profiles.exportMetadata().then((list) => {
-            const blob = new Blob([JSON.stringify(list, null, 2)], {
-              type: 'application/json'
-            })
-            const a = document.createElement('a')
-            a.href = URL.createObjectURL(blob)
-            a.download = 'slack-dashboard-profiles.json'
-            a.click()
-          })
+        onLockApp={() => {
+          void window.api.app.lock()
         }}
-        onImportProfiles={() => {
-          const input = document.createElement('input')
-          input.type = 'file'
-          input.accept = 'application/json,.json'
-          input.onchange = () => {
-            const file = input.files?.[0]
-            if (!file) return
-            void file.text().then(async (text) => {
-              const parsed = JSON.parse(text) as Profile[]
-              const list = await window.api.profiles.importMetadata(parsed)
-              useProfileStore.setState({ profiles: list })
-              setToast(`Imported — ${list.length} profiles total (sessions still need sign-in).`)
-            })
-          }
-          input.click()
+        onSyncAll={() => {
+          void useDashboardStore.getState().syncNow()
+          setToast('Syncing all project cards…')
         }}
-        onAdminLogout={() => {
-          void window.api.app.adminLogout().then(() => {
-            setSettingsOpen(false)
-            setCmdkOpen(false)
-            setAdminAuthenticated(false)
-            void window.api.profiles.setEmbedVisible(false)
-          })
+        onOpenObserver={() => {
+          setShowObserverView(true)
         }}
       />
 
@@ -1222,6 +1196,7 @@ function App(): React.JSX.Element {
           }}
           onSelectProfile={(id) => void handleSelectProfile(id)}
           onOpenCustomLink={(pId, link) => void handleSelectCustomLink(pId, link)}
+          onOpenObserver={() => setShowObserverView(true)}
         />
       ) : null}
 

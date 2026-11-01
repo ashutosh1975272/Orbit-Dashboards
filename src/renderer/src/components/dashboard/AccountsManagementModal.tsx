@@ -21,6 +21,7 @@ interface AccountsManagementModalProps {
   onAddGoogleAccount?: () => void
   onSelectProfile?: (profileId: string) => void
   onOpenCustomLink?: (profileId: string, link: CustomLink) => void
+  onOpenObserver?: () => void
 }
 
 export function AccountsManagementModal({
@@ -31,7 +32,8 @@ export function AccountsManagementModal({
   onNewProfile,
   onAddGoogleAccount,
   onSelectProfile: _onSelectProfile,
-  onOpenCustomLink: _onOpenCustomLink
+  onOpenCustomLink: _onOpenCustomLink,
+  onOpenObserver
 }: AccountsManagementModalProps): React.JSX.Element | null {
   const profiles = useProfileStore((s) => s.profiles)
   const activeProfileId = useProfileStore((s) => s.activeProfileId)
@@ -454,6 +456,19 @@ export function AccountsManagementModal({
                   <p style={{ margin: '6px 0 0', fontSize: '13px', color: '#94a3b8', maxWidth: '420px' }}>
                     Observer streams are kept clean and active in the background. Live activity feeds and surveillance channels will populate here.
                   </p>
+                  {onOpenObserver && (
+                    <button
+                      type="button"
+                      className="btn primary"
+                      onClick={() => {
+                        onClose()
+                        onOpenObserver()
+                      }}
+                      style={{ marginTop: '16px', fontSize: '13px', padding: '8px 18px' }}
+                    >
+                      🔭 Open Dedicated Observer Canvas
+                    </button>
+                  )}
                 </div>
               </div>
             )}
