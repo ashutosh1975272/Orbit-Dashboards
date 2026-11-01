@@ -11,6 +11,15 @@ function formatRelativeTime(isoString: string): string {
   return `${diffHr}h ago`
 }
 
+function formatExactTime(isoString: string): string {
+  try {
+    const d = new Date(isoString)
+    return d.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  } catch {
+    return ''
+  }
+}
+
 export function LogsObservabilityTab(): React.JSX.Element {
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [levelFilter, setLevelFilter] = useState<LogLevel | 'all'>('all')
@@ -42,7 +51,6 @@ export function LogsObservabilityTab(): React.JSX.Element {
   useEffect(() => {
     const unsubscribe = window.api.logs.onLogEntry((entry: LogEntry) => {
       setLogs((prev) => {
-        // Enforce 15m (or current retention) client-side cutoff as well
         const cutoff = retentionMinutes > 0 ? Date.now() - retentionMinutes * 60 * 1000 : 0
         const filtered = cutoff > 0 ? prev.filter((e) => new Date(e.ts).getTime() >= cutoff) : prev
         return [...filtered, entry]
@@ -58,7 +66,6 @@ export function LogsObservabilityTab(): React.JSX.Element {
         const cutoff = Date.now() - retentionMinutes * 60 * 1000
         setLogs((prev) => prev.filter((e) => new Date(e.ts).getTime() >= cutoff))
       } else {
-        // Trigger a force re-render for relative timestamps
         setLogs((prev) => [...prev])
       }
     }, 5000)
@@ -105,7 +112,7 @@ export function LogsObservabilityTab(): React.JSX.Element {
         document.body.removeChild(a)
         URL.revokeObjectURL(url)
 
-        setExportNotice(`Exported ${res.count} logs to download!`)
+        setExportNotice(`Exported ${res.count} logs to download file!`)
         setTimeout(() => setExportNotice(null), 3500)
       }
     } catch (err) {
@@ -139,117 +146,160 @@ export function LogsObservabilityTab(): React.JSX.Element {
   const warnCount = useMemo(() => logs.filter((e) => e.level === 'warn').length, [logs])
 
   return (
-    <div className="logs-hub-container">
-      {/* Header & Status Summary */}
-      <div className="logs-header-section">
-        <div className="flex items-center justify-between">
+    <div className="logs-hub-container" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      {/* 1. Top Section: Header & Telemetry Cards */}
+      <div className="logs-header-card">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
           <div>
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <span>📜</span> Application Observability & Logs
-            </h2>
-            <p className="text-xs text-slate-400 mt-1">
-              End-to-end real-time diagnostics, background sync telemetry, and security audit stream.
+            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>📜</span> Application Observability &amp; Logs
+            </h3>
+            <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#94a3b8' }}>
+              Full end-to-end real-time diagnostics, background sync telemetry, and security audit feed.
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span
-              className={`px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 border ${
-                errorCount > 0
-                  ? 'bg-rose-950/40 text-rose-300 border-rose-800/60'
-                  : 'bg-emerald-950/40 text-emerald-300 border-emerald-800/60'
-              }`}
+              style={{
+                fontSize: '11.5px',
+                fontWeight: 600,
+                padding: '4px 10px',
+                borderRadius: '20px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: errorCount > 0 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(34, 197, 94, 0.15)',
+                color: errorCount > 0 ? '#fca5a5' : '#86efac',
+                border: errorCount > 0 ? '1px solid rgba(239, 68, 68, 0.35)' : '1px solid rgba(34, 197, 94, 0.35)'
+              }}
             >
               <span
-                className={`w-2 h-2 rounded-full ${errorCount > 0 ? 'bg-rose-500 animate-pulse' : 'bg-emerald-400'}`}
+                style={{
+                  width: '7px',
+                  height: '7px',
+                  borderRadius: '50%',
+                  backgroundColor: errorCount > 0 ? '#ef4444' : '#22c55e',
+                  display: 'inline-block'
+                }}
               />
               {errorCount > 0 ? `${errorCount} Active Errors` : 'System Healthy'}
             </span>
 
-            <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800/80 text-slate-300 border border-slate-700/60">
+            <span
+              style={{
+                fontSize: '11.5px',
+                fontWeight: 600,
+                padding: '4px 10px',
+                borderRadius: '20px',
+                background: 'rgba(30, 41, 59, 0.8)',
+                color: '#cbd5e1',
+                border: '1px solid rgba(255, 255, 255, 0.1)'
+              }}
+            >
               {logs.length} Live Entries
             </span>
           </div>
         </div>
 
-        {/* Status Pills Strip */}
-        <div className="grid grid-cols-4 gap-2 mt-4 text-xs">
-          <div className="bg-slate-900/60 border border-slate-800 rounded-lg p-2.5 flex flex-col justify-between">
-            <span className="text-slate-400">Total Tracked</span>
-            <span className="text-base font-bold text-white mt-0.5">{logs.length}</span>
+        {/* Structured 4-Card Telemetry Grid */}
+        <div className="logs-metric-grid">
+          <div className="logs-metric-card">
+            <span className="logs-metric-label">📊 Total Tracked</span>
+            <div className="logs-metric-value" style={{ color: '#f8fafc' }}>
+              {logs.length}
+              <span style={{ fontSize: '11px', fontWeight: 500, color: '#64748b' }}>events</span>
+            </div>
           </div>
-          <div className="bg-slate-900/60 border border-slate-800 rounded-lg p-2.5 flex flex-col justify-between">
-            <span className="text-slate-400">Errors & Warnings</span>
-            <span
-              className={`text-base font-bold mt-0.5 ${errorCount > 0 ? 'text-rose-400' : 'text-slate-200'}`}
+
+          <div className="logs-metric-card">
+            <span className="logs-metric-label">⚠️ Errors &amp; Warnings</span>
+            <div
+              className="logs-metric-value"
+              style={{ color: errorCount > 0 ? '#f87171' : warnCount > 0 ? '#fbbf24' : '#94a3b8' }}
             >
-              {errorCount} err · {warnCount} warn
-            </span>
+              {errorCount} <span style={{ fontSize: '11px', color: '#64748b' }}>err</span> · {warnCount}{' '}
+              <span style={{ fontSize: '11px', color: '#64748b' }}>warn</span>
+            </div>
           </div>
-          <div className="bg-slate-900/60 border border-slate-800 rounded-lg p-2.5 flex flex-col justify-between">
-            <span className="text-slate-400">Retention Policy</span>
-            <span className="text-base font-bold text-indigo-300 mt-0.5">
-              {retentionMinutes > 0 ? `${retentionMinutes} min auto-purge` : 'Session only'}
-            </span>
+
+          <div className="logs-metric-card">
+            <span className="logs-metric-label">⏳ Retention Window</span>
+            <div className="logs-metric-value" style={{ color: '#a5b4fc' }}>
+              {retentionMinutes > 0 ? `${retentionMinutes} min` : 'Session'}
+              <span style={{ fontSize: '11px', fontWeight: 500, color: '#64748b' }}>auto-purge</span>
+            </div>
           </div>
-          <div className="bg-slate-900/60 border border-slate-800 rounded-lg p-2.5 flex flex-col justify-between">
-            <span className="text-slate-400">Security Redaction</span>
-            <span className="text-base font-bold text-emerald-400 mt-0.5">Active (Strict)</span>
+
+          <div className="logs-metric-card">
+            <span className="logs-metric-label">🛡️ Security Redaction</span>
+            <div className="logs-metric-value" style={{ color: '#4ade80' }}>
+              Active
+              <span style={{ fontSize: '11px', fontWeight: 500, color: '#64748b' }}>tokens masked</span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Toolbar Controls */}
-      <div className="logs-toolbar-strip flex flex-wrap items-center justify-between gap-2.5 mt-4 p-3 bg-slate-900/80 border border-slate-800/80 rounded-xl">
-        {/* Left: Filters & Search */}
-        <div className="flex flex-wrap items-center gap-2">
+      {/* 2. Controls & Filtering Bar */}
+      <div className="logs-control-bar">
+        {/* Left Side: Filters & Search */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           {/* Level Filter */}
           <select
             value={levelFilter}
             onChange={(e) => setLevelFilter(e.target.value as any)}
-            className="bg-slate-800 border border-slate-700 text-xs rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500"
+            className="logs-select"
             aria-label="Filter by log level"
           >
-            <option value="all">All Levels</option>
-            <option value="error">Errors Only</option>
-            <option value="warn">Warnings</option>
-            <option value="info">Info</option>
-            <option value="security">Security</option>
-            <option value="debug">Debug</option>
+            <option value="all">Level: All</option>
+            <option value="error">Level: Error</option>
+            <option value="warn">Level: Warn</option>
+            <option value="info">Level: Info</option>
+            <option value="security">Level: Security</option>
+            <option value="debug">Level: Debug</option>
           </select>
 
           {/* Category Filter */}
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value as any)}
-            className="bg-slate-800 border border-slate-700 text-xs rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500"
+            className="logs-select"
             aria-label="Filter by category"
           >
-            <option value="all">All Categories</option>
-            <option value="ui">UI Clicks & Modals [UI]</option>
+            <option value="all">Category: All</option>
+            <option value="ui">UI Clicks &amp; Modals [UI]</option>
             <option value="nav">Navigation [NAV]</option>
             <option value="ipc">IPC Bridge [IPC]</option>
             <option value="sync">Sync Engine [SYNC]</option>
             <option value="auth">Authentication [AUTH]</option>
             <option value="sec">Security Audit [SEC]</option>
             <option value="error">Errors [ERROR]</option>
-            <option value="system">System [SYS]</option>
+            <option value="system">System Core [SYS]</option>
           </select>
 
           {/* Search Box */}
-          <div className="relative">
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
             <input
               type="text"
-              placeholder="Search logs & metadata…"
+              placeholder="Search logs &amp; payload…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-48 sm:w-64 bg-slate-800/90 border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+              className="logs-input"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-1.5 text-slate-400 hover:text-white text-xs"
+                style={{
+                  position: 'absolute',
+                  right: '8px',
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#94a3b8',
+                  cursor: 'pointer',
+                  fontSize: '12px'
+                }}
               >
                 ✕
               </button>
@@ -257,184 +307,232 @@ export function LogsObservabilityTab(): React.JSX.Element {
           </div>
         </div>
 
-        {/* Right: Retention & Actions */}
-        <div className="flex items-center gap-2">
-          {/* Retention Duration Selector */}
-          <div className="flex items-center gap-1.5 text-xs text-slate-400">
+        {/* Right Side: Retention, Live Toggle, Actions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#94a3b8' }}>
             <span>Expire after:</span>
             <select
               value={retentionMinutes}
               onChange={(e) => void handleRetentionChange(Number(e.target.value))}
-              className="bg-slate-800 border border-slate-700 text-xs rounded-lg px-2 py-1.5 text-slate-200 focus:outline-none"
+              className="logs-select"
               aria-label="Log retention duration"
             >
               <option value={5}>5 min</option>
               <option value={15}>15 min (Default)</option>
               <option value={30}>30 min</option>
               <option value={60}>1 hour</option>
-              <option value={0}>Session only</option>
+              <option value={0}>Until App Closes</option>
             </select>
           </div>
 
-          {/* Auto-scroll Pause Toggle */}
           <button
             type="button"
             onClick={() => setAutoScroll((prev) => !prev)}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-              autoScroll
-                ? 'bg-indigo-950/60 border-indigo-700/60 text-indigo-300'
-                : 'bg-slate-800 border-slate-700 text-slate-400'
-            }`}
-            title={autoScroll ? 'Click to pause auto-scroll' : 'Click to resume live auto-scroll'}
+            className={`logs-btn ${autoScroll ? 'logs-btn-primary' : 'logs-btn-secondary'}`}
+            title={autoScroll ? 'Auto-scroll active — click to pause' : 'Stream paused — click to resume live scroll'}
           >
-            {autoScroll ? '● Live Stream' : '⏸ Paused'}
+            <span>{autoScroll ? '● Live Stream' : '⏸ Paused'}</span>
           </button>
 
-          {/* Export Button */}
           <button
             type="button"
             onClick={() => void handleExportLogs()}
-            className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-lg text-xs font-medium transition-colors"
+            className="logs-btn logs-btn-secondary"
+            title="Download sanitized logs file"
           >
-            Export
+            <span>📥 Export</span>
           </button>
 
-          {/* Clear Button */}
           <button
             type="button"
             onClick={() => void handleClearLogs()}
-            className="px-2.5 py-1.5 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/60 text-rose-300 rounded-lg text-xs font-medium transition-colors"
+            className="logs-btn logs-btn-danger"
+            title="Clear all live logs"
           >
-            Clear
+            <span>🗑️ Clear</span>
           </button>
         </div>
       </div>
 
       {exportNotice && (
-        <div className="mt-2 px-3 py-1.5 bg-emerald-950/80 border border-emerald-700 text-emerald-300 text-xs rounded-lg animate-fade-in flex items-center justify-between">
+        <div
+          style={{
+            padding: '8px 14px',
+            borderRadius: '8px',
+            background: 'rgba(34, 197, 94, 0.15)',
+            border: '1px solid rgba(34, 197, 94, 0.35)',
+            color: '#86efac',
+            fontSize: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}
+        >
           <span>{exportNotice}</span>
           <button
             type="button"
             onClick={() => setExportNotice(null)}
-            className="text-emerald-400 hover:text-white"
+            style={{ background: 'transparent', border: 'none', color: '#86efac', cursor: 'pointer' }}
           >
             ✕
           </button>
         </div>
       )}
 
-      {/* Log Feed Stream */}
-      <div
-        ref={containerRef}
-        className="logs-stream-viewport mt-3 bg-slate-950/90 border border-slate-800/90 rounded-xl p-2.5 font-mono text-xs overflow-y-auto max-h-[460px] min-h-[300px]"
-      >
-        {filteredLogs.length === 0 ? (
-          <div className="py-16 text-center text-slate-500 font-sans">
-            <p className="text-sm">No log entries found matching criteria</p>
-            <p className="text-xs text-slate-600 mt-1">
-              Events will automatically appear here as user actions, sync tasks, or errors occur.
-            </p>
+      {/* 3. Structured Console Window */}
+      <div className="logs-console-window">
+        {/* Terminal Header Bar */}
+        <div className="logs-console-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ display: 'inline-flex', gap: '4px' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444' }} />
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#f59e0b' }} />
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981' }} />
+            </span>
+            <span style={{ fontWeight: 600, color: '#94a3b8' }}>LIVE EVENT CONSOLE</span>
           </div>
-        ) : (
-          <div className="space-y-1">
-            {filteredLogs.map((entry) => {
-              const isExpanded = Boolean(expandedLogIds[entry.id])
-              const hasMeta = Boolean(
-                entry.meta &&
-                  typeof entry.meta === 'object' &&
-                  Object.keys(entry.meta as Record<string, unknown>).length > 0
-              )
+          <div>
+            <span>
+              Showing {filteredLogs.length} of {logs.length} events · Auto-purge: {retentionMinutes > 0 ? `${retentionMinutes}m TTL` : 'Off'}
+            </span>
+          </div>
+        </div>
 
-              let levelColor = 'text-slate-300'
-              let levelBadgeBg = 'bg-slate-800 text-slate-300 border-slate-700'
-              if (entry.level === 'error') {
-                levelColor = 'text-rose-400 font-semibold'
-                levelBadgeBg = 'bg-rose-950/80 text-rose-300 border-rose-800'
-              } else if (entry.level === 'warn') {
-                levelColor = 'text-amber-300'
-                levelBadgeBg = 'bg-amber-950/80 text-amber-300 border-amber-800'
-              } else if (entry.level === 'security') {
-                levelColor = 'text-purple-300 font-semibold'
-                levelBadgeBg = 'bg-purple-950/80 text-purple-300 border-purple-800'
-              }
+        {/* Log Entries Viewport */}
+        <div ref={containerRef} className="logs-stream-viewport">
+          {filteredLogs.length === 0 ? (
+            <div style={{ padding: '60px 20px', textAlign: 'center', color: '#64748b' }}>
+              <p style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#94a3b8' }}>
+                No log entries found
+              </p>
+              <p style={{ margin: '6px 0 0', fontSize: '12px' }}>
+                Events will appear here in real time as actions, sync jobs, or errors occur.
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {filteredLogs.map((entry) => {
+                const isExpanded = Boolean(expandedLogIds[entry.id])
+                const hasMeta = Boolean(
+                  entry.meta &&
+                    typeof entry.meta === 'object' &&
+                    Object.keys(entry.meta as Record<string, unknown>).length > 0
+                )
 
-              let categoryBadge = 'bg-slate-800 text-slate-400 border-slate-700'
-              if (entry.category === 'ui')
-                categoryBadge = 'bg-blue-950/70 text-blue-300 border-blue-800/60'
-              if (entry.category === 'nav')
-                categoryBadge = 'bg-purple-950/70 text-purple-300 border-purple-800/60'
-              if (entry.category === 'sync')
-                categoryBadge = 'bg-cyan-950/70 text-cyan-300 border-cyan-800/60'
-              if (entry.category === 'ipc')
-                categoryBadge = 'bg-teal-950/70 text-teal-300 border-teal-800/60'
-              if (entry.category === 'auth')
-                categoryBadge = 'bg-emerald-950/70 text-emerald-300 border-emerald-800/60'
-              if (entry.category === 'sec')
-                categoryBadge = 'bg-amber-950/70 text-amber-300 border-amber-800/60'
-              if (entry.category === 'error')
-                categoryBadge = 'bg-rose-950/80 text-rose-300 border-rose-800/80'
+                // Level colors
+                let levelBadgeStyle: React.CSSProperties = {
+                  background: 'rgba(51, 65, 85, 0.6)',
+                  color: '#cbd5e1',
+                  border: '1px solid rgba(255, 255, 255, 0.1)'
+                }
+                let msgColor = '#f1f5f9'
 
-              return (
-                <div
-                  key={entry.id}
-                  className={`log-row p-2 rounded-lg border transition-colors ${
-                    entry.level === 'error'
-                      ? 'bg-rose-950/15 border-rose-900/30'
-                      : 'bg-slate-900/40 border-slate-800/40 hover:bg-slate-900/80'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {/* Timestamp */}
-                      <span
-                        className="text-slate-500 font-mono text-[11px] whitespace-nowrap"
-                        title={entry.ts}
-                      >
-                        {formatRelativeTime(entry.ts)}
-                      </span>
+                if (entry.level === 'error') {
+                  levelBadgeStyle = {
+                    background: 'rgba(239, 68, 68, 0.2)',
+                    color: '#fca5a5',
+                    border: '1px solid rgba(239, 68, 68, 0.4)'
+                  }
+                  msgColor = '#f87171'
+                } else if (entry.level === 'warn') {
+                  levelBadgeStyle = {
+                    background: 'rgba(245, 158, 11, 0.2)',
+                    color: '#fde68a',
+                    border: '1px solid rgba(245, 158, 11, 0.4)'
+                  }
+                  msgColor = '#fbbf24'
+                } else if (entry.level === 'security') {
+                  levelBadgeStyle = {
+                    background: 'rgba(168, 85, 247, 0.2)',
+                    color: '#e9d5ff',
+                    border: '1px solid rgba(168, 85, 247, 0.4)'
+                  }
+                  msgColor = '#c084fc'
+                }
 
-                      {/* Level Badge */}
-                      <span
-                        className={`px-1.5 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider border ${levelBadgeBg}`}
-                      >
-                        {entry.level}
-                      </span>
+                // Category colors
+                let catBadgeStyle: React.CSSProperties = {
+                  background: 'rgba(30, 41, 59, 0.8)',
+                  color: '#94a3b8',
+                  border: '1px solid rgba(255, 255, 255, 0.08)'
+                }
 
-                      {/* Category Badge */}
-                      <span
-                        className={`px-1.5 py-0.5 rounded text-[10px] uppercase font-semibold border ${categoryBadge}`}
-                      >
-                        [{entry.category}]
-                      </span>
+                if (entry.category === 'ui') {
+                  catBadgeStyle = { background: 'rgba(59, 130, 246, 0.15)', color: '#93c5fd', border: '1px solid rgba(59, 130, 246, 0.3)' }
+                } else if (entry.category === 'nav') {
+                  catBadgeStyle = { background: 'rgba(147, 51, 234, 0.15)', color: '#d8b4fe', border: '1px solid rgba(147, 51, 234, 0.3)' }
+                } else if (entry.category === 'sync') {
+                  catBadgeStyle = { background: 'rgba(6, 182, 212, 0.15)', color: '#67e8f9', border: '1px solid rgba(6, 182, 212, 0.3)' }
+                } else if (entry.category === 'ipc') {
+                  catBadgeStyle = { background: 'rgba(20, 184, 166, 0.15)', color: '#5eead4', border: '1px solid rgba(20, 184, 166, 0.3)' }
+                } else if (entry.category === 'auth') {
+                  catBadgeStyle = { background: 'rgba(16, 185, 129, 0.15)', color: '#6ee7b7', border: '1px solid rgba(16, 185, 129, 0.3)' }
+                } else if (entry.category === 'sec') {
+                  catBadgeStyle = { background: 'rgba(245, 158, 11, 0.15)', color: '#fcd34d', border: '1px solid rgba(245, 158, 11, 0.3)' }
+                } else if (entry.category === 'error') {
+                  catBadgeStyle = { background: 'rgba(239, 68, 68, 0.15)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.3)' }
+                }
 
-                      {/* Log Message */}
-                      <span className={`break-all ${levelColor}`}>{entry.message}</span>
+                return (
+                  <div key={entry.id} className={`log-item-row ${entry.level === 'error' ? 'is-error' : ''}`}>
+                    <div className="log-row-main">
+                      <div className="log-row-left">
+                        {/* Time */}
+                        <span className="log-time" title={entry.ts}>
+                          {formatExactTime(entry.ts)} ({formatRelativeTime(entry.ts)})
+                        </span>
+
+                        {/* Level */}
+                        <span className="log-badge-level" style={levelBadgeStyle}>
+                          {entry.level}
+                        </span>
+
+                        {/* Category */}
+                        <span className="log-badge-cat" style={catBadgeStyle}>
+                          [{entry.category.toUpperCase()}]
+                        </span>
+
+                        {/* Message */}
+                        <span className="log-message-text" style={{ color: msgColor }}>
+                          {entry.message}
+                        </span>
+                      </div>
+
+                      {/* Payload toggle button */}
+                      {hasMeta ? (
+                        <button
+                          type="button"
+                          onClick={() => toggleExpand(entry.id)}
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            background: isExpanded ? 'rgba(99, 102, 241, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+                            color: isExpanded ? '#c7d2fe' : '#94a3b8',
+                            border: isExpanded ? '1px solid rgba(99, 102, 241, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {isExpanded ? 'Hide Payload ▲' : 'Payload { }'}
+                        </button>
+                      ) : null}
                     </div>
 
-                    {/* Metadata Toggle */}
-                    {hasMeta ? (
-                      <button
-                        type="button"
-                        onClick={() => toggleExpand(entry.id)}
-                        className="px-1.5 py-0.5 text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded border border-slate-700"
-                      >
-                        {isExpanded ? 'Hide Payload' : 'View Payload'}
-                      </button>
+                    {/* Expandable JSON Metadata */}
+                    {hasMeta && isExpanded ? (
+                      <div className="log-payload-box">
+                        <pre style={{ margin: 0 }}>{JSON.stringify(entry.meta, null, 2)}</pre>
+                      </div>
                     ) : null}
                   </div>
-
-                  {/* Expandable JSON Metadata */}
-                  {hasMeta && isExpanded ? (
-                    <div className="mt-2 p-2 bg-black/60 border border-slate-800 rounded font-mono text-[11px] text-slate-300 overflow-x-auto">
-                      <pre>{JSON.stringify(entry.meta, null, 2)}</pre>
-                    </div>
-                  ) : null}
-                </div>
-              )
-            })}
-            <div ref={streamEndRef} />
-          </div>
-        )}
+                )
+              })}
+              <div ref={streamEndRef} />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

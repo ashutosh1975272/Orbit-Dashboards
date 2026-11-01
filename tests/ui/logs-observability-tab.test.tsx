@@ -105,7 +105,7 @@ describe('LogsObservabilityTab UI', () => {
       await Promise.resolve()
     })
 
-    const searchInput = screen.getByPlaceholderText(/Search logs & metadata…/i)
+    const searchInput = screen.getByPlaceholderText(/Search logs/i)
     act(() => {
       fireEvent.change(searchInput, { target: { value: 'poller' } })
     })
@@ -145,7 +145,7 @@ describe('LogsObservabilityTab UI', () => {
       await Promise.resolve()
     })
 
-    const clearBtn = screen.getByRole('button', { name: 'Clear' })
+    const clearBtn = screen.getByRole('button', { name: /Clear/i })
     await act(async () => {
       fireEvent.click(clearBtn)
     })
@@ -170,3 +170,4 @@ describe('LogsObservabilityTab UI', () => {
     expect(window.api.logs.setRetention).toHaveBeenCalledWith(30)
   })
 })
+

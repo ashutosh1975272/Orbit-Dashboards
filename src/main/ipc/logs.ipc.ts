@@ -54,3 +54,4 @@ export function registerLogsIpc(): () => void {
 
   return unsubscribe
 }
+

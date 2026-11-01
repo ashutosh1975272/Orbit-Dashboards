@@ -32,3 +32,4 @@ The user required:
 - High-resolution, zero-friction debugging for errors and user flows without memory leaks.
 - Live entries automatically purge after 15 minutes, preserving user privacy.
 - Complete auditability and clean one-click log exports for external reporting.
+

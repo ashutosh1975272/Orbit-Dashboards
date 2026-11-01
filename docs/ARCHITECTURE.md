@@ -101,3 +101,4 @@ Orbit-Dashboards/
 │   └── shared/                 # Typed IPC contracts & interfaces
 └── tests/                      # Vitest UI and unit test suites
 ```
+
