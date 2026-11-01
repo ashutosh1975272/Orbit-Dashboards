@@ -218,13 +218,14 @@
 }
 
 .admin-login-logo {
-  width: 64px;
-  height: 64px;
-  border-radius: 16px;
-  object-fit: cover;
+  width: 72px;
+  height: 72px;
+  border-radius: 0;
+  object-fit: contain;
   align-self: center;
   margin-bottom: 2px;
-  box-shadow: 0 8px 24px rgba(100, 70, 150, 0.35);
+  box-shadow: none;
+  filter: drop-shadow(0 8px 24px rgba(147, 51, 234, 0.5));
 }
 
 .admin-login-card h1 {
