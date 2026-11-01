@@ -426,6 +426,19 @@ const api: IpcApi = {
       ipcRenderer.on(IpcChannels.DashboardScrapeEvent, listener)
       return () => ipcRenderer.removeListener(IpcChannels.DashboardScrapeEvent, listener)
     },
+  },
+  logs: {
+    getRecent: (filter) => ipcRenderer.invoke(IpcChannels.LogsGetRecent, { filter }),
+    setRetention: (minutes) => ipcRenderer.invoke(IpcChannels.LogsSetRetention, { minutes }),
+    clear: () => ipcRenderer.invoke(IpcChannels.LogsClear),
+    export: () => ipcRenderer.invoke(IpcChannels.LogsExport),
+    logAction: (category, level, message, meta) =>
+      ipcRenderer.invoke(IpcChannels.LogsLogAction, { category, level, message, meta }),
+    onLogEntry: (callback) => {
+      const listener = (_: unknown, entry: any) => callback(entry)
+      ipcRenderer.on(IpcChannels.LogsOnEntry, listener)
+      return () => ipcRenderer.removeListener(IpcChannels.LogsOnEntry, listener)
+    }
   }
 }
 

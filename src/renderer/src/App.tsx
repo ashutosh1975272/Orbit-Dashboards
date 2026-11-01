@@ -274,6 +274,7 @@ function App(): React.JSX.Element {
     }
     setToastState(message)
     if (message) {
+      void window.api?.logs?.logAction('ui', 'info', `Notification: ${message}`)
       toastTimerRef.current = setTimeout(() => {
         toastTimerRef.current = null
         setToastState(null)
@@ -1045,16 +1046,20 @@ function App(): React.JSX.Element {
         onOpenSettings={() => {
           setUnifiedSettingsTab('general')
           setUnifiedSettingsOpen(true)
+          void window.api?.logs?.logAction('ui', 'info', 'Opened Settings Hub')
         }}
         onLockApp={() => {
           void window.api.app.lock()
+          void window.api?.logs?.logAction('sec', 'info', 'App locked by user command')
         }}
         onSyncAll={() => {
           void useDashboardStore.getState().syncNow()
           setToast('Syncing all project cards…')
+          void window.api?.logs?.logAction('sync', 'info', 'Manual sync triggered for all projects')
         }}
         onOpenObserver={() => {
           setShowObserverView(true)
+          void window.api?.logs?.logAction('nav', 'info', 'Opened Observer View')
         }}
       />
 
@@ -1063,7 +1068,10 @@ function App(): React.JSX.Element {
         open={unifiedSettingsOpen && !locked}
         initialTab={unifiedSettingsTab}
         settings={settings}
-        onClose={() => setUnifiedSettingsOpen(false)}
+        onClose={() => {
+          setUnifiedSettingsOpen(false)
+          void window.api?.logs?.logAction('ui', 'info', 'Closed Settings Hub')
+        }}
         onChangeSettings={(patch) => {
           void window.api.app.setSettings(patch).then((s) => {
             setSettings(s)

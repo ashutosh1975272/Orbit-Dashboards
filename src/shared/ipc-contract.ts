@@ -135,6 +135,13 @@ export const IpcChannels = {
   AppAdminLogin: 'app:admin-login',
   AppAdminLogout: 'app:admin-logout',
 
+  LogsGetRecent: 'logs:get-recent',
+  LogsSetRetention: 'logs:set-retention',
+  LogsClear: 'logs:clear',
+  LogsExport: 'logs:export',
+  LogsLogAction: 'logs:log-action',
+  LogsOnEntry: 'logs:on-entry',
+
   OauthStartWorkspaceConnect: 'oauth:start-workspace-connect',
 
   SlackWorkspacesForProfile: 'slack:workspaces-for-profile',
@@ -509,6 +516,37 @@ export interface IpcApi {
       }) => void
     ) => () => void
   }
+  logs: {
+    getRecent: (filter?: LogFilter) => Promise<LogEntry[]>
+    setRetention: (minutes: number) => Promise<void>
+    clear: () => Promise<void>
+    export: () => Promise<{ ok: boolean; count: number; content: string }>
+    logAction: (
+      category: LogCategory,
+      level: LogLevel,
+      message: string,
+      meta?: unknown
+    ) => Promise<void>
+    onLogEntry: (callback: (entry: LogEntry) => void) => () => void
+  }
+}
+
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'security'
+export type LogCategory = 'ui' | 'nav' | 'ipc' | 'sync' | 'auth' | 'sec' | 'system' | 'error'
+
+export interface LogEntry {
+  id: string
+  level: LogLevel
+  category: LogCategory
+  message: string
+  meta?: unknown
+  ts: string
+}
+
+export interface LogFilter {
+  level?: LogLevel | 'all'
+  category?: LogCategory | 'all'
+  query?: string
 }
 
 export type {

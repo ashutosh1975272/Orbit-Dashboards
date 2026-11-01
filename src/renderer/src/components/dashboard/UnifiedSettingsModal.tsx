@@ -5,7 +5,15 @@ import { CustomLink, Profile } from '../../../../shared/types'
 import { useProfileStore } from '../../hooks/useProfiles'
 import { modKey } from '../../lib/shortcut-label'
 import AiSettingsForm from './AiSettingsForm'
-export type SettingsTabKey = 'general' | 'sidebar' | 'ai' | 'accounts' | 'maintenance' | 'advance'
+import { LogsObservabilityTab } from './LogsObservabilityTab'
+export type SettingsTabKey =
+  | 'general'
+  | 'sidebar'
+  | 'ai'
+  | 'accounts'
+  | 'logs'
+  | 'maintenance'
+  | 'advance'
 
 interface UnifiedSettingsModalProps {
   open: boolean
@@ -154,6 +162,7 @@ export function UnifiedSettingsModal({
     { key: 'sidebar', label: 'Sidebar & Navigation', icon: '📑' },
     { key: 'ai', label: 'Global AI & NVIDIA NIM', icon: '🤖' },
     { key: 'accounts', label: 'Accounts & Workspaces', icon: '👥' },
+    { key: 'logs', label: 'Logs & Observability', icon: '📜' },
     { key: 'maintenance', label: 'System & Maintenance', icon: '🛡️' }
   ]
 
@@ -253,7 +262,7 @@ export function UnifiedSettingsModal({
                   ⚡ Advanced Settings
                 </span>
                 <span style={{ fontSize: '10.5px', color: '#64748b' }}>
-                  {isAdvanceMode ? 'All 6 tabs visible' : 'Basic view (2 tabs)'}
+                  {isAdvanceMode ? 'All 7 tabs visible' : 'Basic view (2 tabs)'}
                 </span>
               </div>
               <label
@@ -315,7 +324,10 @@ export function UnifiedSettingsModal({
                 <button
                   key={item.key}
                   type="button"
-                  onClick={() => setActiveTab(item.key)}
+                  onClick={() => {
+                    setActiveTab(item.key)
+                    void window.api?.logs?.logAction('nav', 'info', `Switched settings tab to ${item.label}`)
+                  }}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -1456,6 +1468,8 @@ export function UnifiedSettingsModal({
                 </div>
               </div>
             )}
+
+            {activeTab === 'logs' && <LogsObservabilityTab />}
           </main>
         </div>
       </div>
