@@ -513,30 +513,6 @@ export const ProfileSidebar = memo(function ProfileSidebar({
             </button>
             <button
               type="button"
-              onClick={() => handleSetLook('ancient')}
-              aria-pressed={activeLook === 'ancient'}
-              style={{
-                padding: '5px 2px',
-                fontSize: '11px',
-                fontWeight: 600,
-                borderRadius: '6px',
-                border: activeLook === 'ancient' ? '1px solid var(--accent)' : '1px solid transparent',
-                background: activeLook === 'ancient' ? 'color-mix(in srgb, var(--accent) 22%, transparent)' : 'transparent',
-                color: activeLook === 'ancient' ? '#fff' : 'var(--text-faint)',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-                textAlign: 'center',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                minWidth: 0
-              }}
-              title="Ancient"
-            >
-              Ancient
-            </button>
-            <button
-              type="button"
               onClick={() => handleSetLook('new-cosmic')}
               aria-pressed={activeLook === 'new-cosmic'}
               style={{
@@ -558,6 +534,30 @@ export const ProfileSidebar = memo(function ProfileSidebar({
               title="Cosmic"
             >
               Cosmic
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSetLook('ancient')}
+              aria-pressed={activeLook === 'ancient'}
+              style={{
+                padding: '5px 2px',
+                fontSize: '11px',
+                fontWeight: 600,
+                borderRadius: '6px',
+                border: activeLook === 'ancient' ? '1px solid var(--accent)' : '1px solid transparent',
+                background: activeLook === 'ancient' ? 'color-mix(in srgb, var(--accent) 22%, transparent)' : 'transparent',
+                color: activeLook === 'ancient' ? '#fff' : 'var(--text-faint)',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                textAlign: 'center',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                minWidth: 0
+              }}
+              title="Ancient"
+            >
+              Ancient
             </button>
           </div>
         ) : null}

@@ -432,8 +432,8 @@ export function UnifiedSettingsModal({
                           }
                         >
                           <option value="minimal">Minimal Look (Clean &amp; compact)</option>
-                          <option value="ancient">Ancient Look (Default established theme)</option>
                           <option value="new-cosmic">New Cosmic (Futuristic exploration)</option>
+                          <option value="ancient">Ancient Look (Default established theme)</option>
                         </select>
                       </label>
 
