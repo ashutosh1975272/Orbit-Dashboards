@@ -1015,7 +1015,7 @@ function App(): React.JSX.Element {
           {showObserverView ? (
             <ObserverView onBack={() => setShowObserverView(false)} />
           ) : showCosmicCard ? (
-            <CosmicWorkspaceView />
+            <CosmicWorkspaceView sidebarLook={settings.sidebarLook ?? 'ancient'} />
           ) : showDashboard ? (
             <DashboardView />
           ) : showEmbed ? (

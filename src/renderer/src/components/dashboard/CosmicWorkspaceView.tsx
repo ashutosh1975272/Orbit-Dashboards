@@ -22,8 +22,15 @@ const STATUS_FLAGS: Record<string, CardHeadFlag> = {
   'waiting-on-client': { label: 'Waiting on client', tone: 'warn' }
 }
 
-export function CosmicWorkspaceView(): React.JSX.Element | null {
+interface CosmicWorkspaceViewProps {
+  sidebarLook?: 'minimal' | 'ancient' | 'new-cosmic' | 'basic'
+}
+
+export function CosmicWorkspaceView({
+  sidebarLook
+}: CosmicWorkspaceViewProps = {}): React.JSX.Element | null {
   const cosmicSelectedCardId = useDashboardStore((s) => s.cosmicSelectedCardId)
+  const basicActiveTab = useDashboardStore((s) => s.basicActiveTab)
   const snapshot = useDashboardStore((s) => s.snapshot)
   const loadSnapshot = useDashboardStore((s) => s.loadSnapshot)
   const syncNow = useDashboardStore((s) => s.syncNow)
@@ -158,8 +165,81 @@ export function CosmicWorkspaceView(): React.JSX.Element | null {
     }
   }
 
+  const effectiveNav = useMemo(() => {
+    if (sidebarLook !== 'basic') return nav
+    if (!basicActiveTab || basicActiveTab === 'dashboard') {
+      return {
+        ...nav,
+        openGroup: 'dash' as const,
+        selection: null
+      }
+    }
+    if (basicActiveTab === 'slack') {
+      return {
+        ...nav,
+        openGroup: 'slack' as const,
+        selection: 'c:team:main' as const
+      }
+    }
+    if (basicActiveTab === 'teams') {
+      return {
+        ...nav,
+        openGroup: 'slack' as const,
+        selection: 'c:teams' as const
+      }
+    }
+    if (basicActiveTab === 'whatsapp') {
+      return {
+        ...nav,
+        openGroup: 'slack' as const,
+        selection: 'c:whatsapp' as const
+      }
+    }
+    if (basicActiveTab.startsWith('c:preset:')) {
+      return {
+        ...nav,
+        openGroup: 'slack' as const,
+        selection: basicActiveTab as any
+      }
+    }
+    return nav
+  }, [sidebarLook, basicActiveTab, nav])
+
   if (!activeProjectSnapshot || !cardView || !cardSummary || !project) {
     return null
+  }
+
+  // In Basic look: full-screen end-to-end view without card chrome or duplicate sidebar
+  if (sidebarLook === 'basic') {
+    return (
+      <ErrorBoundary label="cosmic-workspace-view-basic">
+        <div
+          className="cosmic-full-workspace basic-mode-workspace"
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            flex: 1,
+            width: '100%',
+            height: '100%',
+            background: 'var(--surface-sunken, #090d16)',
+            overflow: 'hidden'
+          }}
+        >
+          <WorkspaceContent
+            view={cardView}
+            summary={cardSummary}
+            project={project}
+            snapshot={activeProjectSnapshot}
+            nav={effectiveNav}
+            channels={channelLists}
+            syncing={activeProjectSnapshot.syncState === 'syncing'}
+            onSync={() => void syncNow(project.id)}
+            onOpenSettings={() => openGroup('settings')}
+            onSelect={select}
+          />
+        </div>
+      </ErrorBoundary>
+    )
   }
 
   const { identity } = cardView

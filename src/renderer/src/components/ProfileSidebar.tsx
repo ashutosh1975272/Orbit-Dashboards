@@ -16,6 +16,7 @@ import { formatUnreadBadge, unreadKey } from '../lib/unread-badge'
 import { AppIcon } from './AppIcon'
 import { SidebarPanelIcon } from './SidebarPanelIcon'
 import { CosmicSidebarContent } from './dashboard/CosmicSidebarNav'
+import { BasicSidebarProjectTree } from './dashboard/BasicSidebarProjectTree'
 import { getBaseLayoutItems } from '../../../shared/base-app-presets'
 
 interface RecentWorkspace {
@@ -632,7 +633,7 @@ export const ProfileSidebar = memo(function ProfileSidebar({
           onOpenProfilesHub={onOpenProfilesHub}
           onNewProject={onNewProject}
         />
-      ) : activeLook === 'minimal' || activeLook === 'basic' ? (
+      ) : activeLook === 'minimal' ? (
         <CosmicSidebarContent
           isMinimalLook
           profiles={profiles}
@@ -642,6 +643,71 @@ export const ProfileSidebar = memo(function ProfileSidebar({
           onOpenProfilesHub={onOpenProfilesHub}
           onNewProject={onNewProject}
         />
+      ) : activeLook === 'basic' ? (
+        <>
+          {showRecentSection && visibleRecents.length > 0 ? (
+            <div className="recent-strip" aria-label="Recent workspaces">
+              <div className="recent-strip-head">
+                <p className="recent-label">Recent</p>
+              </div>
+              <ul className="recent-list">
+                {visibleRecents.map((r) => {
+                  const profile = profiles.find((p) => p.id === r.profileId)
+                  const profileName = profile ? profileDisplayLabel(profile) : 'Profile'
+                  const app = APP_IDS.includes(r.appId as AppId) ? (r.appId as AppId) : null
+                  const live =
+                    app && profile
+                      ? profile.apps[app].availableWorkspaces.find((w) => w.teamId === r.teamId)
+                      : undefined
+                  const pinned =
+                    app && profile
+                      ? profile.apps[app].pinnedWorkspaces.find((w) => w.teamId === r.teamId)
+                      : undefined
+                  const title =
+                    live?.lastChannelName?.trim() ||
+                    (live ? displayWorkspaceName(live) : null) ||
+                    (pinned ? displayWorkspaceName(pinned) : null) ||
+                    r.label?.trim() ||
+                    'Workspace'
+                  return (
+                    <li key={`basic-recent:${r.profileId}:${r.appId}:${r.teamId}:${r.at}`}>
+                      <button
+                        type="button"
+                        className="recent-item"
+                        onClick={() => {
+                          if (app) {
+                            onOpenWorkspace(r.profileId, app, r.teamId)
+                          }
+                        }}
+                      >
+                        {app ? (
+                          <span className="recent-app-chip" aria-hidden>
+                            <AppIcon appId={app} className="recent-app-icon" size={11} />
+                          </span>
+                        ) : (
+                          <span className="ws-avatar recent-avatar" aria-hidden>
+                            {monogramFromLabel(title)}
+                          </span>
+                        )}
+                        <span className="ws-copy">
+                          <span className="ws-title">{title}</span>
+                          <span className="ws-sub">
+                            {profileName}
+                            {app ? ` · ${sidebarAppLabel(app)}` : ''}
+                          </span>
+                        </span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          ) : null}
+          <BasicSidebarProjectTree
+            baseAppLayout={baseAppLayout}
+            onNewProject={onNewProject}
+          />
+        </>
       ) : (
         dashboardSlot
       )}

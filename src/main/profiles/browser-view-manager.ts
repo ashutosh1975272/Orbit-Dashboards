@@ -42,6 +42,7 @@ import {
   WHATSAPP_WEB_URL
 } from './session-partition'
 import { parseUnreadFromTitle, READ_PAGE_UNREAD_SCRIPT, unreadKey } from './unread-from-title'
+import { syncGoogleSessionFromProfileToCard } from './google-session-sync'
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -998,6 +999,13 @@ export class BrowserViewManager {
   ): Promise<void> {
     const key = projectId ? cardViewKey(projectId, appId) : viewKey(profileId, appId)
     const view = projectId ? this.getOrCreateCardView(projectId, appId) : this.getOrCreate(profileId, appId)
+
+    // Propagate the profile's Google session cookies into the card partition so that
+    // "Continue with Google" OAuth flows inside the card are pre-seeded with the
+    // profile's Google identity.  Slack / Teams / WhatsApp cookies are never copied.
+    if (projectId && profileId) {
+      void syncGoogleSessionFromProfileToCard(profileId, projectId, appId).catch(() => undefined)
+    }
 
     // If switching card views, detach the previously embedded view first
     if (this.cardEmbedKey && this.cardEmbedKey !== key) {

@@ -30,6 +30,7 @@ import {
   runSlackChromeBrowserLogin,
   syncChromeBrowserBounds
 } from '../profiles/chrome-browser-auth'
+import { syncGoogleSessionToProfileCards } from '../profiles/google-session-sync'
 import { runTeamsLoginForProfile } from '../profiles/teams-first-login-flow'
 import { waitForWhatsAppSignedIn } from '../profiles/whatsapp-login-flow'
 import type { TokenStore } from '../slack/token-store'
@@ -169,6 +170,19 @@ async function runGoogleBrowserAuth(
       notifyAuthProgress(deps.getMainWindow, 'Google signed in.')
       const updated = await deps.profileStore.forceGoogleAuthStatus(profileId, 'signed-in')
       notifyProfileUpdated(deps.getMainWindow, updated)
+
+      // Propagate newly imported Google cookies to all cards belonging to this profile
+      // so that OAuth "Continue with Google" flows inside each card already show the
+      // authenticated account without requiring a fresh email/password entry.
+      if (deps.monitorStore) {
+        void deps.monitorStore.listProjects().then((projects) => {
+          const cardIds = projects
+            .filter((p) => p.profileId === profileId)
+            .map((p) => p.id)
+          return syncGoogleSessionToProfileCards(profileId, cardIds, 'slack')
+        }).catch(() => undefined)
+      }
+
       return updated
     }
 
