@@ -39,3 +39,4 @@ export const BASE_APP_PRESETS: Record<BaseAppLayoutKey, BaseAppPresetItem[]> = {
 export function getBaseLayoutItems(layout: BaseAppLayoutKey = 'standard'): BaseAppPresetItem[] {
   return BASE_APP_PRESETS[layout] ?? BASE_APP_PRESETS.standard
 }
+

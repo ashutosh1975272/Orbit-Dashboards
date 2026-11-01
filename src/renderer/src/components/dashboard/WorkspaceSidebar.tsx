@@ -524,7 +524,6 @@ export default function WorkspaceSidebar({
                       return true
                     }).map((connector) => {
                     const list = channels[connector.key]
-                    const allId = connector.allId
                     const entries = list?.entries ?? []
                     const open = nav.openConnectors.includes(connector.key)
                     const holding =
@@ -533,6 +532,10 @@ export default function WorkspaceSidebar({
                     // Custom attached platform accounts for this role
                     const roleKey = connector.key === 'client' ? 'client' : 'ours'
                     const extraSources = sources.filter((s: any) => s.role === roleKey && s.platform && s.platform !== 'slack')
+                    const isMyAccounts = connector.key === 'team'
+                    const count = isMyAccounts
+                      ? baseItems.length + extraSources.length
+                      : entries.length + extraSources.length
 
                     return (
                       <div key={connector.key} className="ws-nav-group">
@@ -549,16 +552,16 @@ export default function WorkspaceSidebar({
                             <NavIcon name={connector.icon} />
                           </span>
                           <span className="ws-nav-label">{connector.label}</span>
-                          {(entries.length > 0 || extraSources.length > 0 || (isMinimal && baseItems.length > 0)) && (
+                          {(count > 0 || isMinimal) && (
                             <span className="ws-nav-count">
-                              {isMinimal ? baseItems.length : entries.length + extraSources.length}
+                              {count}
                             </span>
                           )}
                           <Chevron open={open} />
                         </button>
                         {open && (
                           <>
-                            {isMinimal ? (
+                            {isMyAccounts ? (
                               <>
                                 {baseItems.map((item) => {
                                   const isActive =
@@ -614,18 +617,36 @@ export default function WorkspaceSidebar({
                                     </button>
                                   )
                                 })}
+                                {extraSources.map((src: any) => (
+                                  <button
+                                    key={src.id}
+                                    type="button"
+                                    className="ws-nav-subitem"
+                                    title={src.url ? `${src.workspaceName} (${src.url})` : `${src.workspaceName} (${src.platform})`}
+                                    onClick={() => onSelect(`c:ours:${src.id}` as SelectionId)}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      padding: '4px 12px 4px 28px',
+                                      width: '100%',
+                                      textAlign: 'left'
+                                    }}
+                                  >
+                                    <span className="ws-nav-label" style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, overflow: 'hidden' }}>
+                                      <span style={{ fontSize: 13, flexShrink: 0 }}>{src.url ? '🌐' : '🔌'}</span>
+                                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {src.workspaceName}
+                                      </span>
+                                    </span>
+                                    <span className="ws-nav-tag" style={{ fontSize: 10, opacity: 0.7, textTransform: 'capitalize', flexShrink: 0 }}>
+                                      {src.url ? 'link ↗' : src.platform}
+                                    </span>
+                                  </button>
+                                ))}
                               </>
                             ) : (
                               <>
-                                {allId && (
-                                  <Row
-                                    leaf
-                                    label="All channels"
-                                    title={connector.note}
-                                    active={nav.selection === allId}
-                                    onClick={() => onSelect(allId)}
-                                  />
-                                )}
                                 {list?.loading && <p className="ws-nav-note">Loading channels…</p>}
                                 {list?.error && (
                                   <p className="ws-nav-note is-error" style={{ fontSize: '11px', lineHeight: 1.4 }}>
@@ -658,25 +679,23 @@ export default function WorkspaceSidebar({
                                     type="button"
                                     className="ws-nav-subitem"
                                     title={src.url ? `${src.workspaceName} (${src.url})` : `${src.workspaceName} (${src.platform})`}
-                                    onClick={() => {
-                                      if (src.url) {
-                                        window.open(src.url, '_blank')
-                                      }
-                                    }}
+                                    onClick={() => onSelect(`c:client:${src.id}` as SelectionId)}
                                     style={{
                                       display: 'flex',
                                       alignItems: 'center',
                                       justifyContent: 'space-between',
                                       padding: '4px 12px 4px 28px',
                                       width: '100%',
-                                      textAlign: 'left',
-                                      cursor: src.url ? 'pointer' : 'default'
+                                      textAlign: 'left'
                                     }}
                                   >
-                                    <span className="ws-nav-label" style={{ fontSize: 12 }}>
-                                      {src.url ? '🌐' : '🔌'} {src.workspaceName}
+                                    <span className="ws-nav-label" style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, overflow: 'hidden' }}>
+                                      <span style={{ fontSize: 13, flexShrink: 0 }}>{src.url ? '🌐' : '🔌'}</span>
+                                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {src.workspaceName}
+                                      </span>
                                     </span>
-                                    <span className="ws-nav-tag" style={{ fontSize: 10, opacity: 0.7, textTransform: 'capitalize' }}>
+                                    <span className="ws-nav-tag" style={{ fontSize: 10, opacity: 0.7, textTransform: 'capitalize', flexShrink: 0 }}>
                                       {src.url ? 'link ↗' : src.platform}
                                     </span>
                                   </button>
