@@ -642,6 +642,7 @@ if (!gotSingleInstanceLock) {
       lock,
       adminAuth,
       profileStore,
+      getMainWindow: () => mainWindow,
       onUserActivity: () => {
         lastEmbedActivity = Date.now()
       },

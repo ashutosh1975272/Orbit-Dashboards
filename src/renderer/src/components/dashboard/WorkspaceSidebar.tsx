@@ -1,6 +1,7 @@
 import type React from 'react'
 import { Fragment, useRef, useMemo, useState, useEffect } from 'react'
 import type { DashboardProject } from '../../../../shared/dashboard-contract'
+import type { AppSettings } from '../../../../shared/ipc-contract'
 import type { CardView } from './card-view'
 import NavIcon from './nav-icons'
 import { AppIcon } from '../AppIcon'
@@ -49,6 +50,7 @@ interface WorkspaceSidebarProps {
   onResize: (width: number) => void
   onOpenAdd?: () => void
   sidebarLook?: 'minimal' | 'ancient' | 'new-cosmic'
+  baseAppLayout?: BaseAppLayoutKey
 }
 
 /** Real counts only — a row with nothing in it is dimmed, never given a badge. */
@@ -171,14 +173,21 @@ export default function WorkspaceSidebar({
   onToggleCollapse,
   onResize,
   onOpenAdd,
-  sidebarLook: propSidebarLook
+  sidebarLook: propSidebarLook,
+  baseAppLayout: propBaseAppLayout
 }: WorkspaceSidebarProps): React.ReactElement {
   const collapsed = nav.collapsed
   const asideRef = useRef<HTMLElement>(null)
   const { layout } = useSidebarLayout(projectId)
   const profiles = useProfileStore((s) => s.profiles)
   const [appLook, setAppLook] = useState<'minimal' | 'ancient' | 'new-cosmic'>('ancient')
-  const [baseAppLayout, setBaseAppLayout] = useState<BaseAppLayoutKey>('standard')
+  const [baseAppLayout, setBaseAppLayout] = useState<BaseAppLayoutKey>(propBaseAppLayout ?? 'standard')
+
+  useEffect(() => {
+    if (propBaseAppLayout) {
+      setBaseAppLayout(propBaseAppLayout)
+    }
+  }, [propBaseAppLayout])
 
   useEffect(() => {
     void window.api?.app?.getSettings?.().then((s) => {
@@ -189,8 +198,15 @@ export default function WorkspaceSidebar({
       if (s?.sidebarLook) setAppLook(s.sidebarLook)
       if (s?.baseAppLayout) setBaseAppLayout(s.baseAppLayout)
     })
+    const handleCustom = (e: Event): void => {
+      const s = (e as CustomEvent<AppSettings>).detail
+      if (s?.sidebarLook) setAppLook(s.sidebarLook)
+      if (s?.baseAppLayout) setBaseAppLayout(s.baseAppLayout)
+    }
+    window.addEventListener('orbit:settings-changed', handleCustom)
     return () => {
       unsub?.()
+      window.removeEventListener('orbit:settings-changed', handleCustom)
     }
   }, [])
 

@@ -280,6 +280,7 @@ function App(): React.JSX.Element {
       applyDocumentTheme(next.theme)
       applySidebarDensity(next.sidebarDensity)
       applySidebarWidth(next.sidebarWidth)
+      window.dispatchEvent(new CustomEvent('orbit:settings-changed', { detail: next }))
     })
   }, [])
 
@@ -1072,6 +1073,7 @@ function App(): React.JSX.Element {
             applySidebarDensity(s.sidebarDensity)
             applySidebarWidth(s.sidebarWidth)
             if (!s.splitViewEnabled) setSplitSecondary(null)
+            window.dispatchEvent(new CustomEvent('orbit:settings-changed', { detail: s }))
           })
         }}
         onClearAllProfiles={() => {
