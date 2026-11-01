@@ -109,7 +109,7 @@ function App(): React.JSX.Element {
     '~/Library/Application Support/slack-dashboard/.env'
   )
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({})
-  const [toast, setToast] = useState<string | null>(null)
+  const [toast, setToastState] = useState<string | null>(null)
   const [showOnboarding, setShowOnboarding] = useState(
     () => localStorage.getItem('onboardingDone') !== '1'
   )
@@ -267,14 +267,21 @@ function App(): React.JSX.Element {
     }
   }, [])
 
-  const showToast = useCallback((message: string, ms = 4500): void => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
-    setToast(message)
-    toastTimerRef.current = setTimeout(() => {
+  const showToast = useCallback((message: string | null, ms = 4500): void => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current)
       toastTimerRef.current = null
-      setToast(null)
-    }, ms)
+    }
+    setToastState(message)
+    if (message) {
+      toastTimerRef.current = setTimeout(() => {
+        toastTimerRef.current = null
+        setToastState(null)
+      }, ms)
+    }
   }, [])
+
+  const setToast = showToast
 
   useEffect(() => {
     return window.api.app.onToast((message) => showToast(message))
@@ -1240,8 +1247,24 @@ function App(): React.JSX.Element {
       ) : null}
 
       {toast ? (
-        <div className="app-toast" role="status">
-          {toast}
+        <div
+          className="app-toast"
+          role="status"
+          onClick={() => setToast(null)}
+          title="Click to dismiss"
+        >
+          <span className="app-toast-text">{toast}</span>
+          <button
+            type="button"
+            className="app-toast-close"
+            onClick={(e) => {
+              e.stopPropagation()
+              setToast(null)
+            }}
+            aria-label="Dismiss notification"
+          >
+            ×
+          </button>
         </div>
       ) : null}
 
