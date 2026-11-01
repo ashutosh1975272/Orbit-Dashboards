@@ -16,6 +16,7 @@ import { formatUnreadBadge, unreadKey } from '../lib/unread-badge'
 import { AppIcon } from './AppIcon'
 import { SidebarPanelIcon } from './SidebarPanelIcon'
 import { CosmicSidebarContent } from './dashboard/CosmicSidebarNav'
+import { getBaseLayoutItems } from '../../../shared/base-app-presets'
 
 interface RecentWorkspace {
   profileId: string
@@ -388,6 +389,10 @@ export const ProfileSidebar = memo(function ProfileSidebar({
   const handleSetLook = (look: 'minimal' | 'ancient' | 'new-cosmic'): void => {
     onLookChange?.(look)
   }
+  const presetToolLinks = useMemo(
+    () => getBaseLayoutItems(baseAppLayout).filter((item) => item.type === 'link'),
+    [baseAppLayout]
+  )
   const profileIdSet = useMemo(() => new Set(profiles.map((p) => p.id)), [profiles])
   const visibleRecents = useMemo(() => {
     const fromHistory = recentWorkspaces.filter((r) => profileIdSet.has(r.profileId))
@@ -894,6 +899,56 @@ export const ProfileSidebar = memo(function ProfileSidebar({
                               onUnpin={onUnpin}
                             />
                           ) : null}
+                        </li>
+                      )
+                    })}
+
+                    {/* Dynamic Base Preset Tools (e.g. Claude, ChatGPT) when extended/full layout is active */}
+                    {presetToolLinks.map((preset) => {
+                      const isLinkActive =
+                        profileActive && activeCustomLinkId === `preset:${preset.id}`
+
+                      return (
+                        <li
+                          key={`preset:${preset.id}`}
+                          className={`nav-app${isLinkActive ? ' is-active' : ''}`}
+                          style={{ position: 'relative' }}
+                        >
+                          <div className="nav-app-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: '4px' }}>
+                            <button
+                              type="button"
+                              className="nav-app-select"
+                              onClick={() => {
+                                onSelect(profile.id)
+                                onSelectCustomLink?.(profile.id, {
+                                  id: `preset:${preset.id}`,
+                                  name: preset.name,
+                                  url: preset.url!,
+                                  order: 0,
+                                  partition: `persist:profile-${profile.id}-link-preset-${preset.id}`,
+                                  createdAt: ''
+                                })
+                              }}
+                              title={`Open ${preset.name} (${preset.url})`}
+                              style={{ flex: 1, minWidth: 0 }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: '0.82rem',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  width: '16px',
+                                  marginRight: '2px'
+                                }}
+                              >
+                                {preset.icon || '🌐'}
+                              </span>
+                              <span className="nav-app-label" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {preset.name}
+                              </span>
+                            </button>
+                          </div>
                         </li>
                       )
                     })}

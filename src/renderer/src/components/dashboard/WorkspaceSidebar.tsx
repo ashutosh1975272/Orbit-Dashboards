@@ -4,6 +4,7 @@ import type { DashboardProject } from '../../../../shared/dashboard-contract'
 import type { CardView } from './card-view'
 import NavIcon from './nav-icons'
 import { AppIcon } from '../AppIcon'
+import { getBaseLayoutItems, type BaseAppLayoutKey } from '../../../../shared/base-app-presets'
 import { detailMeta } from './guide-model'
 import { useSidebarLayout } from './use-sidebar-layout'
 import { useProfileStore } from '../../hooks/useProfiles'
@@ -177,12 +178,23 @@ export default function WorkspaceSidebar({
   const { layout } = useSidebarLayout(projectId)
   const profiles = useProfileStore((s) => s.profiles)
   const [appLook, setAppLook] = useState<'minimal' | 'ancient' | 'new-cosmic'>('ancient')
+  const [baseAppLayout, setBaseAppLayout] = useState<BaseAppLayoutKey>('standard')
 
   useEffect(() => {
     void window.api?.app?.getSettings?.().then((s) => {
       if (s?.sidebarLook) setAppLook(s.sidebarLook)
+      if (s?.baseAppLayout) setBaseAppLayout(s.baseAppLayout)
     })
+    const unsub = window.api?.app?.onSettingsChanged?.((s) => {
+      if (s?.sidebarLook) setAppLook(s.sidebarLook)
+      if (s?.baseAppLayout) setBaseAppLayout(s.baseAppLayout)
+    })
+    return () => {
+      unsub?.()
+    }
   }, [])
+
+  const baseItems = useMemo(() => getBaseLayoutItems(baseAppLayout), [baseAppLayout])
 
   const isMinimal = layout.mode === 'minimal' || propSidebarLook === 'minimal' || appLook === 'minimal'
   const isAddHidden = isMinimal ? (layout.custom.hideAddButton ?? true) : Boolean(layout.custom.hideAddButton)
@@ -537,9 +549,9 @@ export default function WorkspaceSidebar({
                             <NavIcon name={connector.icon} />
                           </span>
                           <span className="ws-nav-label">{connector.label}</span>
-                          {(entries.length > 0 || extraSources.length > 0 || isMinimal) && (
+                          {(entries.length > 0 || extraSources.length > 0 || (isMinimal && baseItems.length > 0)) && (
                             <span className="ws-nav-count">
-                              {isMinimal ? 3 : entries.length + extraSources.length}
+                              {isMinimal ? baseItems.length : entries.length + extraSources.length}
                             </span>
                           )}
                           <Chevron open={open} />
@@ -548,77 +560,60 @@ export default function WorkspaceSidebar({
                           <>
                             {isMinimal ? (
                               <>
-                                {/* 1. Slack */}
-                                <button
-                                  type="button"
-                                  className={`ws-nav-subitem${nav.selection === 's:team' || (nav.selection && nav.selection.startsWith('c:team')) ? ' is-active' : ''}`}
-                                  title="Slack Workspace & Channels"
-                                  onClick={() => onSelect('s:team')}
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    padding: '4px 12px 4px 28px',
-                                    width: '100%',
-                                    textAlign: 'left'
-                                  }}
-                                >
-                                  <span className="ws-nav-label" style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                                    <AppIcon appId="slack" size={13} />
-                                    <span>Slack</span>
-                                  </span>
-                                  <span className="ws-nav-tag" style={{ fontSize: 10, opacity: 0.7 }}>
-                                    {entries.length > 0 ? `${entries.length} ch` : 'Active'}
-                                  </span>
-                                </button>
+                                {baseItems.map((item) => {
+                                  const isActive =
+                                    item.type === 'app'
+                                      ? item.appId === 'slack'
+                                        ? nav.selection === 's:team' || (nav.selection && nav.selection.startsWith('c:team'))
+                                        : nav.selection?.startsWith(`c:${item.appId}`)
+                                      : nav.selection === `c:preset:${item.id}`
 
-                                {/* 2. Microsoft Teams */}
-                                <button
-                                  type="button"
-                                  className={`ws-nav-subitem${nav.selection?.startsWith('c:teams') ? ' is-active' : ''}`}
-                                  title="Microsoft Teams"
-                                  onClick={() => onSelect('c:teams:main')}
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    padding: '4px 12px 4px 28px',
-                                    width: '100%',
-                                    textAlign: 'left'
-                                  }}
-                                >
-                                  <span className="ws-nav-label" style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                                    <AppIcon appId="teams" size={13} />
-                                    <span>Microsoft Teams</span>
-                                  </span>
-                                  <span className="ws-nav-tag" style={{ fontSize: 10, opacity: 0.7 }}>
-                                    Teams
-                                  </span>
-                                </button>
+                                  const handleClick = () => {
+                                    if (item.type === 'app') {
+                                      if (item.appId === 'slack') onSelect('s:team')
+                                      else if (item.appId === 'teams') onSelect('c:teams:main')
+                                      else if (item.appId === 'whatsapp') onSelect('c:whatsapp:main')
+                                    } else {
+                                      onSelect(`c:preset:${item.id}` as SelectionId)
+                                    }
+                                  }
 
-                                {/* 3. WhatsApp */}
-                                <button
-                                  type="button"
-                                  className={`ws-nav-subitem${nav.selection?.startsWith('c:whatsapp') ? ' is-active' : ''}`}
-                                  title="WhatsApp"
-                                  onClick={() => onSelect('c:whatsapp:main')}
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    padding: '4px 12px 4px 28px',
-                                    width: '100%',
-                                    textAlign: 'left'
-                                  }}
-                                >
-                                  <span className="ws-nav-label" style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                                    <AppIcon appId="whatsapp" size={13} />
-                                    <span>WhatsApp</span>
-                                  </span>
-                                  <span className="ws-nav-tag" style={{ fontSize: 10, opacity: 0.7 }}>
-                                    WhatsApp
-                                  </span>
-                                </button>
+                                  return (
+                                    <button
+                                      key={item.id}
+                                      type="button"
+                                      className={`ws-nav-subitem${isActive ? ' is-active' : ''}`}
+                                      title={item.name}
+                                      onClick={handleClick}
+                                      style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        padding: '4px 12px 4px 28px',
+                                        width: '100%',
+                                        textAlign: 'left'
+                                      }}
+                                    >
+                                      <span className="ws-nav-label" style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, overflow: 'hidden' }}>
+                                        {item.type === 'app' && item.appId ? (
+                                          <AppIcon appId={item.appId} size={13} />
+                                        ) : (
+                                          <span style={{ fontSize: 13, flexShrink: 0 }}>{item.icon || '🌐'}</span>
+                                        )}
+                                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          {item.name}
+                                        </span>
+                                      </span>
+                                      <span className="ws-nav-tag" style={{ fontSize: 10, opacity: 0.7, flexShrink: 0 }}>
+                                        {item.id === 'slack' && entries.length > 0
+                                          ? `${entries.length} ch`
+                                          : item.type === 'app'
+                                            ? 'Active'
+                                            : 'Web'}
+                                      </span>
+                                    </button>
+                                  )
+                                })}
                               </>
                             ) : (
                               <>

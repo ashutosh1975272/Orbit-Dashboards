@@ -17,6 +17,7 @@ import { requestMessageJump } from './jump-to-message'
 import SchedulesPage from './SchedulesPage'
 import { AppIcon } from '../AppIcon'
 import { useProfileStore } from '../../hooks/useProfiles'
+import { BASE_APP_PRESETS } from '../../../../shared/base-app-presets'
 import {
   channelIdOf,
   connectorOf,
@@ -206,6 +207,78 @@ export default function WorkspaceContent({
           teamId={tId}
           appId="slack"
         />
+      )
+    } else if (sel && sel.startsWith('c:preset:')) {
+      const presetId = sel.replace('c:preset:', '')
+      const presetItem = BASE_APP_PRESETS.full.find((p) => p.id === presetId)
+      const url = presetItem?.url || 'https://google.com'
+      const name = presetItem?.name || presetId
+      const icon = presetItem?.icon || '🌐'
+
+      body = (
+        <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', background: '#111318' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '8px 14px',
+            background: 'rgba(255, 255, 255, 0.03)',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+            fontSize: 12,
+            color: '#cbd5e1'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 16 }}>{icon}</span>
+              <span style={{ fontWeight: 650, color: '#f8fafc' }}>{name}</span>
+              <span style={{ color: 'var(--text-faint)', fontSize: 11 }}>· {url}</span>
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                fontSize: 11,
+                color: '#60a5fa',
+                background: 'rgba(96, 165, 250, 0.1)',
+                padding: '2px 7px',
+                borderRadius: 12,
+                fontWeight: 600
+              }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#60a5fa' }} />
+                Web Tool
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button
+                type="button"
+                onClick={() => window.open(url, '_blank')}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  color: '#cbd5e1',
+                  fontSize: 11,
+                  borderRadius: 6,
+                  padding: '3px 9px',
+                  cursor: 'pointer'
+                }}
+                title="Open in external browser"
+              >
+                Open in Browser ↗
+              </button>
+            </div>
+          </div>
+          <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+            <iframe
+              src={url}
+              title={name}
+              style={{
+                width: '100%',
+                height: '100%',
+                border: 'none',
+                background: '#fff'
+              }}
+              allow="microphone; camera; clipboard-read; clipboard-write"
+            />
+          </div>
+        </div>
       )
     } else if (sel && sel.startsWith('c:teams')) {
       const teamsStatus = targetProfile?.apps?.teams?.sessionStatus ?? 'not-signed-in'
