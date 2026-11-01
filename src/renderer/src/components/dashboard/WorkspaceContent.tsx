@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import type { CardView, CardSummary } from './card-view'
 import type {
   DashboardProject,
@@ -17,6 +17,7 @@ import { requestMessageJump } from './jump-to-message'
 import SchedulesPage from './SchedulesPage'
 import { AppIcon } from '../AppIcon'
 import { useProfileStore } from '../../hooks/useProfiles'
+import { useDashboardStore } from '../../hooks/useDashboard'
 import { BASE_APP_PRESETS } from '../../../../shared/base-app-presets'
 import {
   channelIdOf,
@@ -119,6 +120,46 @@ export default function WorkspaceContent({
   const [authBusyApp, setAuthBusyApp] = useState<'slack' | 'teams' | 'whatsapp' | null>(null)
   const [authError, setAuthError] = useState<string | null>(null)
   const [slackViewMode, setSlackViewMode] = useState<'messages' | 'live'>('live')
+
+  // Resolve genuine Slack team ID, avoiding glitch placeholders like team-xxx or T-PENDING
+  const effectiveSlackTeamId = useMemo(() => {
+    if (project?.teamId && /^T[A-Z0-9]+$/i.test(project.teamId)) {
+      return project.teamId
+    }
+    const realWs = targetProfile?.apps?.slack?.availableWorkspaces?.find(
+      (w) => w.teamId && /^T[A-Z0-9]+$/i.test(w.teamId)
+    )
+    if (realWs?.teamId) {
+      return realWs.teamId
+    }
+    for (const p of profiles) {
+      const w = p.apps?.slack?.availableWorkspaces?.find(
+        (ws) => ws.teamId && /^T[A-Z0-9]+$/i.test(ws.teamId)
+      )
+      if (w?.teamId) return w.teamId
+    }
+    return ''
+  }, [project?.teamId, targetProfile, profiles])
+
+  // Auto-heal project teamId if placeholder
+  useEffect(() => {
+    if (!project || !effectiveSlackTeamId) return
+    const isPlaceholder = !project.teamId || !/^T[A-Z0-9]+$/i.test(project.teamId)
+    if (isPlaceholder && effectiveSlackTeamId) {
+      const realWs = targetProfile?.apps?.slack?.availableWorkspaces?.find(
+        (w) => w.teamId === effectiveSlackTeamId
+      )
+      void window.api?.dashboard?.upsertProject?.({
+        project: {
+          ...project,
+          teamId: effectiveSlackTeamId,
+          teamName: realWs?.teamName || project.teamName || 'Slack Workspace'
+        }
+      }).then(() => {
+        void useDashboardStore.getState().loadSnapshot()
+      }).catch(() => undefined)
+    }
+  }, [project?.id, project?.teamId, effectiveSlackTeamId, targetProfile])
 
   const handleStartAppLogin = async (profileId?: string, appId?: 'slack' | 'teams' | 'whatsapp') => {
     if (!profileId || !appId) return
@@ -588,7 +629,7 @@ export default function WorkspaceContent({
       const listed = channels[connectorOfSelection(sel) === 'team' ? 'team' : 'client']
       const isWholeWorkspace = sel === 's:team' || sel === 's:client' || !isChannelId(sel)
 
-      if (isWholeWorkspace && slackViewMode === 'live' && (project.teamId || channels.teamConnected)) {
+      if (isWholeWorkspace && slackViewMode === 'live' && (effectiveSlackTeamId || project.teamId || channels.teamConnected)) {
         body = (
           <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', background: '#111318' }}>
             <div style={{
@@ -658,7 +699,7 @@ export default function WorkspaceContent({
               </div>
             </div>
             <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
-              <CardLiveSlackEmbed appId="slack" profileId={targetProfile?.id} teamId={project.teamId} />
+              <CardLiveSlackEmbed appId="slack" profileId={targetProfile?.id} teamId={effectiveSlackTeamId || project.teamId} />
             </div>
           </div>
         )

@@ -85,10 +85,22 @@ export function NewProjectModal({
         id: `src-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
       }))
 
-      // Pick the primary source or fallback
+      // Pick the primary source or fallback to profile's authentic Slack workspace
       const primarySource = activeSources[0]
-      const teamId = primarySource?.workspaceId || `team-${Date.now().toString(36)}`
-      const teamName = primarySource?.workspaceName || projectName.trim()
+      const selectedProf = individualProfiles.find((p) => p.id === profileId)
+      const authenticatedWorkspace = selectedProf?.apps?.slack?.availableWorkspaces?.find(
+        (w) => w.teamId && !w.teamId.startsWith('team-') && w.teamId !== 'team' && w.teamId !== 'T-PENDING'
+      ) ?? selectedProf?.apps?.slack?.pinnedWorkspaces?.find(
+        (w) => w.teamId && !w.teamId.startsWith('team-') && w.teamId !== 'team' && w.teamId !== 'T-PENDING'
+      )
+      const fallbackTeamId = authenticatedWorkspace?.teamId || ''
+      const fallbackTeamName = authenticatedWorkspace?.teamName || projectName.trim()
+
+      const rawWorkspaceId = primarySource?.workspaceId
+      const teamId = (rawWorkspaceId && !rawWorkspaceId.startsWith('team-') && rawWorkspaceId !== 'team' && rawWorkspaceId !== 'T-PENDING')
+        ? rawWorkspaceId
+        : fallbackTeamId
+      const teamName = primarySource?.workspaceName || fallbackTeamName
 
       const newProject: DashboardProject = {
         id: newProjectId,

@@ -259,10 +259,12 @@ async function runSlackBrowserAuth(
     if (!mainWindow) throw new Error('Main window is not available')
     const viewBounds = defaultBounds(mainWindow, bounds)
 
-    // Match product flow: Slack auth in Chrome → then embed in Electron right pane.
+    // Match product flow: Slack auth in Chrome → then embed in Electron right pane (unless card embed is active).
     closeChromeStayEmbed()
-    deps.browserViewManager.setEmbedVisible(mainWindow, true)
-    deps.browserViewManager.activate(profileId, 'slack', mainWindow, viewBounds)
+    if (!deps.browserViewManager.isCardEmbedActive()) {
+      deps.browserViewManager.setEmbedVisible(mainWindow, true)
+      deps.browserViewManager.activate(profileId, 'slack', mainWindow, viewBounds)
+    }
     void deps.browserViewManager.sampleAndEmitSlackTheme(profileId)
 
     const updated = await deps.profileStore.forceSessionStatus(profileId, 'slack', 'signed-in')

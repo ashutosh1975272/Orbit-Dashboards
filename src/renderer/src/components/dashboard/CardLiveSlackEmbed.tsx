@@ -74,21 +74,46 @@ export default function CardLiveSlackEmbed({
     if (!el) return
 
     let cancelled = false
+    let animFrameId: number | null = null
+    const lastBoundsRef = { current: null as { x: number; y: number; width: number; height: number } | null }
 
     const sendBounds = () => {
       if (cancelled) return
       const targetEl = embedRef.current ?? containerRef.current
       if (!targetEl) return
       const rect = targetEl.getBoundingClientRect()
-      if (rect.width > 0 && rect.height > 0) {
+      if (rect.width >= 20 && rect.height >= 20) {
         const bounds = {
           x: Math.round(rect.left),
           y: Math.round(rect.top),
           width: Math.round(rect.width),
           height: Math.round(rect.height)
         }
-        void window.api.profiles.updateCardSlackEmbedBounds(bounds)
+        const last = lastBoundsRef.current
+        if (
+          !last ||
+          last.x !== bounds.x ||
+          last.y !== bounds.y ||
+          last.width !== bounds.width ||
+          last.height !== bounds.height
+        ) {
+          lastBoundsRef.current = bounds
+          void window.api.profiles.updateCardSlackEmbedBounds(bounds)
+        }
       }
+    }
+
+    const startTrackingLoop = (durationMs = 450) => {
+      const startTime = performance.now()
+      const step = (now: number) => {
+        if (cancelled) return
+        sendBounds()
+        if (now - startTime < durationMs) {
+          animFrameId = requestAnimationFrame(step)
+        }
+      }
+      if (animFrameId) cancelAnimationFrame(animFrameId)
+      animFrameId = requestAnimationFrame(step)
     }
 
     // Initial mount and activation
@@ -99,6 +124,7 @@ export default function CardLiveSlackEmbed({
       width: Math.round(rect.width),
       height: Math.round(rect.height)
     }
+    lastBoundsRef.current = initialBounds
 
     void window.api.profiles
       .activateCardSlackEmbed({
@@ -110,6 +136,7 @@ export default function CardLiveSlackEmbed({
       .then(() => {
         if (!cancelled) {
           setLoading(false)
+          startTrackingLoop(400)
         }
       })
       .catch((err) => {
@@ -120,15 +147,39 @@ export default function CardLiveSlackEmbed({
       sendBounds()
     })
     ro.observe(el)
+    if (document.body) {
+      ro.observe(document.body)
+    }
 
-    window.addEventListener('resize', sendBounds)
+    const onResizeOrLayout = () => startTrackingLoop(400)
+    const onTransitionEnd = () => startTrackingLoop(150)
+
+    window.addEventListener('resize', onResizeOrLayout)
     window.addEventListener('scroll', sendBounds, true)
+    window.addEventListener('layout-bounds-change', onResizeOrLayout)
+    document.addEventListener('transitionrun', onResizeOrLayout)
+    document.addEventListener('transitionstart', onResizeOrLayout)
+    document.addEventListener('transitionend', onTransitionEnd)
+    document.addEventListener('animationstart', onResizeOrLayout)
+    document.addEventListener('animationend', onTransitionEnd)
+
+    const unsubSettings = window.api?.app?.onSettingsChanged?.(() => {
+      startTrackingLoop(450)
+    })
 
     return () => {
       cancelled = true
+      if (animFrameId) cancelAnimationFrame(animFrameId)
       ro.disconnect()
-      window.removeEventListener('resize', sendBounds)
+      unsubSettings?.()
+      window.removeEventListener('resize', onResizeOrLayout)
       window.removeEventListener('scroll', sendBounds, true)
+      window.removeEventListener('layout-bounds-change', onResizeOrLayout)
+      document.removeEventListener('transitionrun', onResizeOrLayout)
+      document.removeEventListener('transitionstart', onResizeOrLayout)
+      document.removeEventListener('transitionend', onTransitionEnd)
+      document.removeEventListener('animationstart', onResizeOrLayout)
+      document.removeEventListener('animationend', onTransitionEnd)
       void window.api.profiles.clearCardSlackEmbed()
     }
   }, [profileId, teamId, appId])

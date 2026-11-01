@@ -487,10 +487,21 @@ function App(): React.JSX.Element {
           const message = sidebarToastFor(previousCollapsed, s.sidebarCollapsed)
           if (message) showToast(message, 6000)
         }
+        window.dispatchEvent(new Event('resize'))
+        window.dispatchEvent(new CustomEvent('layout-bounds-change'))
+        const startTime = Date.now()
+        const loop = () => {
+          window.dispatchEvent(new CustomEvent('layout-bounds-change'))
+          if (Date.now() - startTime < 420) {
+            window.requestAnimationFrame(loop)
+          }
+        }
+        window.requestAnimationFrame(loop)
+
         window.requestAnimationFrame(() => {
           window.requestAnimationFrame(() => {
             const bounds = viewportBounds()
-            if (useProfileStore.getState().activeAppId) {
+            if (useProfileStore.getState().activeAppId && !showCosmicCard) {
               void window.api.profiles.updateBounds(bounds)
             }
           })
@@ -1175,6 +1186,13 @@ function App(): React.JSX.Element {
         <NewProjectModal
           open={true}
           onClose={() => setNewProjectModalOpen(false)}
+          onSuccess={(projectId) => {
+            setNewProjectModalOpen(false)
+            const p = useDashboardStore.getState().snapshot?.projects.find((proj) => proj.project.id === projectId)
+            const pProfileId = p?.project.profileId || 'all'
+            useDashboardStore.getState().setCosmicNavigation(pProfileId, projectId)
+            useProfileStore.getState().clearActiveApp()
+          }}
           showLinkedAccounts={settings.showNewProjectLinkedAccounts ?? true}
         />
       ) : null}

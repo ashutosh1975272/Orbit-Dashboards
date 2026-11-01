@@ -962,13 +962,21 @@ export class BrowserViewManager {
     view.setBounds(bounds)
 
     // Ensure we are navigated appropriately
-    if (appId === 'slack' && teamId) {
+    if (appId === 'slack') {
+      const isRealTeamId = Boolean(teamId && /^T[A-Z0-9]+$/i.test(teamId))
       const currentUrl = view.webContents.getURL()
-      if (!currentUrl || !currentUrl.includes(teamId)) {
-        try {
-          await this.navigateToWorkspace(profileId, 'slack', { teamId })
-        } catch (err) {
-          log.warn('Card live slack navigate failed or partially loaded', { profileId, teamId, err: String(err) })
+      if (isRealTeamId) {
+        if (!currentUrl || !currentUrl.includes(teamId)) {
+          try {
+            await this.navigateToWorkspace(profileId, 'slack', { teamId })
+          } catch (err) {
+            log.warn('Card live slack navigate failed or partially loaded', { profileId, teamId, err: String(err) })
+          }
+        }
+      } else {
+        // teamId is missing or placeholder. If not on Slack or if stuck on glitch page, load SLACK_CLIENT_URL
+        if (!currentUrl || !currentUrl.includes('slack.com') || currentUrl.includes('/client/team')) {
+          void view.webContents.loadURL(SLACK_CLIENT_URL)
         }
       }
     } else if (appId === 'whatsapp') {
@@ -1005,6 +1013,10 @@ export class BrowserViewManager {
 
   getCardEmbedBounds(): Rectangle | null {
     return this.cardEmbedBounds
+  }
+
+  isCardEmbedActive(): boolean {
+    return Boolean(this.cardEmbedKey && this.cardEmbedBounds)
   }
 
   clearCardSlackEmbed(mainWindow: BrowserWindow): void {
@@ -1093,6 +1105,10 @@ export class BrowserViewManager {
 
   updateBounds(mainWindow: BrowserWindow, bounds: Rectangle): void {
     this.lastBounds = bounds
+    if (this.cardEmbedKey) {
+      // In-card embed is actively positioned inside a card; do not overwrite with full viewport bounds
+      return
+    }
     if (!this.activeKey || this.embedHidden) {
       return
     }
@@ -1109,6 +1125,16 @@ export class BrowserViewManager {
   setEmbedVisible(mainWindow: BrowserWindow, visible: boolean): void {
     if (visible) {
       this.embedHidden = false
+      if (this.cardEmbedKey && this.cardEmbedBounds) {
+        const view = this.views.get(this.cardEmbedKey)
+        if (view) {
+          if (!mainWindow.contentView.children.includes(view)) {
+            mainWindow.contentView.addChildView(view)
+          }
+          view.setBounds(this.cardEmbedBounds)
+          return
+        }
+      }
       if (this.activeKey) {
         const view = this.views.get(this.activeKey)
         if (view) {
@@ -1133,6 +1159,7 @@ export class BrowserViewManager {
     this.embedHidden = true
     for (const key of [this.activeKey, this.secondaryKey]) {
       if (!key) continue
+      if (key === this.cardEmbedKey) continue
       const view = this.views.get(key)
       if (view) {
         mainWindow.contentView.removeChildView(view)

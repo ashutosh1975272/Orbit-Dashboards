@@ -346,7 +346,10 @@ export function CosmicSidebarContent({
                   <button
                     key={entry.project.id}
                     type="button"
-                    onClick={() => setCosmicNavigation(cosmicLevel1, entry.project.id)}
+                    onClick={() => {
+                      setCosmicNavigation(cosmicLevel1, entry.project.id)
+                      useProfileStore.getState().clearActiveApp()
+                    }}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
